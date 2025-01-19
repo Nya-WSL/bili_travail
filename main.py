@@ -14,7 +14,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app, native
 
-version = "0.9.0-beta"
+version = "0.10.0-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
@@ -73,18 +73,37 @@ class BiliHandler(blivedm.BaseHandler):
         #       f' （{message.coin_type}瓜子x{message.total_coin}）')
         with open("gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
+        with open("special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+
         tmp_time = countdown_timer.get_tmp_time()
         gift = message.gift_name
         num = message.num
+        result = ""
+
         if gift not in gifts:
-            gifts[gift] = 0
-            with open("gifts.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, indent=4, ensure_ascii=False)
-        changed_time = (gifts[gift] * int(num)) + tmp_time
+            if gift not in special:
+                gifts[gift] = 0
+                with open("gifts.json", "w+", encoding="utf-8") as f:
+                    json.dump(gifts, f, indent=4, ensure_ascii=False)
+        if gift in special:
+            if special[gift] == "double":
+                changed_time = tmp_time * int(num + 1)
+                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+            if special[gift] == "clear":
+                changed_time = 3
+                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
+            if type(special[gift]) == list:
+                changed_time = random.randint(special[gift][0], special[gift][1])
+                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+        else:
+            changed_time = (gifts[gift] * int(num)) + tmp_time
+            result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+
         countdown_timer.set_time(changed_time)
         hour, minute = divmod(changed_time, 3600)
         minute, second = divmod(minute, 60)
-        print(f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\nurl:{message.gift_img}\n总时长：", "%02d:%02d:%02d" % (hour, minute, second))
+        print(result, "%02d:%02d:%02d" % (hour, minute, second))
 
 
     # def _on_buy_guard(self, client: blivedm.BLiveClient, message: web_models.GuardBuyMessage):
@@ -93,6 +112,9 @@ class BiliHandler(blivedm.BaseHandler):
     def _on_user_toast_v2(self, client: blivedm.BLiveClient, message: web_models.UserToastV2Message):
         with open("gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
+        with open("special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+
         tmp_time = countdown_timer.get_tmp_time()
         gift = message.guard_level
         if gift == 1:
@@ -104,15 +126,31 @@ class BiliHandler(blivedm.BaseHandler):
         else:
             gift = "神秘物种"
         num = message.num
+        result = ""
+
         if gift not in gifts:
-            gifts[gift] = 0
-            with open("gifts.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, indent=4, ensure_ascii=False)
-        changed_time = (gifts[gift] * int(num)) + tmp_time
+            if gift not in special:
+                gifts[gift] = 0
+                with open("gifts.json", "w+", encoding="utf-8") as f:
+                    json.dump(gifts, f, indent=4, ensure_ascii=False)
+        if gift in special:
+            if special[gift] == "double":
+                changed_time = tmp_time * int(num)
+                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+            if special[gift] == "clear":
+                changed_time = 3
+                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
+            if type(special[gift]) == list:
+                changed_time = random.randint(special[gift][0], special[gift][1])
+                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+        else:
+            changed_time = (gifts[gift] * int(num)) + tmp_time
+            result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+
         countdown_timer.set_time(changed_time)
         hour, minute = divmod(changed_time, 3600)
         minute, second = divmod(minute, 60)
-        print(f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长：", "%02d:%02d:%02d" % (hour, minute, second))
+        print(result, "%02d:%02d:%02d" % (hour, minute, second))
 
 
     def _on_super_chat(self, client: blivedm.BLiveClient, message: web_models.SuperChatMessage):
@@ -226,16 +264,40 @@ class CountdownTimer:
 
 # GUI
 def gift():
+    def show():
+        if status.value == "random":
+            min.set_visibility(True)
+            max.set_visibility(True)
+        else:
+            min.set_visibility(False)
+            max.set_visibility(False)
+        if status.value == "double" or status.value == "clear" or status.value == "random":
+            time.disable()
+        else:
+            time.enable()
+
     def run():
         with open("gifts.json", "r+", encoding="utf-8") as f:
             gifts = json.load(f)
+        with open("special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
         if status.value == "add":
             gifts[gift_name.value] = int(time.value)
         elif status.value == "sub":
             gifts[gift_name.value] = float(f"-{time.value}")
+        elif status.value == "double":
+            special[gift_name.value] = "double"
+        elif status.value == "clear":
+            special[gift_name.value] = "clear"
+        elif status.value == "random":
+            if min.value != 0 and max.value != 0:
+                special[gift_name.value] = [min.value, max.value]
         with open("gifts.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
+        with open("special.json", "w+", encoding="utf-8") as f:
+            json.dump(special, f, ensure_ascii=False, indent=4)
         ui.notify(f'添加成功，{gift_name.value} | {time.value}秒', type="positive")
+
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
         if os.path.exists("gifts.json"):
@@ -245,14 +307,31 @@ def gift():
             gifts = {
                     "牛哇牛哇": 0
                     }
-
-        with ui.row():
+            with open("gifts.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+        if os.path.exists("special.json"):
+            with open("special.json", "r", encoding="utf-8") as f:
+                special = json.load(f)
+        else:
+            special = {
+                    "舰长": "clear",
+                    "我星永恒": "double",
+                    "情书": [-60, 60]
+                    }
+            with open("special.json", "w+", encoding="utf-8") as f:
+                json.dump(special, f, ensure_ascii=False, indent=4)
+        with ui.row(align_items="center"):
             gifts_name = []
             for k,v in gifts.items():
                 gifts_name.append(k)
             gift_name = ui.select(label="礼物", options=gifts_name, value=gifts_name[0])
             time = ui.number(label="时长(秒)", value=0)
-            status = ui.toggle(options={"add": "加时", "sub": "减时"}, value="add")
+        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "盲盒"}, value="add", on_change=lambda: show()).classes('items-center')
+        with ui.row():
+            min = ui.number("盲盒最小数(秒)", value=0)
+            max = ui.number("盲盒最大数(秒)", value=0)
+            min.set_visibility(False)
+            max.set_visibility(False)
         with ui.row():
             ui.button('添加', on_click=lambda: run())
             ui.button('关闭', on_click=lambda: dialog.close())
@@ -296,6 +375,11 @@ def capture():
         config = json.load(f)
     with open("gifts.json", "r", encoding="utf-8") as f:
         gifts = json.load(f)
+    if os.path.exists("special.json"):
+        with open("special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+    else:
+        special = {}
     # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
     # with ui.card(align_items="center").classes("absolute-center bg-transparent"):
     ui.badge(outline=True).bind_text_from(time_badge).classes("text-7xl w-full items-center")
@@ -311,6 +395,22 @@ def capture():
                     ui.label(k).classes("text-2xl")
                     ui.space()
                     ui.label(f"{v}秒").classes("text-2xl")
+    if special != {}:
+        for k,v in special.items():
+            if type(v) == list:
+                with ui.row().classes('w-full'):
+                    ui.label(k).classes("text-2xl")
+                    ui.space()
+                    ui.label(f"{v[0]}秒 - {v[1]}秒").classes("text-2xl")
+            else:
+                with ui.row().classes('w-full'):
+                    ui.label(k).classes("text-2xl")
+                    ui.space()
+                    if v == "clear":
+                        v = "清空"
+                    if v == "double":
+                        v = "加倍"
+                    ui.label(v).classes("text-2xl")
         # i = iter(gift_list_rows[0].items())
         # while True:
         #     d = dict(itertools.islice(i, 3))
