@@ -5,9 +5,11 @@ import blivedm.blivedm.models.web as web_models
 # Third Party Packages
 import os
 import json
+import shutil
 import random
 import asyncio
 import aiohttp
+import datetime
 import http.cookies
 from typing import *
 from nicegui import ui, app, native
@@ -17,6 +19,9 @@ version = "0.9.0-beta"
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
 port = native.find_open_port(65000, 65525)
+
+if not os.path.exists("config.json"):
+    shutil.copy("config.example.json", "config.json")
 
 # handler
 async def start_handler():
@@ -58,7 +63,7 @@ async def start_handler():
 
 class BiliHandler(blivedm.BaseHandler):
     def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
-        print(f'[{client.room_id}] 心跳')
+        print(f'[{client.room_id}] [{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 心跳')
 
     # def _on_danmaku(self, client: blivedm.BLiveClient, message: web_models.DanmakuMessage):
     #     print(f'[{client.room_id}] {message.uname}：{message.msg}')
@@ -264,7 +269,7 @@ def start_task():
 def add_time():
     try:
         tmp_time = countdown_timer.get_tmp_time()
-        changed_time = tmp_time + (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
+        changed_time = tmp_time + ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value)
         countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
@@ -273,7 +278,7 @@ def add_time():
 def sub_time():
     try:
         tmp_time = countdown_timer.get_tmp_time()
-        changed_time = tmp_time - (input_hour.value * 3600) - (input_minute.value * 60) + input_second.value
+        changed_time = tmp_time - ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value)
         countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
@@ -283,8 +288,9 @@ def save_room_id():
         json.dump(config, f, ensure_ascii=False, indent=4)
 
 @ui.refreshable
-@ui.page("/gift_info")
-def gift_info():
+@ui.page("/capture", title="capture | bili_travail")
+# obs: 宽度最高325px
+def capture():
     # Gifts List
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -353,8 +359,8 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("礼物设置", on_click=lambda: gift())
         
         # Show gift list button
-        ui.button("礼物列表", on_click=lambda: ui.navigate.to("gift_info", new_tab=True))
-    ui.label(f"obs捕获url：http://127.0.0.1:{port}/gift_info")
+        ui.button("礼物列表", on_click=lambda: ui.navigate.to("capture", new_tab=True))
+    ui.label(f"obs浏览器源：http://127.0.0.1:{port}/capture")
 
 with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
@@ -387,4 +393,4 @@ def _():
         ui.separator()
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
-ui.run(port=port, title=f"加班姬控制面板 | {version}", favicon="static/logo.ico", reload=False, show=True)
+ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=True)
