@@ -75,7 +75,7 @@ class BiliHandler(blivedm.BaseHandler):
             gifts[gift] = 0
             with open("gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, indent=4, ensure_ascii=False)
-        changed_time = tmp_time + gifts[gift] * int(num)
+        changed_time = (gifts[gift] * int(num)) + tmp_time
         countdown_timer.set_time(changed_time)
         hour, minute = divmod(changed_time, 3600)
         minute, second = divmod(minute, 60)
@@ -103,7 +103,7 @@ class BiliHandler(blivedm.BaseHandler):
             gifts[gift] = 0
             with open("gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, indent=4, ensure_ascii=False)
-        changed_time = tmp_time + gifts[gift] * int(num)
+        changed_time = (gifts[gift] * int(num)) + tmp_time
         countdown_timer.set_time(changed_time)
         hour, minute = divmod(changed_time, 3600)
         minute, second = divmod(minute, 60)
