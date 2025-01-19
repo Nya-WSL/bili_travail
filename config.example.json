@@ -1,0 +1,10 @@
+{
+    "room_id": "",
+    "show_zero": false,
+    "SESSDATA": "",
+    "background_image": [
+        "https://nya-wsl.com/images/image01.jpg",
+        "static/sample.png",
+        "static/sample2.png"
+    ]
+}
