@@ -14,14 +14,28 @@ import http.cookies
 from typing import *
 from nicegui import ui, app, native
 
-version = "0.10.0-beta"
+version = "0.10.1-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
 port = native.find_open_port(65000, 65525)
 
 if not os.path.exists("config.json"):
-    shutil.copy("config.example.json", "config.json")
+    if not os.path.exists("config.example.json"):
+        with open("config.json", "w+", encoding="utf-8") as f:
+            config = {
+    "room_id": "",
+    "show_zero": False,
+    "SESSDATA": "",
+    "background_image": [
+        "https://nya-wsl.com/images/image01.jpg",
+        "static/sample.png",
+        "static/sample2.png"
+    ]
+}
+            json.dump(config, f, indent=4, ensure_ascii=False)
+    else:
+        shutil.copy("config.example.json", "config.json")
 
 # handler
 async def start_handler():
