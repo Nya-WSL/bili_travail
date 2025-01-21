@@ -16,11 +16,12 @@ import http.cookies
 from typing import *
 from nicegui import ui, app, native
 
-version = "0.11.1-beta"
+version = "0.12.0-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
 port = native.find_open_port(65000, 65525)
+refresh_capture = False
 
 # init config
 if not os.path.exists("config.json"):
@@ -34,7 +35,10 @@ if not os.path.exists("config.json"):
         "https://nya-wsl.com/images/image01.jpg",
         "static/sample.png",
         "static/sample2.png"
-    ]
+    ],
+    "color": "#5898d4",
+    "text_color": "#000000",
+    "local_text": False
 }
             json.dump(config, f, indent=4, ensure_ascii=False)
     else:
@@ -63,11 +67,7 @@ if not os.path.exists("data/gifts.json"):
 
 # init special gift
 if not os.path.exists("data/special.json"):
-    special = {
-        "舰长": "clear",
-        "我星永恒": "double",
-        "情书": [-60, 60]
-}
+    special = {}
     with open("data/special.json", "w+", encoding="utf-8") as f:
         json.dump(special, f, ensure_ascii=False, indent=4)
 
@@ -136,14 +136,15 @@ class BiliHandler(blivedm.BaseHandler):
                     json.dump(gifts, f, indent=4, ensure_ascii=False)
         if gift in special:
             if special[gift] == "double":
-                changed_time = tmp_time * int(num + 1)
+                changed_time = tmp_time * (2 * int(num))
                 result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
             if special[gift] == "clear":
                 changed_time = 3
                 result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
             if type(special[gift]) == list:
-                changed_time = random.randint(special[gift][0], special[gift][1])
-                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+                random_time = random.randint(special[gift][0], special[gift][1])
+                changed_time = tmp_time + random_time
+                result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
         else:
             changed_time = (gifts[gift] * int(num)) + tmp_time
             result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
@@ -183,14 +184,15 @@ class BiliHandler(blivedm.BaseHandler):
                     json.dump(gifts, f, indent=4, ensure_ascii=False)
         if gift in special:
             if special[gift] == "double":
-                changed_time = tmp_time * int(num)
+                changed_time = tmp_time * (2 * int(num))
                 result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
             if special[gift] == "clear":
                 changed_time = 3
                 result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
             if type(special[gift]) == list:
-                changed_time = random.randint(special[gift][0], special[gift][1])
-                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+                random_time = random.randint(special[gift][0], special[gift][1] + 1)
+                changed_time = tmp_time + random_time
+                result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
         else:
             changed_time = (gifts[gift] * int(num)) + tmp_time
             result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
@@ -325,14 +327,19 @@ def gift():
             time.enable()
 
     def run():
+        global refresh_capture
         with open("data/gifts.json", "r+", encoding="utf-8") as f:
             gifts = json.load(f)
         with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
         if status.value == "add":
             gifts[gift_name.value] = int(time.value)
+            if gift_name.value in special:
+                special.pop(gift_name.value)
         elif status.value == "sub":
             gifts[gift_name.value] = float(f"-{time.value}")
+            if gift_name.value in special:
+                special.pop(gift_name.value)
         elif status.value == "double":
             special[gift_name.value] = "double"
             if gift_name.value in gifts:
@@ -342,16 +349,46 @@ def gift():
             if gift_name.value in gifts:
                 gifts[gift_name.value] = 0
         elif status.value == "random":
-            if min.value != 0 and max.value != 0:
-                special[gift_name.value] = [min.value, max.value]
-                if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+            special[gift_name.value] = [int(min.value), int(max.value)]
+            if gift_name.value in gifts:
+                gifts[gift_name.value] = 0
         with open("data/gifts.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
         with open("data/special.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
         ui.notify(f'添加成功，{gift_name.value} | {time.value}秒', type="positive")
+        refresh_capture = True
 
+    def delete():
+        global refresh_capture
+        with open("data/gifts.json", "r+", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r+", encoding="utf-8") as f:
+            special = json.load(f)
+        if gift_name.value in gifts:
+            gifts[gift_name.value] = 0
+        if gift_name.value in special:
+            special.pop(gift_name.value)
+        with open("data/gifts.json", "w+", encoding="utf-8") as f:
+            json.dump(gifts, f, ensure_ascii=False, indent=4)
+        with open("data/special.json", "w+", encoding="utf-8") as f:
+            json.dump(special, f, ensure_ascii=False, indent=4)
+        refresh_capture = True
+
+    def reset():
+        global refresh_capture
+        with open("data/gifts.json", "r+", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r+", encoding="utf-8") as f:
+            special = json.load(f)
+        for k in gifts.keys():
+            gifts[k] = 0
+        special = {}
+        with open("data/gifts.json", "w+", encoding="utf-8") as f:
+            json.dump(gifts, f, ensure_ascii=False, indent=4)
+        with open("data/special.json", "w+", encoding="utf-8") as f:
+            json.dump(special, f, ensure_ascii=False, indent=4)
+        refresh_capture = True
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
         with open("data/gifts.json", "r", encoding="utf-8") as f:
@@ -369,7 +406,9 @@ def gift():
             min.set_visibility(False)
             max.set_visibility(False)
         with ui.row():
-            ui.button('添加', on_click=lambda: run())
+            ui.button('添加/修改', on_click=lambda: run())
+            ui.button("删除",on_click=lambda: delete())
+            ui.button("重置", on_click=lambda: reset())
             ui.button('关闭', on_click=lambda: dialog.close())
 
     dialog.open()
@@ -398,14 +437,28 @@ def sub_time():
     except NameError:
         ui.notify("请先开始计时", type="negative")
 
-def save_room_id():
+def save_config():
     with open("config.json", "w+", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
-@ui.refreshable
+def open_capture():
+    with ui.dialog() as dialog, ui.card(align_items="center"):
+        ui.label("使用OBS捕捉浏览器源时请关闭预览窗口")
+        ui.label("如OBS未刷新，请点击：浏览器源 → 刷新当前页面缓存")
+        with ui.row():
+            ui.button("打开", on_click=lambda: ui.navigate.to("/capture", new_tab=True))
+            ui.button("关闭", on_click=lambda: dialog.close())
+
+    dialog.open()
+
 @ui.page("/capture", title="capture | bili_travail")
-# obs: 宽度最高350px
 def capture():
+    def check_refresh():
+        global refresh_capture
+        if refresh_capture:
+            refresh_capture = False
+            ui.run_javascript('window.location.reload()')
+
     # Gifts List
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -427,64 +480,61 @@ def capture():
         special = {}
     # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
-        ui.badge(outline=True).bind_text_from(time_badge).classes("text-8xl")
+        ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(time_badge).classes("text-8xl")
         ui.separator()
         for k,v in gifts.items():
             if config["show_zero"]:
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-2xl")
+                    ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
                     ui.space()
-                    ui.label(f"{v}秒").classes("text-2xl")
+                    ui.label(f"{v}秒").classes("text-2xl").style(f"color: {config['text_color']}")
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl")
+                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v}秒").classes("text-2xl")
+                        ui.label(f"{v}秒").classes("text-2xl").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl")
+                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v[0]} - {v[1]}秒").classes("text-2xl")
+                        ui.label(f"{v[0]} ~ {v[1]}秒").classes("text-2xl").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl")
+                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
                         ui.space()
                         if v == "clear":
                             v = "清空"
                         if v == "double":
                             v = "加倍"
-                        ui.label(v).classes("text-2xl")
-            # i = iter(gift_list_rows[0].items())
-            # while True:
-            #     d = dict(itertools.islice(i, 3))
-            #     if d == {}:
-            #         break
-            #     rows_list = []
-            #     rows_list.append(d)
-            #     ui.table(rows=rows_list).classes("bg-transparent")
-
+                        ui.label(v).classes("text-2xl").style(f"color: {config['text_color']}")
+    ui.timer(1, callback=lambda: check_refresh())
 
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 with ui.card(align_items="center").classes("absolute-center"):
     # Countdown Control Panel
     time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl")
+
     with ui.row():
-        room_id = ui.input("房间号", on_change=lambda: save_room_id()).bind_value(config, "room_id")
-        input_hour = ui.number("时", value=0, min=0)
-        input_minute = ui.number("分", value=0, min=0)
-        input_second = ui.number("秒", value=0, min=0)
+        input_hour = ui.number("时", value=0, min=0).style("width: 100px")
+        input_minute = ui.number("分", value=0, min=0).style("width: 100px")
+        input_second = ui.number("秒", value=0, min=0).style("width: 100px")
+
+    with ui.row():
+        room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id")
+        ui.color_input(label="倒计时颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+        ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
 
     with ui.row():
         # Start button
@@ -513,8 +563,8 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("礼物设置", on_click=lambda: gift())
         
         # Show gift list button
-        ui.button("礼物列表", on_click=lambda: ui.navigate.to("capture", new_tab=True))
-    ui.label(f"obs浏览器源：http://127.0.0.1:{port}/capture")
+        ui.button("界面预览", on_click=lambda: open_capture())
+    ui.label(f"OBS浏览器源URL：http://127.0.0.1:{port}/capture")
 
 with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
@@ -525,12 +575,40 @@ def _():
         config = json.load(f)
     ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
     with ui.card(align_items="center").classes("absolute-center"):
-        ui.label(f"B站加班姬").classes("text-3xl text-blue")
+        ui.label(f"B站加班姬").classes("text-3xl").style(f"color: {config['text_color']}")
         ui.badge(f"v{version}", outline=True)
-        ui.chat_message('代码没写完，哪有脸睡觉', avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
-        ui.chat_message('alias cd="sudo rm -rf"', avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
-        ui.html('A Project of <u><a href="https://nya-wsl.com">Nya-WSL</a></u>.')
-        ui.html('Powered by <u><a href="https://nicegui.io">NiceGUI</a></u> - <u><a href="https://github.com/xfgryujk/blivedm">blivedm</a></u>.')
+
+        text_a = requests.get("https://nya-wsl.com/bili_travail/text_a.txt")
+        text_b = requests.get("https://nya-wsl.com/bili_travail/text_b.txt")
+        text_a.encoding = "utf-8"
+        text_b.encoding = "utf-8"
+
+        if text_a.status_code == 200 or not config["local_text"]:
+            ui.chat_message(text_a.text, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
+        else:
+            if os.path.exists("data/text_a.txt"):
+                with open("data/text_a.txt", "r", encoding="utf-8") as f:
+                    text_a = f.read()
+            else:
+                text_a = "代码没写完，哪有脸睡觉"
+                with open("data/text_a.txt", "w", encoding="utf-8") as f:
+                    f.write(text_a)
+            ui.chat_message(text_a, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
+
+        if text_b.status_code == 200 or not config["local_text"]:
+            ui.chat_message(text_b.text, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
+        else:
+            if os.path.exists("data/text_b.txt"):
+                with open("data/text_b.txt", "r", encoding="utf-8") as f:
+                    text_b = f.read()
+            else:
+                text_a = 'alias cd="sudo rm -rf"'
+                with open("data/text_b.txt", "w", encoding="utf-8") as f:
+                    f.write(text_b)
+            ui.chat_message(text_b, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
+
+        ui.html('A Project of <u><a href="https://nya-wsl.com" target="_blank">Nya-WSL</a></u>.')
+        ui.html('Powered by <u><a href="https://nicegui.io" target="_blank">NiceGUI</a></u> - <u><a href="https://github.com/xfgryujk/blivedm" target="_blank">blivedm</a></u>.')
         ui.label("Copyright © 2025. All rights reserved. ")
         ui.separator()
         with ui.row():
