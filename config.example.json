@@ -6,5 +6,8 @@
         "https://nya-wsl.com/images/image01.jpg",
         "static/sample.png",
         "static/sample2.png"
-    ]
+    ],
+    "color": "#5898d4",
+    "text_color": "#000000",
+    "local_text": false
 }

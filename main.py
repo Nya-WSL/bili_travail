@@ -16,7 +16,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app, native
 
-version = "0.12.0-beta"
+version = "0.12.1-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
@@ -67,9 +67,8 @@ if not os.path.exists("data/gifts.json"):
 
 # init special gift
 if not os.path.exists("data/special.json"):
-    special = {}
     with open("data/special.json", "w+", encoding="utf-8") as f:
-        json.dump(special, f, ensure_ascii=False, indent=4)
+        json.dump({}, f, ensure_ascii=False, indent=4)
 
 # handler
 async def start_handler():
@@ -315,6 +314,10 @@ class CountdownTimer:
 # GUI
 def gift():
     def show():
+        if status.value == "add" or status.value == "sub":
+            time.set_visibility(True)
+        else:
+            time.set_visibility(False)
         if status.value == "random":
             min.set_visibility(True)
             max.set_visibility(True)
@@ -325,6 +328,8 @@ def gift():
             time.disable()
         else:
             time.enable()
+        if status.value == "delete":
+            time.disable()
 
     def run():
         global refresh_capture
@@ -336,44 +341,41 @@ def gift():
             gifts[gift_name.value] = int(time.value)
             if gift_name.value in special:
                 special.pop(gift_name.value)
+            result = f'添加成功，{gift_name.value} | +{time.value}秒'
         elif status.value == "sub":
             gifts[gift_name.value] = float(f"-{time.value}")
             if gift_name.value in special:
                 special.pop(gift_name.value)
+            result = f'添加成功，{gift_name.value} | -{time.value}秒'
         elif status.value == "double":
             special[gift_name.value] = "double"
             if gift_name.value in gifts:
                 gifts[gift_name.value] = 0
+            result = f'添加成功，{gift_name.value} | 双倍'
         elif status.value == "clear":
             special[gift_name.value] = "clear"
             if gift_name.value in gifts:
                 gifts[gift_name.value] = 0
+            result = f'添加成功，{gift_name.value} | 清空(缓冲3秒)'
         elif status.value == "random":
             special[gift_name.value] = [int(min.value), int(max.value)]
             if gift_name.value in gifts:
                 gifts[gift_name.value] = 0
-        with open("data/gifts.json", "w+", encoding="utf-8") as f:
-            json.dump(gifts, f, ensure_ascii=False, indent=4)
-        with open("data/special.json", "w+", encoding="utf-8") as f:
-            json.dump(special, f, ensure_ascii=False, indent=4)
-        ui.notify(f'添加成功，{gift_name.value} | {time.value}秒', type="positive")
-        refresh_capture = True
+            result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}秒随机'
+        elif status.value == "delete":
+            if gift_name.value in gifts:
+                gifts[gift_name.value] = 0
+            if gift_name.value in special:
+                special.pop(gift_name.value)
+            result = f'删除成功 → {gift_name.value}'
 
-    def delete():
-        global refresh_capture
-        with open("data/gifts.json", "r+", encoding="utf-8") as f:
-            gifts = json.load(f)
-        with open("data/special.json", "r+", encoding="utf-8") as f:
-            special = json.load(f)
-        if gift_name.value in gifts:
-            gifts[gift_name.value] = 0
-        if gift_name.value in special:
-            special.pop(gift_name.value)
         with open("data/gifts.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
         with open("data/special.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
+        ui.notify(result, type="positive")
         refresh_capture = True
+        dialog.close()
 
     def reset():
         global refresh_capture
@@ -389,25 +391,65 @@ def gift():
         with open("data/special.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
         refresh_capture = True
+        dialog.close()
+
+    def gift_list_fun():
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+        ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
+        # ui.separator()
+        for k,v in gifts.items():
+            if config["show_zero"]:
+                with ui.row().classes('w-full'):
+                    ui.label(k)
+                    ui.space()
+                    ui.label(f"{v}秒")
+            else:
+                if v != 0:
+                    with ui.row().classes('w-full'):
+                        ui.label(k)
+                        ui.space()
+                        ui.label(f"{v}秒")
+        if special != {}:
+            for k,v in special.items():
+                if type(v) == list:
+                    with ui.row().classes('w-full'):
+                        ui.label(k)
+                        ui.space()
+                        ui.label(f"{v[0]} ~ {v[1]}秒")
+                else:
+                    with ui.row().classes('w-full'):
+                        ui.label(k)
+                        ui.space()
+                        if v == "clear":
+                            v = "清空"
+                        if v == "double":
+                            v = "加倍"
+                        ui.label(v)
+        ui.separator()
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
         with open("data/gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
+        gift_list_fun()
         with ui.row(align_items="center"):
             gifts_name = []
             for k,v in gifts.items():
                 gifts_name.append(k)
-            gift_name = ui.select(label="礼物", options=gifts_name, value=gifts_name[0])
-            time = ui.number(label="时长(秒)", value=0)
-        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "盲盒"}, value="add", on_change=lambda: show()).classes('items-center')
+            gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
+
+        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "盲盒", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
             min = ui.number("盲盒最小数(秒)", value=0)
             max = ui.number("盲盒最大数(秒)", value=0)
+            time = ui.number(label="时长(秒)", value=0)
+            time.set_visibility(False)
             min.set_visibility(False)
             max.set_visibility(False)
         with ui.row():
-            ui.button('添加/修改', on_click=lambda: run())
-            ui.button("删除",on_click=lambda: delete())
+            ui.button('提交', on_click=lambda: run())
             ui.button("重置", on_click=lambda: reset())
             ui.button('关闭', on_click=lambda: dialog.close())
 
@@ -578,13 +620,20 @@ def _():
         ui.label(f"B站加班姬").classes("text-3xl").style(f"color: {config['text_color']}")
         ui.badge(f"v{version}", outline=True)
 
-        text_a = requests.get("https://nya-wsl.com/bili_travail/text_a.txt")
-        text_b = requests.get("https://nya-wsl.com/bili_travail/text_b.txt")
-        text_a.encoding = "utf-8"
-        text_b.encoding = "utf-8"
-
-        if text_a.status_code == 200 or not config["local_text"]:
-            ui.chat_message(text_a.text, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
+        text = requests.get("https://nya-wsl.com/bili_travail/chat_msg.json")
+        text.encoding = "utf-8"
+        if text.status_code == 200 or not config["local_text"]:
+            if random.random() < 0.3:
+                msg_index = []
+                for k in text.json().keys():
+                    msg_index.append(k)
+                msg_index.remove("group_a")
+                msg = text.json()[random.choice(msg_index)]
+                ui.chat_message(msg["text_a"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
+                ui.chat_message(msg["text_b"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
+            else:
+                ui.chat_message(text.json()["group_a"]["text_a"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
+                ui.chat_message(text.json()["group_a"]["text_b"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
         else:
             if os.path.exists("data/text_a.txt"):
                 with open("data/text_a.txt", "r", encoding="utf-8") as f:
@@ -593,11 +642,7 @@ def _():
                 text_a = "代码没写完，哪有脸睡觉"
                 with open("data/text_a.txt", "w", encoding="utf-8") as f:
                     f.write(text_a)
-            ui.chat_message(text_a, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
 
-        if text_b.status_code == 200 or not config["local_text"]:
-            ui.chat_message(text_b.text, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
-        else:
             if os.path.exists("data/text_b.txt"):
                 with open("data/text_b.txt", "r", encoding="utf-8") as f:
                     text_b = f.read()
@@ -605,6 +650,8 @@ def _():
                 text_a = 'alias cd="sudo rm -rf"'
                 with open("data/text_b.txt", "w", encoding="utf-8") as f:
                     f.write(text_b)
+
+            ui.chat_message(text_a, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
             ui.chat_message(text_b, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
 
         ui.html('A Project of <u><a href="https://nya-wsl.com" target="_blank">Nya-WSL</a></u>.')
@@ -613,16 +660,22 @@ def _():
         ui.separator()
         with ui.row():
             with ui.column(align_items="center"):
-                with ui.link(target="https://space.bilibili.com/16748991"):
+                with ui.link(target="https://space.bilibili.com/16748991", new_tab=True):
                     with ui.avatar():
                         ui.image("https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696")
                 ui.badge("高橋はるき", outline=True)
             with ui.column(align_items="center"):
-                with ui.link(target="https://space.bilibili.com/8907402"):
+                with ui.link(target="https://space.bilibili.com/8907402", new_tab=True):
                     with ui.avatar():
                         ui.image("https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930")
                 ui.badge("狐日泽", outline=True)
         ui.separator()
+        ui.label(f"联系我们").classes("text-2xl").style(f"color: {config['text_color']}")
+        ui.link("GitHub Issues", "https://github.com/Nya-WSL/bili_travail/issues", True)
+        ui.link("support@nya-wsl.com", "mailto:support@nya-wsl.com", True)
+        ui.link("Nya-WSL服务与反馈群", "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
+        ui.separator()
+        # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵').classes("text-2xl text-white")
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=True)
