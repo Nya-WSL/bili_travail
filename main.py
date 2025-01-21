@@ -1,4 +1,5 @@
 # Local Packages
+import gift as get_gift
 from blivedm import blivedm
 import blivedm.blivedm.models.web as web_models
 
@@ -9,17 +10,19 @@ import shutil
 import random
 import asyncio
 import aiohttp
+import requests
 import datetime
 import http.cookies
 from typing import *
 from nicegui import ui, app, native
 
-version = "0.10.1-beta"
+version = "0.11.1-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
 port = native.find_open_port(65000, 65525)
 
+# init config
 if not os.path.exists("config.json"):
     if not os.path.exists("config.example.json"):
         with open("config.json", "w+", encoding="utf-8") as f:
@@ -36,6 +39,37 @@ if not os.path.exists("config.json"):
             json.dump(config, f, indent=4, ensure_ascii=False)
     else:
         shutil.copy("config.example.json", "config.json")
+
+# init when the data folder does not exist
+if not os.path.exists("data"):
+    os.mkdir("data")
+# download guard images
+#     guard = {
+#         "舰长": "guard-level-3.png",
+#         "提督": "guard-level-2.png",
+#         "总督": "guard-level-1.png"
+# }
+#     url = "https://nya-wsl.com/images/bili_travail/"
+#     for k,v in guard.items():
+#         try:
+#             with open(f"data/{v}", "wb") as f:
+#                 f.write(requests.get(url + k).content)
+#         except:
+#             print(f"Failed to download {url + k}")
+
+# init gift list
+if not os.path.exists("data/gifts.json"):
+    get_gift.get_gift("data/gifts.json", write=False, write_time=True, return_dict=True)
+
+# init special gift
+if not os.path.exists("data/special.json"):
+    special = {
+        "舰长": "clear",
+        "我星永恒": "double",
+        "情书": [-60, 60]
+}
+    with open("data/special.json", "w+", encoding="utf-8") as f:
+        json.dump(special, f, ensure_ascii=False, indent=4)
 
 # handler
 async def start_handler():
@@ -85,9 +119,9 @@ class BiliHandler(blivedm.BaseHandler):
     def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
         # print(f'[{client.room_id}] {message.uname} 赠送{message.gift_name}x{message.num}'
         #       f' （{message.coin_type}瓜子x{message.total_coin}）')
-        with open("gifts.json", "r", encoding="utf-8") as f:
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
-        with open("special.json", "r", encoding="utf-8") as f:
+        with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
 
         tmp_time = countdown_timer.get_tmp_time()
@@ -98,7 +132,7 @@ class BiliHandler(blivedm.BaseHandler):
         if gift not in gifts:
             if gift not in special:
                 gifts[gift] = 0
-                with open("gifts.json", "w+", encoding="utf-8") as f:
+                with open("data/gifts.json", "w+", encoding="utf-8") as f:
                     json.dump(gifts, f, indent=4, ensure_ascii=False)
         if gift in special:
             if special[gift] == "double":
@@ -124,9 +158,9 @@ class BiliHandler(blivedm.BaseHandler):
     #     print(f'[{client.room_id}] {message.username} 上舰，guard_level={message.guard_level}')
 
     def _on_user_toast_v2(self, client: blivedm.BLiveClient, message: web_models.UserToastV2Message):
-        with open("gifts.json", "r", encoding="utf-8") as f:
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
-        with open("special.json", "r", encoding="utf-8") as f:
+        with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
 
         tmp_time = countdown_timer.get_tmp_time()
@@ -145,7 +179,7 @@ class BiliHandler(blivedm.BaseHandler):
         if gift not in gifts:
             if gift not in special:
                 gifts[gift] = 0
-                with open("gifts.json", "w+", encoding="utf-8") as f:
+                with open("data/gifts.json", "w+", encoding="utf-8") as f:
                     json.dump(gifts, f, indent=4, ensure_ascii=False)
         if gift in special:
             if special[gift] == "double":
@@ -291,9 +325,9 @@ def gift():
             time.enable()
 
     def run():
-        with open("gifts.json", "r+", encoding="utf-8") as f:
+        with open("data/gifts.json", "r+", encoding="utf-8") as f:
             gifts = json.load(f)
-        with open("special.json", "r", encoding="utf-8") as f:
+        with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
         if status.value == "add":
             gifts[gift_name.value] = int(time.value)
@@ -301,39 +335,27 @@ def gift():
             gifts[gift_name.value] = float(f"-{time.value}")
         elif status.value == "double":
             special[gift_name.value] = "double"
+            if gift_name.value in gifts:
+                gifts[gift_name.value] = 0
         elif status.value == "clear":
             special[gift_name.value] = "clear"
+            if gift_name.value in gifts:
+                gifts[gift_name.value] = 0
         elif status.value == "random":
             if min.value != 0 and max.value != 0:
                 special[gift_name.value] = [min.value, max.value]
-        with open("gifts.json", "w+", encoding="utf-8") as f:
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+        with open("data/gifts.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
-        with open("special.json", "w+", encoding="utf-8") as f:
+        with open("data/special.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
         ui.notify(f'添加成功，{gift_name.value} | {time.value}秒', type="positive")
 
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
-        if os.path.exists("gifts.json"):
-            with open("gifts.json", "r", encoding="utf-8") as f:
-                gifts = json.load(f)
-        else:
-            gifts = {
-                    "牛哇牛哇": 0
-                    }
-            with open("gifts.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, ensure_ascii=False, indent=4)
-        if os.path.exists("special.json"):
-            with open("special.json", "r", encoding="utf-8") as f:
-                special = json.load(f)
-        else:
-            special = {
-                    "舰长": "clear",
-                    "我星永恒": "double",
-                    "情书": [-60, 60]
-                    }
-            with open("special.json", "w+", encoding="utf-8") as f:
-                json.dump(special, f, ensure_ascii=False, indent=4)
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
         with ui.row(align_items="center"):
             gifts_name = []
             for k,v in gifts.items():
@@ -382,57 +404,75 @@ def save_room_id():
 
 @ui.refreshable
 @ui.page("/capture", title="capture | bili_travail")
-# obs: 宽度最高325px
+# obs: 宽度最高350px
 def capture():
     # Gifts List
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    with open("gifts.json", "r", encoding="utf-8") as f:
-        gifts = json.load(f)
-    if os.path.exists("special.json"):
-        with open("special.json", "r", encoding="utf-8") as f:
+    if os.path.exists("data/gifts.json"):
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+    else:
+        gifts = {}
+    if os.path.exists("data/gift_img.json"):
+        with open("data/gift_img.json", "r", encoding="utf-8") as f:
+            gift_img = json.load(f)
+        
+    else:
+        gift_img = get_gift.get_gift("data/gift_img.json", return_dict=True)
+    if os.path.exists("data/special.json"):
+        with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
     else:
         special = {}
     # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
-    # with ui.card(align_items="center").classes("absolute-center bg-transparent"):
-    ui.badge(outline=True).bind_text_from(time_badge).classes("text-7xl w-full items-center")
-    for k,v in gifts.items():
-        if config["show_zero"]:
-            with ui.row().classes('w-full'):
-                ui.label(k).classes("text-2xl")
-                ui.space()
-                ui.label(f"{v}秒").classes("text-2xl")
-        else:
-            if v != 0:
+    with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
+        ui.badge(outline=True).bind_text_from(time_badge).classes("text-8xl")
+        ui.separator()
+        for k,v in gifts.items():
+            if config["show_zero"]:
                 with ui.row().classes('w-full'):
+                    with ui.avatar(color=None):
+                        ui.image().bind_source_from(gift_img, k)
                     ui.label(k).classes("text-2xl")
                     ui.space()
                     ui.label(f"{v}秒").classes("text-2xl")
-    if special != {}:
-        for k,v in special.items():
-            if type(v) == list:
-                with ui.row().classes('w-full'):
-                    ui.label(k).classes("text-2xl")
-                    ui.space()
-                    ui.label(f"{v[0]}秒 - {v[1]}秒").classes("text-2xl")
             else:
-                with ui.row().classes('w-full'):
-                    ui.label(k).classes("text-2xl")
-                    ui.space()
-                    if v == "clear":
-                        v = "清空"
-                    if v == "double":
-                        v = "加倍"
-                    ui.label(v).classes("text-2xl")
-        # i = iter(gift_list_rows[0].items())
-        # while True:
-        #     d = dict(itertools.islice(i, 3))
-        #     if d == {}:
-        #         break
-        #     rows_list = []
-        #     rows_list.append(d)
-        #     ui.table(rows=rows_list).classes("bg-transparent")
+                if v != 0:
+                    with ui.row().classes('w-full'):
+                        with ui.avatar(color=None):
+                            ui.image().bind_source_from(gift_img, k)
+                        ui.label(k).classes("text-2xl")
+                        ui.space()
+                        ui.label(f"{v}秒").classes("text-2xl")
+        if special != {}:
+            for k,v in special.items():
+                if type(v) == list:
+                    with ui.row().classes('w-full'):
+                        with ui.avatar(color=None):
+                            ui.image().bind_source_from(gift_img, k)
+                        ui.label(k).classes("text-2xl")
+                        ui.space()
+                        ui.label(f"{v[0]} - {v[1]}秒").classes("text-2xl")
+                else:
+                    with ui.row().classes('w-full'):
+                        with ui.avatar(color=None):
+                            ui.image().bind_source_from(gift_img, k)
+                        ui.label(k).classes("text-2xl")
+                        ui.space()
+                        if v == "clear":
+                            v = "清空"
+                        if v == "double":
+                            v = "加倍"
+                        ui.label(v).classes("text-2xl")
+            # i = iter(gift_list_rows[0].items())
+            # while True:
+            #     d = dict(itertools.islice(i, 3))
+            #     if d == {}:
+            #         break
+            #     rows_list = []
+            #     rows_list.append(d)
+            #     ui.table(rows=rows_list).classes("bg-transparent")
 
 
 with open("config.json", "r", encoding="utf-8") as f:

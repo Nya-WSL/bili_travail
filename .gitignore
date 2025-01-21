@@ -160,4 +160,6 @@ cython_debug/
 #.idea/
 test.json
 config.json
-special.json
+test.htm
+save_test.html
+/data/*.json
