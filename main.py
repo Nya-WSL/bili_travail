@@ -14,13 +14,13 @@ import requests
 import datetime
 import http.cookies
 from typing import *
-from nicegui import ui, app, native
+from nicegui import ui, app
 
 version = "0.12.1-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
-port = native.find_open_port(65000, 65525)
+port = 65000
 refresh_capture = False
 
 # init config
