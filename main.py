@@ -16,12 +16,15 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.12.1-beta"
+version = "0.13.0-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
 port = 65000
-refresh_capture = False
+refresh_capture_cd = False
+refresh_capture_gift = False
+b_connect_status = False
+cd_status = False
 
 # init config
 if not os.path.exists("config.json"):
@@ -38,7 +41,8 @@ if not os.path.exists("config.json"):
     ],
     "color": "#5898d4",
     "text_color": "#000000",
-    "local_text": False
+    "local_text": False,
+    "count_status": False
 }
             json.dump(config, f, indent=4, ensure_ascii=False)
     else:
@@ -118,40 +122,72 @@ class BiliHandler(blivedm.BaseHandler):
     def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
         # print(f'[{client.room_id}] {message.uname} 赠送{message.gift_name}x{message.num}'
         #       f' （{message.coin_type}瓜子x{message.total_coin}）')
-        with open("data/gifts.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
-        with open("data/special.json", "r", encoding="utf-8") as f:
-            special = json.load(f)
 
-        tmp_time = countdown_timer.get_tmp_time()
         gift = message.gift_name
         num = message.num
         result = ""
+        if b_connect_status:
+            print("status: True")
+            if count_status_switch.value:
+                with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+                    gifts = json.load(f)
+                with open("data/special_count.json", "r", encoding="utf-8") as f:
+                    special = json.load(f)
 
-        if gift not in gifts:
-            if gift not in special:
-                gifts[gift] = 0
-                with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                    json.dump(gifts, f, indent=4, ensure_ascii=False)
-        if gift in special:
-            if special[gift] == "double":
-                changed_time = tmp_time * (2 * int(num))
-                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
-            if special[gift] == "clear":
-                changed_time = 3
-                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
-            if type(special[gift]) == list:
-                random_time = random.randint(special[gift][0], special[gift][1])
-                changed_time = tmp_time + random_time
-                result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
-        else:
-            changed_time = (gifts[gift] * int(num)) + tmp_time
-            result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+                if gift not in gifts:
+                    if gift not in special:
+                        gifts[gift] = 0
+                        with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                            json.dump(gifts, f, indent=4, ensure_ascii=False)
+                if gift in special:
+                    if special[gift] == "double":
+                        changed_num = int(gift_count.text) * (2 * int(num))
+                        result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
+                    if special[gift] == "clear":
+                        changed_num = 0
+                        result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_count.text)}\n总数量："
+                    if type(special[gift]) == list:
+                        random_num = random.randint(special[gift][0], special[gift][1])
+                        changed_num = int(gift_count.text) + random_num
+                        result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
+                else:
+                    changed_num = (gifts[gift] * int(num)) + int(gift_count.text)
+                    result = f"礼物：{gift}\n数量：{num}\n总数量："
+                gift_count.set_text(changed_num)
+                print(result, changed_num)
 
-        countdown_timer.set_time(changed_time)
-        hour, minute = divmod(changed_time, 3600)
-        minute, second = divmod(minute, 60)
-        print(result, "%02d:%02d:%02d" % (hour, minute, second))
+            if cd_status:
+                with open("data/gifts.json", "r", encoding="utf-8") as f:
+                    gifts = json.load(f)
+                with open("data/special.json", "r", encoding="utf-8") as f:
+                    special = json.load(f)
+
+                tmp_time = countdown_timer.get_tmp_time()
+
+                if gift not in gifts:
+                    if gift not in special:
+                        gifts[gift] = 0
+                        with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                            json.dump(gifts, f, indent=4, ensure_ascii=False)
+                if gift in special:
+                    if special[gift] == "double":
+                        changed_time = tmp_time * (2 * int(num))
+                        result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+                    if special[gift] == "clear":
+                        changed_time = 3
+                        result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
+                    if type(special[gift]) == list:
+                        random_time = random.randint(special[gift][0], special[gift][1])
+                        changed_time = tmp_time + random_time
+                        result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
+                else:
+                    changed_time = (gifts[gift] * int(num)) + tmp_time
+                    result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+
+                countdown_timer.set_time(changed_time)
+                hour, minute = divmod(changed_time, 3600)
+                minute, second = divmod(minute, 60)
+                print(result, "%02d:%02d:%02d" % (hour, minute, second))
 
 
     # def _on_buy_guard(self, client: blivedm.BLiveClient, message: web_models.GuardBuyMessage):
@@ -176,30 +212,31 @@ class BiliHandler(blivedm.BaseHandler):
         num = message.num
         result = ""
 
-        if gift not in gifts:
-            if gift not in special:
-                gifts[gift] = 0
-                with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                    json.dump(gifts, f, indent=4, ensure_ascii=False)
-        if gift in special:
-            if special[gift] == "double":
-                changed_time = tmp_time * (2 * int(num))
-                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
-            if special[gift] == "clear":
-                changed_time = 3
-                result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
-            if type(special[gift]) == list:
-                random_time = random.randint(special[gift][0], special[gift][1] + 1)
-                changed_time = tmp_time + random_time
-                result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
-        else:
-            changed_time = (gifts[gift] * int(num)) + tmp_time
-            result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+        if b_connect_status:
+            if gift not in gifts:
+                if gift not in special:
+                    gifts[gift] = 0
+                    with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                        json.dump(gifts, f, indent=4, ensure_ascii=False)
+            if gift in special:
+                if special[gift] == "double":
+                    changed_time = tmp_time * (2 * int(num))
+                    result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+                if special[gift] == "clear":
+                    changed_time = 3
+                    result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
+                if type(special[gift]) == list:
+                    random_time = random.randint(special[gift][0], special[gift][1] + 1)
+                    changed_time = tmp_time + random_time
+                    result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
+            else:
+                changed_time = (gifts[gift] * int(num)) + tmp_time
+                result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
 
-        countdown_timer.set_time(changed_time)
-        hour, minute = divmod(changed_time, 3600)
-        minute, second = divmod(minute, 60)
-        print(result, "%02d:%02d:%02d" % (hour, minute, second))
+            countdown_timer.set_time(changed_time)
+            hour, minute = divmod(changed_time, 3600)
+            minute, second = divmod(minute, 60)
+            print(result, "%02d:%02d:%02d" % (hour, minute, second))
 
 
     def _on_super_chat(self, client: blivedm.BLiveClient, message: web_models.SuperChatMessage):
@@ -248,6 +285,7 @@ class CountdownTimer:
             cancel_button.disable()
 
     def start(self, label):
+        global cd_status
         if not self._running:
             self._running = True
             self._remaining_time = self._start_time  # Reset to initial time
@@ -256,27 +294,30 @@ class CountdownTimer:
                 input_hour.set_value(0)
                 input_minute.set_value(0)
                 input_second.set_value(0)
-                asyncio.create_task(start_handler())
+                cd_status = True
             else:
                 ui.notify("请输入时间", type="negative")
 
     async def pause(self):
+        global cd_status
         if self._running and not self._paused:
             self._paused = True
             self._paused_event.clear()  # Pause the timer
             resume_button.enable()
             pause_button.disable()
-            await client.stop_and_close()
+            cd_status = False
 
     def resume(self):
+        global cd_status
         if self._running and self._paused:
             self._paused = False
             self._paused_event.set()  # Resume the timer
             pause_button.enable()
             resume_button.disable()
-            asyncio.create_task(start_handler())
+            cd_status = True
 
     async def stop(self, label):
+        global cd_status
         if self._running:
             self._running = False
             self._remaining_time = self._start_time  # Reset the timer
@@ -287,7 +328,7 @@ class CountdownTimer:
             cancel_button.disable()
             pause_button.disable()
             resume_button.disable()
-            await client.stop_and_close()
+            cd_status = False
 
     def set_time(self, time):
         # 如果计时器正在运行，首先停止它
@@ -313,148 +354,324 @@ class CountdownTimer:
 
 # GUI
 def gift():
-    def show():
-        if status.value == "add" or status.value == "sub":
-            time.set_visibility(True)
-        else:
-            time.set_visibility(False)
-        if status.value == "random":
-            min.set_visibility(True)
-            max.set_visibility(True)
-        else:
-            min.set_visibility(False)
-            max.set_visibility(False)
-        if status.value == "double" or status.value == "clear" or status.value == "random":
-            time.disable()
-        else:
-            time.enable()
-        if status.value == "delete":
-            time.disable()
 
-    def run():
-        global refresh_capture
-        with open("data/gifts.json", "r+", encoding="utf-8") as f:
-            gifts = json.load(f)
-        with open("data/special.json", "r", encoding="utf-8") as f:
-            special = json.load(f)
-        if status.value == "add":
-            gifts[gift_name.value] = int(time.value)
-            if gift_name.value in special:
-                special.pop(gift_name.value)
-            result = f'添加成功，{gift_name.value} | +{time.value}秒'
-        elif status.value == "sub":
-            gifts[gift_name.value] = float(f"-{time.value}")
-            if gift_name.value in special:
-                special.pop(gift_name.value)
-            result = f'添加成功，{gift_name.value} | -{time.value}秒'
-        elif status.value == "double":
-            special[gift_name.value] = "double"
-            if gift_name.value in gifts:
-                gifts[gift_name.value] = 0
-            result = f'添加成功，{gift_name.value} | 双倍'
-        elif status.value == "clear":
-            special[gift_name.value] = "clear"
-            if gift_name.value in gifts:
-                gifts[gift_name.value] = 0
-            result = f'添加成功，{gift_name.value} | 清空(缓冲3秒)'
-        elif status.value == "random":
-            special[gift_name.value] = [int(min.value), int(max.value)]
-            if gift_name.value in gifts:
-                gifts[gift_name.value] = 0
-            result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}秒随机'
-        elif status.value == "delete":
-            if gift_name.value in gifts:
-                gifts[gift_name.value] = 0
-            if gift_name.value in special:
-                special.pop(gift_name.value)
-            result = f'删除成功 → {gift_name.value}'
-
-        with open("data/gifts.json", "w+", encoding="utf-8") as f:
-            json.dump(gifts, f, ensure_ascii=False, indent=4)
-        with open("data/special.json", "w+", encoding="utf-8") as f:
-            json.dump(special, f, ensure_ascii=False, indent=4)
-        ui.notify(result, type="positive")
-        refresh_capture = True
-        dialog.close()
-
-    def reset():
-        global refresh_capture
-        with open("data/gifts.json", "r+", encoding="utf-8") as f:
-            gifts = json.load(f)
-        with open("data/special.json", "r+", encoding="utf-8") as f:
-            special = json.load(f)
-        for k in gifts.keys():
-            gifts[k] = 0
-        special = {}
-        with open("data/gifts.json", "w+", encoding="utf-8") as f:
-            json.dump(gifts, f, ensure_ascii=False, indent=4)
-        with open("data/special.json", "w+", encoding="utf-8") as f:
-            json.dump(special, f, ensure_ascii=False, indent=4)
-        refresh_capture = True
-        dialog.close()
-
-    def gift_list_fun():
-        with open("data/gifts.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
-        with open("data/special.json", "r", encoding="utf-8") as f:
-            special = json.load(f)
-        ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
-        # ui.separator()
-        for k,v in gifts.items():
-            if config["show_zero"]:
-                with ui.row().classes('w-full'):
-                    ui.label(k)
-                    ui.space()
-                    ui.label(f"{v}秒")
+    def cd_setting_dialog():
+        def show():
+            if status.value == "add" or status.value == "sub":
+                time.set_visibility(True)
             else:
-                if v != 0:
+                time.set_visibility(False)
+            if status.value == "random":
+                min.set_visibility(True)
+                max.set_visibility(True)
+            else:
+                min.set_visibility(False)
+                max.set_visibility(False)
+            if status.value == "double" or status.value == "clear" or status.value == "random":
+                time.disable()
+            else:
+                time.enable()
+            if status.value == "delete":
+                time.disable()
+
+        def run():
+            global refresh_capture_cd
+            with open("data/gifts.json", "r+", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special.json", "r", encoding="utf-8") as f:
+                special = json.load(f)
+            if status.value == "add":
+                gifts[gift_name.value] = int(time.value)
+                if gift_name.value in special:
+                    special.pop(gift_name.value)
+                result = f'添加成功，{gift_name.value} | +{time.value}秒'
+            elif status.value == "sub":
+                gifts[gift_name.value] = float(f"-{time.value}")
+                if gift_name.value in special:
+                    special.pop(gift_name.value)
+                result = f'添加成功，{gift_name.value} | -{time.value}秒'
+            elif status.value == "double":
+                special[gift_name.value] = "double"
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                result = f'添加成功，{gift_name.value} | 双倍'
+            elif status.value == "clear":
+                special[gift_name.value] = "clear"
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                result = f'添加成功，{gift_name.value} | 清空(缓冲3秒)'
+            elif status.value == "random":
+                special[gift_name.value] = [int(min.value), int(max.value)]
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}秒随机'
+            elif status.value == "delete":
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                if gift_name.value in special:
+                    special.pop(gift_name.value)
+                result = f'删除成功 → {gift_name.value}'
+
+            with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+            with open("data/special.json", "w+", encoding="utf-8") as f:
+                json.dump(special, f, ensure_ascii=False, indent=4)
+            ui.notify(result, type="positive")
+            refresh_capture_cd = True
+            cd_dialog.close()
+
+        def reset():
+            global refresh_capture
+            with open("data/gifts.json", "r+", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special.json", "r+", encoding="utf-8") as f:
+                special = json.load(f)
+            for k in gifts.keys():
+                gifts[k] = 0
+            special = {}
+            with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+            with open("data/special.json", "w+", encoding="utf-8") as f:
+                json.dump(special, f, ensure_ascii=False, indent=4)
+            refresh_capture = True
+            cd_dialog.close()
+
+        def gift_list_fun():
+            with open("data/gifts.json", "r", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special.json", "r", encoding="utf-8") as f:
+                special = json.load(f)
+            ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
+            # ui.separator()
+            for k,v in gifts.items():
+                if config["show_zero"]:
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
                         ui.label(f"{v}秒")
-        if special != {}:
-            for k,v in special.items():
-                if type(v) == list:
-                    with ui.row().classes('w-full'):
-                        ui.label(k)
-                        ui.space()
-                        ui.label(f"{v[0]} ~ {v[1]}秒")
                 else:
+                    if v != 0:
+                        with ui.row().classes('w-full'):
+                            ui.label(k)
+                            ui.space()
+                            ui.label(f"{v}秒")
+            if special != {}:
+                for k,v in special.items():
+                    if type(v) == list:
+                        with ui.row().classes('w-full'):
+                            ui.label(k)
+                            ui.space()
+                            ui.label(f"{v[0]} ~ {v[1]}秒")
+                    else:
+                        with ui.row().classes('w-full'):
+                            ui.label(k)
+                            ui.space()
+                            if v == "clear":
+                                v = "清空"
+                            if v == "double":
+                                v = "加倍"
+                            ui.label(v)
+            ui.separator()
+
+        with ui.dialog() as cd_dialog, ui.card(align_items="center"):
+            with open("data/gifts.json", "r", encoding="utf-8") as f:
+                gifts = json.load(f)
+            gift_list_fun()
+            with ui.row(align_items="center"):
+                gifts_name = []
+                for k,v in gifts.items():
+                    gifts_name.append(k)
+                gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
+
+            status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "盲盒", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
+            with ui.row():
+                min = ui.number("盲盒最小数(秒)", value=0)
+                max = ui.number("盲盒最大数(秒)", value=0)
+                time = ui.number(label="时长(秒)", value=0)
+                time.set_visibility(False)
+                min.set_visibility(False)
+                max.set_visibility(False)
+            with ui.row():
+                ui.button('提交', on_click=lambda: run())
+                ui.button("重置", on_click=lambda: reset())
+                ui.button('关闭', on_click=lambda: cd_dialog.close())
+
+        cd_dialog.open()
+
+
+    def gift_count_setting_dialog():
+        global gift_play_unit
+        global gift_play_text
+        def show():
+            if status.value == "add" or status.value == "sub":
+                number.set_visibility(True)
+            else:
+                number.set_visibility(False)
+            if status.value == "random":
+                min.set_visibility(True)
+                max.set_visibility(True)
+            else:
+                min.set_visibility(False)
+                max.set_visibility(False)
+            if status.value == "double" or status.value == "clear" or status.value == "random":
+                number.disable()
+            else:
+                number.enable()
+            if status.value == "delete":
+                number.disable()
+
+        def run():
+            global refresh_capture_gift
+            with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special_count.json", "r", encoding="utf-8") as f:
+                special = json.load(f)
+            if status.value == "add":
+                gifts[gift_name.value] = int(number.value)
+                if gift_name.value in special:
+                    special.pop(gift_name.value)
+                result = f'添加成功，{gift_name.value} | +{number.value}'
+            elif status.value == "sub":
+                gifts[gift_name.value] = float(f"-{number.value}")
+                if gift_name.value in special:
+                    special.pop(gift_name.value)
+                result = f'添加成功，{gift_name.value} | -{number.value}'
+            elif status.value == "double":
+                special[gift_name.value] = "double"
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                result = f'添加成功，{gift_name.value} | 双倍'
+            elif status.value == "clear":
+                special[gift_name.value] = "clear"
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                result = f'添加成功，{gift_name.value} | 清空'
+            elif status.value == "random":
+                special[gift_name.value] = [int(min.value), int(max.value)]
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}随机'
+            elif status.value == "delete":
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+                if gift_name.value in special:
+                    special.pop(gift_name.value)
+                result = f'删除成功 → {gift_name.value}'
+
+            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+            with open("data/special_count.json", "w+", encoding="utf-8") as f:
+                json.dump(special, f, ensure_ascii=False, indent=4)
+            ui.notify(result, type="positive")
+            refresh_capture_gift = True
+            gift_count_dialog.close()
+
+        def reset():
+            global refresh_capture
+            with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special_count.json", "r+", encoding="utf-8") as f:
+                special = json.load(f)
+            for k in gifts.keys():
+                gifts[k] = 0
+            special = {}
+            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+            with open("data/special_count.json", "w+", encoding="utf-8") as f:
+                json.dump(special, f, ensure_ascii=False, indent=4)
+            refresh_capture = True
+            gift_count_dialog.close()
+
+        def gift_list_fun():
+            with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special_count.json", "r", encoding="utf-8") as f:
+                special = json.load(f)
+            ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
+            # ui.separator()
+            for k,v in gifts.items():
+                if config["show_zero"]:
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
-                        if v == "clear":
-                            v = "清空"
-                        if v == "double":
-                            v = "加倍"
-                        ui.label(v)
-        ui.separator()
+                        ui.label(f"{v}")
+                else:
+                    if v != 0:
+                        with ui.row().classes('w-full'):
+                            ui.label(k)
+                            ui.space()
+                            ui.label(f"{v}")
+            if special != {}:
+                for k,v in special.items():
+                    if type(v) == list:
+                        with ui.row().classes('w-full'):
+                            ui.label(k)
+                            ui.space()
+                            ui.label(f"{v[0]} ~ {v[1]}")
+                    else:
+                        with ui.row().classes('w-full'):
+                            ui.label(k)
+                            ui.space()
+                            if v == "clear":
+                                v = "清空"
+                            if v == "double":
+                                v = "加倍"
+                            ui.label(v)
+            ui.separator()
+
+        with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
+            if not os.path.exists("data/gifts_count.json"):
+                with open("data/gifts.json", "r", encoding="utf-8") as f:
+                    gifts = json.load(f)
+                with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                    json.dump(gifts, f, ensure_ascii=False, indent=4)
+            if not os.path.exists("data/special_count.json"):
+                with open("data/special_count.json", "w+", encoding="utf-8") as f:
+                    json.dump({}, f, ensure_ascii=False, indent=4)
+
+            with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+                gifts = json.load(f)
+
+            gift_list_fun()
+            with ui.row(align_items="center"):
+                gifts_name = []
+                for k,v in gifts.items():
+                    gifts_name.append(k)
+                gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
+
+            status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "clear": "清空", "random": "盲盒", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
+            with ui.row():
+                min = ui.number("盲盒最小数", value=0)
+                max = ui.number("盲盒最大数", value=0)
+                number = ui.number(label="数量", value=0).style("width: 150px")
+
+                if gift_play_unit_main != "":
+                    gift_play_unit = ui.input("单位", value=gift_play_unit_main.text, on_change=lambda e: gift_play_unit_main.set_text(e.value))
+                else:
+                    gift_play_unit = ui.input("单位", on_change=lambda e: gift_play_unit_main.set_text(e.value))
+                if gift_play_text_main != "":
+                    gift_play_text = ui.input("项目", value=gift_play_text_main.text, on_change=lambda e: gift_play_text_main.set_text(e.value))
+                else:
+                    gift_play_text = ui.input("项目", on_change=lambda e: gift_play_text_main.set_text(e.value))
+
+                number.set_visibility(False)
+                min.set_visibility(False)
+                max.set_visibility(False)
+
+            with ui.row():
+                ui.button('提交', on_click=lambda: run())
+                ui.button("重置", on_click=lambda: reset())
+                ui.button('关闭', on_click=lambda: gift_count_dialog.close())
+
+        gift_count_dialog.open()
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
-        with open("data/gifts.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
-        gift_list_fun()
-        with ui.row(align_items="center"):
-            gifts_name = []
-            for k,v in gifts.items():
-                gifts_name.append(k)
-            gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
-
-        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "盲盒", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
-            min = ui.number("盲盒最小数(秒)", value=0)
-            max = ui.number("盲盒最大数(秒)", value=0)
-            time = ui.number(label="时长(秒)", value=0)
-            time.set_visibility(False)
-            min.set_visibility(False)
-            max.set_visibility(False)
-        with ui.row():
-            ui.button('提交', on_click=lambda: run())
-            ui.button("重置", on_click=lambda: reset())
-            ui.button('关闭', on_click=lambda: dialog.close())
+            ui.button("加班设置", on_click=lambda: cd_setting_dialog())
+            ui.button("礼物统计", on_click=lambda: gift_count_setting_dialog())
+        ui.button("关闭", on_click=lambda: dialog.close())
 
     dialog.open()
-
 
 def start_task():
     global countdown_timer
@@ -483,23 +700,51 @@ def save_config():
     with open("config.json", "w+", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
+def change_count_status():
+    save_config()
+    if count_status_switch.value:
+        count_status_capture_label.set_visibility(True)
+    else:
+        count_status_capture_label.set_visibility(False)
+
+async def check_b_connect_status():
+    global b_connect_status
+    if b_connect_switch.value:
+        if room_id.value == "":
+            ui.notify("请输入房间号", type="negative")
+            b_connect_switch.set_value(False)
+        else:
+            start_button.enable()
+            count_status_switch.enable()
+            b_connect_status = True
+            asyncio.create_task(start_handler())
+            ui.notify("已连接", type="positive")
+    elif not b_connect_switch.value and room_id.value != "":
+        start_button.disable()
+        count_status_switch.disable()
+        b_connect_status = False
+        await client.stop_and_close()
+        ui.notify("已断开连接", type="positive")
+
 def open_capture():
     with ui.dialog() as dialog, ui.card(align_items="center"):
         ui.label("使用OBS捕捉浏览器源时请关闭预览窗口")
         ui.label("如OBS未刷新，请点击：浏览器源 → 刷新当前页面缓存")
         with ui.row():
-            ui.button("打开", on_click=lambda: ui.navigate.to("/capture", new_tab=True))
+            ui.button("加班预览", on_click=lambda: ui.navigate.to("/capture_cd", new_tab=True)).on(type="click", handler=lambda: dialog.close())
+            ui.button("统计预览", on_click=lambda: ui.navigate.to("/capture_gift", new_tab=True)).on(type="click", handler=lambda: dialog.close())
             ui.button("关闭", on_click=lambda: dialog.close())
 
     dialog.open()
 
-@ui.page("/capture", title="capture | bili_travail")
+@ui.page("/capture_cd", title="capture | bili_travail")
 def capture():
-    def check_refresh():
-        global refresh_capture
-        if refresh_capture:
-            refresh_capture = False
-            ui.run_javascript('window.location.reload()')
+    def check_cd_refresh():
+        global refresh_capture_cd
+        if refresh_capture_cd:
+            refresh_capture_cd = False
+            # ui.run_javascript('window.location.reload()')
+            ui.navigate.to("/capture_cd")
 
     # Gifts List
     with open("config.json", "r", encoding="utf-8") as f:
@@ -560,13 +805,92 @@ def capture():
                         if v == "double":
                             v = "加倍"
                         ui.label(v).classes("text-2xl").style(f"color: {config['text_color']}")
-    ui.timer(1, callback=lambda: check_refresh())
+    ui.timer(5, callback=lambda: check_cd_refresh())
+
+@ui.page("/capture_gift", title="capture | bili_travail")
+def capture():
+    def check_gift_refresh():
+        global refresh_capture_gift
+        if refresh_capture_gift:
+            refresh_capture_gift = False
+            # ui.run_javascript('window.location.reload()')
+            ui.navigate.to("/capture_gift")
+
+    # Gifts List
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+    if os.path.exists("data/gifts_count.json"):
+        with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+    else:
+        gifts = {}
+    if os.path.exists("data/gift_img.json"):
+        with open("data/gift_img.json", "r", encoding="utf-8") as f:
+            gift_img = json.load(f)
+    else:
+        gift_img = get_gift.get_gift("data/gift_img.json", return_dict=True)
+    if os.path.exists("data/special_count.json"):
+        with open("data/special_count.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+    else:
+        special = {}
+    # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
+    with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
+        with ui.row():
+            ui.label("总计").classes("text-4xl").style(f"color: {config['color']}").classes("text-5xl")
+            ui.label().bind_text_from(gift_count).style(f"color: {config['color']}").classes("text-5xl")
+            ui.label().bind_text_from(gift_play_unit_main).style(f"color: {config['color']}").classes("text-5xl")
+            ui.label().bind_text_from(gift_play_text_main).style(f"color: {config['color']}").classes("text-5xl")
+        ui.separator()
+        for k,v in gifts.items():
+            if config["show_zero"]:
+                with ui.row().classes('w-full'):
+                    with ui.avatar(color=None):
+                        ui.image().bind_source_from(gift_img, k)
+                    ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                    ui.space()
+                    ui.label(f"{v}{gift_play_unit_main.text}").classes("text-2xl").style(f"color: {config['text_color']}")
+            else:
+                if v != 0:
+                    with ui.row().classes('w-full'):
+                        with ui.avatar(color=None):
+                            ui.image().bind_source_from(gift_img, k)
+                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.space()
+                        ui.label(f"{v}{gift_play_unit_main.text}").classes("text-2xl").style(f"color: {config['text_color']}")
+        if special != {}:
+            for k,v in special.items():
+                if type(v) == list:
+                    with ui.row().classes('w-full'):
+                        with ui.avatar(color=None):
+                            ui.image().bind_source_from(gift_img, k)
+                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.space()
+                        ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-2xl").style(f"color: {config['text_color']}")
+                else:
+                    with ui.row().classes('w-full'):
+                        with ui.avatar(color=None):
+                            ui.image().bind_source_from(gift_img, k)
+                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.space()
+                        if v == "clear":
+                            v = "清空"
+                        if v == "double":
+                            v = "加倍"
+                        ui.label(v).classes("text-2xl").style(f"color: {config['text_color']}")
+    ui.timer(5, callback=lambda: check_gift_refresh())
 
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 with ui.card(align_items="center").classes("absolute-center"):
     # Countdown Control Panel
     time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl")
+    gift_count = ui.badge("0")
+    gift_play_unit_main = ui.label()
+    gift_play_text_main = ui.label()
+    gift_count.set_visibility(False)
+    gift_play_unit_main.set_visibility(False)
+    gift_play_text_main.set_visibility(False)
 
     with ui.row():
         input_hour = ui.number("时", value=0, min=0).style("width: 100px")
@@ -581,6 +905,7 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         # Start button
         start_button = ui.button('开始加班', on_click=lambda: start_task())
+        start_button.disable()
 
         # Pause button
         pause_button = ui.button('暂停加班', on_click=lambda: countdown_timer.pause())
@@ -606,7 +931,15 @@ with ui.card(align_items="center").classes("absolute-center"):
         
         # Show gift list button
         ui.button("界面预览", on_click=lambda: open_capture())
-    ui.label(f"OBS浏览器源URL：http://127.0.0.1:{port}/capture")
+
+    with ui.row():
+        b_connect_switch = ui.switch("连接弹幕服务器", value=False, on_change=lambda: check_b_connect_status())
+        count_status_switch = ui.switch("启用礼物统计", value=False, on_change=lambda: change_count_status())
+        count_status_switch.disable()
+
+    ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
+    count_status_capture_label = ui.label(f"OBS礼物统计浏览器源URL：http://127.0.0.1:{port}/capture_gift")
+    count_status_capture_label.set_visibility(False)
 
 with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
