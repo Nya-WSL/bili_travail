@@ -16,7 +16,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.13.0-beta"
+version = "0.13.1-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
@@ -147,9 +147,9 @@ class BiliHandler(blivedm.BaseHandler):
                         changed_num = 0
                         result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_count.text)}\n总数量："
                     if type(special[gift]) == list:
-                        random_num = random.randint(special[gift][0], special[gift][1])
-                        changed_num = int(gift_count.text) + random_num
-                        result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
+                            random_num = random.randint(special[gift][0], special[gift][1])
+                            changed_num = int(gift_count.text) + random_num
+                            result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
                 else:
                     changed_num = (gifts[gift] * int(num)) + int(gift_count.text)
                     result = f"礼物：{gift}\n数量：{num}\n总数量："
@@ -401,7 +401,14 @@ def gift():
                     gifts[gift_name.value] = 0
                 result = f'添加成功，{gift_name.value} | 清空(缓冲3秒)'
             elif status.value == "random":
-                special[gift_name.value] = [int(min.value), int(max.value)]
+                try:
+                    if min.value <= max.value:
+                        special[gift_name.value] = [int(min.value), int(max.value)]
+                    else:
+                        ui.notify("盲盒的值必须最小数<=最大数", type="negative")
+                        return
+                except TypeError:
+                    ui.notify("盲盒的值为空", type="negative")
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
                 result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}秒随机'
@@ -547,7 +554,14 @@ def gift():
                     gifts[gift_name.value] = 0
                 result = f'添加成功，{gift_name.value} | 清空'
             elif status.value == "random":
-                special[gift_name.value] = [int(min.value), int(max.value)]
+                try:
+                    if min.value <= max.value:
+                        special[gift_name.value] = [int(min.value), int(max.value)]
+                    else:
+                        ui.notify("盲盒的值必须最小数<=最大数", type="negative")
+                        return
+                except TypeError:
+                    ui.notify("盲盒的值为空", type="negative")
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
                 result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}随机'
@@ -743,7 +757,7 @@ def capture():
         global refresh_capture_cd
         if refresh_capture_cd:
             refresh_capture_cd = False
-            # ui.run_javascript('window.location.reload()')
+            # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
             ui.navigate.to("/capture_cd")
 
     # Gifts List
@@ -813,7 +827,7 @@ def capture():
         global refresh_capture_gift
         if refresh_capture_gift:
             refresh_capture_gift = False
-            # ui.run_javascript('window.location.reload()')
+            # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
             ui.navigate.to("/capture_gift")
 
     # Gifts List
