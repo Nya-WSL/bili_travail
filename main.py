@@ -16,7 +16,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.13.1-beta"
+version = "0.13.2-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
@@ -41,8 +41,7 @@ if not os.path.exists("config.json"):
     ],
     "color": "#5898d4",
     "text_color": "#000000",
-    "local_text": False,
-    "count_status": False
+    "local_text": False
 }
             json.dump(config, f, indent=4, ensure_ascii=False)
     else:
@@ -277,6 +276,7 @@ class CountdownTimer:
             minute, second = divmod(self._remaining_time, 60)
             hour, minute = divmod(minute, 60)
             label.set_text("%02d:%02d:%02d" % (hour, minute, second))
+            print("剩余时间：%02d:%02d:%02d" % (hour, minute, second))
             await asyncio.sleep(1)
 
         if self._remaining_time <= 0:

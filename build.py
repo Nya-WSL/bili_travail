@@ -76,7 +76,11 @@ def main() -> None:
             "总督": "guard-level-1.png"
 }
     for i in guard.values():
-        shutil.copy(os.path.join("data", i), os.path.join("dist", "bili_travail", "data"))
+        save_path = os.path.join("dist", "bili_travail", "data")
+        save_file = os.path.join(save_path, i)
+        if not os.path.exists(save_path):
+            os.mkdir(save_path)
+        shutil.copy(os.path.join("data", i), save_file)
 
 if __name__ == '__main__':
     main()
