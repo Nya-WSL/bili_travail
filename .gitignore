@@ -165,3 +165,5 @@ save_test.html
 /data/*.json
 test*.*
 crawler.py
+version
+version.txt

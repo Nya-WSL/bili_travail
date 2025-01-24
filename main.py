@@ -1,5 +1,6 @@
 # Local Packages
 import gift as get_gift
+import log as cmd_log
 from blivedm import blivedm
 import blivedm.blivedm.models.web as web_models
 
@@ -16,7 +17,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.13.2-beta"
+version = "0.13.3-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
@@ -73,6 +74,10 @@ if not os.path.exists("data/special.json"):
     with open("data/special.json", "w+", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=4)
 
+# cmd log
+cmd_log.start_log(version)
+cmd_log.version_log(version)
+
 # handler
 async def start_handler():
     global client
@@ -113,7 +118,9 @@ async def start_handler():
 
 class BiliHandler(blivedm.BaseHandler):
     def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
-        print(f'[{client.room_id}] [{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 心跳')
+        # print(f'[{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
+        # heartbeat_status = f"[{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳"
+        print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
 
     # def _on_danmaku(self, client: blivedm.BLiveClient, message: web_models.DanmakuMessage):
     #     print(f'[{client.room_id}] {message.uname}：{message.msg}')
@@ -126,7 +133,6 @@ class BiliHandler(blivedm.BaseHandler):
         num = message.num
         result = ""
         if b_connect_status:
-            print("status: True")
             if count_status_switch.value:
                 with open("data/gifts_count.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
@@ -733,6 +739,7 @@ async def check_b_connect_status():
             b_connect_status = True
             asyncio.create_task(start_handler())
             ui.notify("已连接", type="positive")
+            print(f"[INFO] 已成功连接至{room_id.value}")
     elif not b_connect_switch.value and room_id.value != "":
         start_button.disable()
         count_status_switch.disable()
