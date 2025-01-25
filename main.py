@@ -17,7 +17,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.13.3-beta"
+version = "0.14.0-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
@@ -69,7 +69,11 @@ if not os.path.exists("data"):
 
 # init gift list
 if not os.path.exists("data/gifts.json"):
-    get_gift.get_gift("data/gifts.json", write=False, write_time=True, return_dict=True)
+    if config["room_id"] != "":
+        room_id = config["room_id"]
+        get_gift.get_gift(room_id, json_path="data/gifts_img.json", h5_path=f"data/{room_id}.html", write=False, write_time=True)
+    else:
+        get_gift.get_gift(json_path="data/gifts.json", write=False, write_time=True, init=True)
 
 # init special gift
 if not os.path.exists("data/special.json"):
@@ -780,7 +784,6 @@ def capture():
     if os.path.exists("data/gift_img.json"):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gift_img = json.load(f)
-        
     else:
         gift_img = get_gift.get_gift("data/gift_img.json", return_dict=True)
     if os.path.exists("data/special.json"):
