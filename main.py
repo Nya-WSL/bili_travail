@@ -36,8 +36,10 @@ if not os.path.exists("config.json"):
     "show_zero": False,
     "SESSDATA": "",
     "background_image": [
-        "https://nya-wsl.com/images/image01.jpg",
-        "static/sample.png",
+        "https://nya-wsl.com/images/image001.png",
+        "https://nya-wsl.com/images/image002.png",
+        "https://nya-wsl.com/images/image003.png",
+        "static/sample1.png",
         "static/sample2.png"
     ],
     "color": "#5898d4",
