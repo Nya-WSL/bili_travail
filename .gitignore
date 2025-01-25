@@ -167,3 +167,6 @@ test*.*
 crawler.py
 version
 version.txt
+packages/*
+/driver
+*.html
