@@ -17,7 +17,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.14.0-beta"
+version = "0.15.0-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
@@ -67,13 +67,16 @@ if not os.path.exists("data"):
 #         except:
 #             print(f"Failed to download {url + k}")
 
+with open("config.json", "r", encoding="utf-8") as f:
+    config = json.load(f)
+
 # init gift list
 if not os.path.exists("data/gifts.json"):
     if config["room_id"] != "":
         room_id = config["room_id"]
         get_gift.get_gift(room_id, json_path="data/gifts_img.json", h5_path=f"data/{room_id}.html", write=False, write_time=True)
     else:
-        get_gift.get_gift(json_path="data/gifts.json", write=False, write_time=True, init=True)
+        get_gift.init_gift("data/gifts_img.json", "data/gifts.json")
 
 # init special gift
 if not os.path.exists("data/special.json"):
@@ -140,65 +143,67 @@ class BiliHandler(blivedm.BaseHandler):
         result = ""
         if b_connect_status:
             if count_status_switch.value:
-                with open("data/gifts_count.json", "r", encoding="utf-8") as f:
-                    gifts = json.load(f)
-                with open("data/special_count.json", "r", encoding="utf-8") as f:
-                    special = json.load(f)
+                if os.path.exists("data/gifts_count.json"):
+                    with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+                        gifts = json.load(f)
+                    with open("data/special_count.json", "r", encoding="utf-8") as f:
+                        special = json.load(f)
 
-                if gift not in gifts:
-                    if gift not in special:
-                        gifts[gift] = 0
-                        with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
-                            json.dump(gifts, f, indent=4, ensure_ascii=False)
-                if gift in special:
-                    if special[gift] == "double":
-                        changed_num = int(gift_count.text) * (2 * int(num))
-                        result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
-                    if special[gift] == "clear":
-                        changed_num = 0
-                        result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_count.text)}\n总数量："
-                    if type(special[gift]) == list:
-                            random_num = random.randint(special[gift][0], special[gift][1])
-                            changed_num = int(gift_count.text) + random_num
-                            result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
-                else:
-                    changed_num = (gifts[gift] * int(num)) + int(gift_count.text)
-                    result = f"礼物：{gift}\n数量：{num}\n总数量："
-                gift_count.set_text(changed_num)
-                print(result, changed_num)
+                    if gift not in gifts:
+                        if gift not in special:
+                            gifts[gift] = 0
+                            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                                json.dump(gifts, f, indent=4, ensure_ascii=False)
+                    if gift in special:
+                        if special[gift] == "double":
+                            changed_num = int(gift_count.text) * (2 * int(num))
+                            result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
+                        if special[gift] == "clear":
+                            changed_num = 0
+                            result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_count.text)}\n总数量："
+                        if type(special[gift]) == list:
+                                random_num = random.randint(special[gift][0], special[gift][1])
+                                changed_num = int(gift_count.text) + random_num
+                                result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
+                    else:
+                        changed_num = (gifts[gift] * int(num)) + int(gift_count.text)
+                        result = f"礼物：{gift}\n数量：{num}\n总数量："
+                    gift_count.set_text(changed_num)
+                    print(result, changed_num)
 
             if cd_status:
-                with open("data/gifts.json", "r", encoding="utf-8") as f:
-                    gifts = json.load(f)
-                with open("data/special.json", "r", encoding="utf-8") as f:
-                    special = json.load(f)
+                if os.path.exists("data/gifts_count.json"):
+                    with open("data/gifts.json", "r", encoding="utf-8") as f:
+                        gifts = json.load(f)
+                    with open("data/special.json", "r", encoding="utf-8") as f:
+                        special = json.load(f)
 
-                tmp_time = countdown_timer.get_tmp_time()
+                    tmp_time = countdown_timer.get_tmp_time()
 
-                if gift not in gifts:
-                    if gift not in special:
-                        gifts[gift] = 0
-                        with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                            json.dump(gifts, f, indent=4, ensure_ascii=False)
-                if gift in special:
-                    if special[gift] == "double":
-                        changed_time = tmp_time * (2 * int(num))
-                        result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
-                    if special[gift] == "clear":
-                        changed_time = 3
-                        result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
-                    if type(special[gift]) == list:
-                        random_time = random.randint(special[gift][0], special[gift][1])
-                        changed_time = tmp_time + random_time
-                        result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
-                else:
-                    changed_time = (gifts[gift] * int(num)) + tmp_time
-                    result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+                    if gift not in gifts:
+                        if gift not in special:
+                            gifts[gift] = 0
+                            with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                                json.dump(gifts, f, indent=4, ensure_ascii=False)
+                    if gift in special:
+                        if special[gift] == "double":
+                            changed_time = tmp_time * (2 * int(num))
+                            result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+                        if special[gift] == "clear":
+                            changed_time = 3
+                            result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
+                        if type(special[gift]) == list:
+                            random_time = random.randint(special[gift][0], special[gift][1])
+                            changed_time = tmp_time + random_time
+                            result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
+                    else:
+                        changed_time = (gifts[gift] * int(num)) + tmp_time
+                        result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
 
-                countdown_timer.set_time(changed_time)
-                hour, minute = divmod(changed_time, 3600)
-                minute, second = divmod(minute, 60)
-                print(result, "%02d:%02d:%02d" % (hour, minute, second))
+                    countdown_timer.set_time(changed_time)
+                    hour, minute = divmod(changed_time, 3600)
+                    minute, second = divmod(minute, 60)
+                    print(result, "%02d:%02d:%02d" % (hour, minute, second))
 
 
     # def _on_buy_guard(self, client: blivedm.BLiveClient, message: web_models.GuardBuyMessage):
@@ -691,10 +696,22 @@ def gift():
 
         gift_count_dialog.open()
 
+    def refresh_gift():
+        ROOM_ID = room_id.value
+        if ROOM_ID == "":
+            ui.notify("请先填入房间号！", type="negative")
+        else:
+            try:
+                int(ROOM_ID)
+                get_gift.get_gift(ROOM_ID, json_path="data/gifts_img.json", h5_path=f"data/{room_id}.html", write=False, write_time=True)
+            except:
+                ui.notify("房间号似乎有误？", type="negative")
+
     with ui.dialog() as dialog, ui.card(align_items="center"):
         with ui.row():
             ui.button("加班设置", on_click=lambda: cd_setting_dialog())
             ui.button("礼物统计", on_click=lambda: gift_count_setting_dialog())
+            ui.button("刷新礼物", on_click=lambda: refresh_gift())
         ui.button("关闭", on_click=lambda: dialog.close())
 
     dialog.open()
