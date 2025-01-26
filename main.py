@@ -21,7 +21,6 @@ version = "0.15.0-beta"
 
 app.storage.general.indent = True
 app.add_static_files('/static', 'static')
-port = 65000
 refresh_capture_cd = False
 refresh_capture_gift = False
 b_connect_status = False
@@ -33,6 +32,7 @@ if not os.path.exists("config.json"):
         with open("config.json", "w+", encoding="utf-8") as f:
             config = {
     "room_id": "",
+    "port": 65000,
     "show_zero": False,
     "SESSDATA": "",
     "background_image": [
@@ -53,30 +53,30 @@ if not os.path.exists("config.json"):
 # init when the data folder does not exist
 if not os.path.exists("data"):
     os.mkdir("data")
-# download guard images
-#     guard = {
-#         "舰长": "guard-level-3.png",
-#         "提督": "guard-level-2.png",
-#         "总督": "guard-level-1.png"
-# }
-#     url = "https://nya-wsl.com/images/bili_travail/"
-#     for k,v in guard.items():
-#         try:
-#             with open(f"data/{v}", "wb") as f:
-#                 f.write(requests.get(url + k).content)
-#         except:
-#             print(f"Failed to download {url + k}")
 
+# 加载配置文件
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
-# init gift list
+port = config["port"]
+
+GiftManager = get_gift.BiliGiftManager()
+
+# 确保礼物数据文件存在，如果不存在，则进行初始化
 if not os.path.exists("data/gifts.json"):
-    if config["room_id"] != "":
-        room_id = config["room_id"]
-        get_gift.get_gift(room_id, json_path="data/gifts_img.json", h5_path=f"data/{room_id}.html", write=False, write_time=True)
+    # 如果配置文件中包含房间号，则传入；否则会触发 init_gift
+    room_id = config.get("room_id", "")
+
+    if room_id:
+        # 如果配置文件中有room_id，则使用该房间号
+        html_content = GiftManager.get_live_h5(room_id, img_path="data/gift_img.json", time_path="data/gifts.json", time=0, h5_path=f"data/{room_id}.html")
+        if not html_content: # 如果返回get_bili_h5_status = False
+            GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+        else:
+            GiftManager.convert_h5_to_json()
     else:
-        get_gift.init_gift("data/gifts_img.json", "data/gifts.json")
+        # 如果没有room_id，则直接初始化礼物数据
+        GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
 
 # init special gift
 if not os.path.exists("data/special.json"):

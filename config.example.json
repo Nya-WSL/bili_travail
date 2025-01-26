@@ -1,5 +1,6 @@
 {
     "room_id": "",
+    "port": 65000,
     "show_zero": false,
     "SESSDATA": "",
     "background_image": [
