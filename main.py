@@ -300,6 +300,8 @@ class CountdownTimer:
             label.set_text("00:00:00")
             start_button.enable()
             cancel_button.disable()
+            add_button.disable()
+            sub_button.disable()
 
     def start(self, label):
         global cd_status
@@ -746,18 +748,20 @@ def start_task():
 
 def add_time():
     try:
-        tmp_time = countdown_timer.get_tmp_time()
-        changed_time = tmp_time + ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value)
-        countdown_timer.set_time(changed_time)
+        if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
+            tmp_time = countdown_timer.get_tmp_time()
+            changed_time = tmp_time + ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1 # 在视觉效果上倒计时被正确反馈，实际上多加了1s
+            countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
 
 
 def sub_time():
     try:
-        tmp_time = countdown_timer.get_tmp_time()
-        changed_time = tmp_time - ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value)
-        countdown_timer.set_time(changed_time)
+        if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
+            tmp_time = countdown_timer.get_tmp_time()
+            changed_time = tmp_time - ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1  # 在视觉效果上倒计时被正确反馈，实际上少减了1s
+            countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
 

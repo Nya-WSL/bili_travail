@@ -20,6 +20,7 @@ def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True):
     options.add_argument("--no-sandbox")
     options.add_argument("--start-maximized")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--mute-audio")                  # 静音音频
 
     if os.path.exists(os.getcwd()+r"\\driver\\msedgedriver\\win64") == False:                                 # 若webdriver不存在则下载并运行
         print("[INFO] 未找到 Edge WebDriver 环境...下载中...")
