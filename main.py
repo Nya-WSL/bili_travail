@@ -302,6 +302,8 @@ class CountdownTimer:
             cancel_button.disable()
             add_button.disable()
             sub_button.disable()
+            resume_button.disable()
+            pause_button.disable()
 
     def start(self, label):
         global cd_status
@@ -817,12 +819,12 @@ def capture():
         with open("data/gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
     else:
-        gifts = GiftManager.convert_h5_to_json(config["room_id"], write_img=False, return_dict=True)
+        gifts = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False, return_dict=True)
     if os.path.exists("data/gift_img.json"):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gift_img = json.load(f)
     else:
-        gift_img = GiftManager.convert_h5_to_json(config["room_id"], write_time=False, return_dict=True)
+        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False, return_dict=True)
     if os.path.exists("data/special.json"):
         with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
@@ -837,37 +839,37 @@ def capture():
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                    ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                     ui.space()
-                    ui.label(f"{v}秒").classes("text-2xl").style(f"color: {config['text_color']}")
+                    ui.label(f"{v}秒").classes("text-3xl").style(f"color: {config['text_color']}")
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v}秒").classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(f"{v}秒").classes("text-3xl").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v[0]} ~ {v[1]}秒").classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(f"{v[0]} ~ {v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
                         if v == "clear":
                             v = "清空"
                         if v == "double":
                             v = "加倍"
-                        ui.label(v).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(v).classes("text-3xl").style(f"color: {config['text_color']}")
     ui.timer(5, callback=lambda: check_cd_refresh())
 
 @ui.page("/capture_gift", title="capture | bili_travail")
@@ -886,12 +888,12 @@ def capture():
         with open("data/gifts_count.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
     else:
-        gifts = GiftManager.convert_h5_to_json(config["room_id"], write_img=False, time_path="data/gifts_count.json", return_dict=True)
+        gifts = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False, time_path="data/gifts_count.json", return_dict=True)
     if os.path.exists("data/gift_img.json"):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gift_img = json.load(f)
     else:
-        gift_img = GiftManager.convert_h5_to_json(config["room_id"], write_time=False, return_dict=True)
+        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False, return_dict=True)
     if os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "r", encoding="utf-8") as f:
             special = json.load(f)
@@ -910,37 +912,37 @@ def capture():
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                    ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                     ui.space()
-                    ui.label(f"{v}{gift_play_unit_main.text}").classes("text-2xl").style(f"color: {config['text_color']}")
+                    ui.label(f"{v}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v}{gift_play_unit_main.text}").classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(f"{v}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
                         if v == "clear":
                             v = "清空"
                         if v == "double":
                             v = "加倍"
-                        ui.label(v).classes("text-2xl").style(f"color: {config['text_color']}")
+                        ui.label(v).classes("text-3xl").style(f"color: {config['text_color']}")
     ui.timer(5, callback=lambda: check_gift_refresh())
 
 with open("config.json", "r", encoding="utf-8") as f:

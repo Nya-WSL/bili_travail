@@ -2,6 +2,10 @@
 # 基础礼物数据存档
 # 2025/01/25
 # 数据源直播间:1815222606
+#
+# 盲盒数据
+# 2025/01/27
+# 数据源直播间:1815222606
 # ===============================
 gift_mapping = {
     "小花花": "https://s1.hdslb.com/bfs/live/8b40d0470890e7d573995383af8a8ae074d485d9.png@100w_100h.webp",
@@ -92,4 +96,28 @@ gift_mapping = {
     "冲浪": "https://s1.hdslb.com/bfs/live/3816eb1d809c7020a5ef6b4deb10ee9a470acdac.png@100w_100h.webp",
     "海湾之旅": "https://s1.hdslb.com/bfs/live/00587e5dee12f8b8715c2e470104e15a96be4534.png@100w_100h.webp",
     "鸿运小电视": "https://s1.hdslb.com/bfs/live/037ff1f5dbf1cb996a39cedc8b67fcdb04b00cdc.png@100w_100h.webp"
+}
+
+blind_box = {
+    "星月盲盒": {
+        "小蛋糕": "",
+        "星与月": "",
+        "情书": "",
+        "少女祈祷": "",
+        "冲鸭": "",
+        "星河入梦": "",
+        "落樱缤纷": "",
+    },
+    "心动盲盒": {
+        
+    },
+    "奇遇盲盒": {
+        
+    },
+    "闪耀盲盒": {
+        
+    },
+    "至尊盲盒": {
+        
+    },
 }
