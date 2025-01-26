@@ -136,10 +136,10 @@ class BiliGiftManager:
             # 返回字典
             return gift_mapping
 
-    def remove_h5_file(self):
+    def remove_h5_file(self, h5_path):
         try:
-            os.remove(self.h5_path)
+            os.remove(h5_path)
         except FileNotFoundError:
-            print(f"[WARNING] 文件 {self.h5_path} 不存在，跳过删除")
+            print(f"[WARNING] 文件 {h5_path} 不存在，跳过删除")
         except PermissionError:
-            print(f"[ERROR] 没有权限删除文件：{self.h5_path}")
+            print(f"[ERROR] 没有权限删除文件：{h5_path}")

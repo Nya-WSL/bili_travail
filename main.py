@@ -717,6 +717,7 @@ def gift():
         else:
             try:
                 int(ROOM_ID)
+                GiftManager.remove_h5_file(f"data/{ROOM_ID}.html")
                 html_content = GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html")
                 if html_content:
                     GiftManager.convert_h5_to_json(ROOM_ID)
