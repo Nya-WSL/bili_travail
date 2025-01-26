@@ -43,14 +43,12 @@ class BiliGiftManager:
                 json.dump(gift_mapping, f, ensure_ascii=False, indent=4)
             print("[INIT] 数据已重构为基础预设...")
 
-    def get_live_h5(self, room_id, h5_path = "data/saved_page.html"):
+    def get_live_h5(self, room_id, h5_path = "data/saved_page.html", headless = True):
         """
         爬取B站直播间
         :param room_id: 房间号
-        :param img_path: write_img保存JSON文件的路径，需指定到文件
-        :param time_path: write_time保存JSON文件的路径，需指定到文件
-        :param time: 礼物时长
-        :param h5_path: 需解析的HTML文件的路径，需指定到文件
+        :param h5_path: 解析的HTML文件的路径，需指定到文件
+        :param headless: 无头模式
         """
 
         # 初始化变量
@@ -58,20 +56,27 @@ class BiliGiftManager:
         self.h5_path = h5_path
 
         # 使用blive_crower爬取所连接的直播间h5代码
-        self.html_content = blive_crower.get_bili_h5(room_id, h5_path, False)
+        self.html_content = blive_crower.get_bili_h5(room_id, h5_path, headless)
 
-    def convert_h5_to_json(self, write_img = True, write_time = True, show = False, return_dict = False):
+    def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gifts_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, show = False, return_dict = False):
         """
         爬取并解析B站直播间礼物标签和URL，保存为JSON文件
+        :param h5_path: 解析的HTML文件的路径，需指定到文件
         :param write_img: 是否将解析结果保存为JSON文件
         :param write_time: 是否将礼物时长保存为JSON文件
+        :param img_path: write_img保存JSON文件的路径，需指定到文件
+        :param time_path: write_time保存JSON文件的路径，需指定到文件
+        :param time: 礼物时长
         :param show: 是否打印解析结果
         :param return_dict: 是否返回解析结果的字典
         """
 
-        soup = BeautifulSoup(self.html_content, 'html.parser') # 使用BeautifulSoup解析HTML
+        with open(h5_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
 
-        self.gift_mapping = {} # 创建一个空字典来存储礼物标签和URL
+        soup = BeautifulSoup(html_content, 'html.parser') # 使用BeautifulSoup解析HTML
+
+        gift_mapping = {} # 创建一个空字典来存储礼物标签和URL
 
         gift_items = soup.find_all('div', class_='gift-item') # 找到所有的礼物项
 
@@ -93,9 +98,9 @@ class BiliGiftManager:
                 gift_name = "error"
 
             # 将标签和URL对应起来
-            self.gift_mapping[gift_name] = img_url
-            if 'error' in self.gift_mapping:
-                del self.gift_mapping['error']
+            gift_mapping[gift_name] = img_url
+            if 'error' in gift_mapping:
+                del gift_mapping['error']
 
             guard = {
                 "舰长": "guard-level-3.png",
@@ -105,32 +110,36 @@ class BiliGiftManager:
             url = "https://nya-wsl.com/images/bili_travail/"
             for k,v in guard.items():
                 if not os.path.exists(f"data/{k}"):
-                    self.gift_mapping[k] = url + v
+                    gift_mapping[k] = url + v
                 else:
-                    self.gift_mapping[k] = f"data/{v}"
+                    gift_mapping[k] = f"data/{v}"
 
         if show:
             # 打印映射结果
-            for url, name in self.gift_mapping.items():
+            for url, name in gift_mapping.items():
                 print(f"URL: {url} -> 标签: {name}")
+
         if write_img:
             # 写入json文件
-            with open(self.img_path, "w", encoding="utf-8") as file:
-                json.dump(self.gift_mapping, file, ensure_ascii=False, indent=4)
-            try:
-                os.remove(self.h5_path)
-            except FileNotFoundError:
-                print(f"[WARNING] 文件 {self.h5_path} 不存在，跳过删除")
-            except PermissionError:
-                print(f"[ERROR] 没有权限删除文件：{self.h5_path}")
+            with open(img_path, "w", encoding="utf-8") as file:
+                json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
 
         if write_time:
             tmp_dict = {}
-            for k,v in self.gift_mapping.items():
-                tmp_dict[k] = self.time
+            for k,v in gift_mapping.items():
+                tmp_dict[k] = time
             # 写入json文件
-            with open(self.time_path, "w", encoding="utf-8") as file:
+            with open(time_path, "w", encoding="utf-8") as file:
                 json.dump(tmp_dict, file, ensure_ascii=False, indent=4)
+
         if return_dict:
             # 返回字典
-            return self.gift_mapping
+            return gift_mapping
+
+    def remove_h5_file(self):
+        try:
+            os.remove(self.h5_path)
+        except FileNotFoundError:
+            print(f"[WARNING] 文件 {self.h5_path} 不存在，跳过删除")
+        except PermissionError:
+            print(f"[ERROR] 没有权限删除文件：{self.h5_path}")

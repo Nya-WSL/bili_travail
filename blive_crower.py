@@ -149,3 +149,4 @@ def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True):
         driver.quit()
 
         print("[INFO] 完成!")
+        return get_bili_h5_status

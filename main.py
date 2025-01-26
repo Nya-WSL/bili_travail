@@ -69,11 +69,11 @@ if not os.path.exists("data/gifts.json"):
 
     if room_id:
         # 如果配置文件中有room_id，则使用该房间号
-        html_content = GiftManager.get_live_h5(room_id, img_path="data/gift_img.json", time_path="data/gifts.json", time=0, h5_path=f"data/{room_id}.html")
+        html_content = GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
         if not html_content: # 如果返回get_bili_h5_status = False
             GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
         else:
-            GiftManager.convert_h5_to_json()
+            GiftManager.convert_h5_to_json(room_id)
     else:
         # 如果没有room_id，则直接初始化礼物数据
         GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
@@ -705,13 +705,27 @@ def gift():
         gift_count_dialog.open()
 
     def refresh_gift():
+        def reset_gift_data():
+            GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+            reset_dialog.close()
+
         ROOM_ID = room_id.value
         if ROOM_ID == "":
             ui.notify("请先填入房间号！", type="negative")
         else:
             try:
                 int(ROOM_ID)
-                get_gift.get_gift(ROOM_ID, json_path="data/gifts_img.json", h5_path=f"data/{room_id}.html", write=False, write_time=True)
+                html_content = GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html")
+                if html_content:
+                    GiftManager.convert_h5_to_json(ROOM_ID)
+                else:
+                    with ui.dialog() as reset_dialog, ui.card(align_items="center"):
+                        with ui.row():
+                            ui.label("更新礼物数据失败。是否重置本地数据？")
+                        ui.button("确定", on_click=lambda: reset_gift_data())
+                        ui.button("取消", on_click=lambda: dialog.close())
+
+                    reset_dialog.open()
             except:
                 ui.notify("房间号似乎有误？", type="negative")
 
@@ -798,12 +812,12 @@ def capture():
         with open("data/gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
     else:
-        gifts = {}
+        gifts = GiftManager.convert_h5_to_json(config["room_id"], write_img=False, return_dict=True)
     if os.path.exists("data/gift_img.json"):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gift_img = json.load(f)
     else:
-        gift_img = get_gift.get_gift("data/gift_img.json", return_dict=True)
+        gift_img = GiftManager.convert_h5_to_json(config["room_id"], write_time=False, return_dict=True)
     if os.path.exists("data/special.json"):
         with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
@@ -867,12 +881,12 @@ def capture():
         with open("data/gifts_count.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
     else:
-        gifts = {}
+        gifts = GiftManager.convert_h5_to_json(config["room_id"], write_img=False, time_path="data/gifts_count.json", return_dict=True)
     if os.path.exists("data/gift_img.json"):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gift_img = json.load(f)
     else:
-        gift_img = get_gift.get_gift("data/gift_img.json", return_dict=True)
+        gift_img = GiftManager.convert_h5_to_json(config["room_id"], write_time=False, return_dict=True)
     if os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "r", encoding="utf-8") as f:
             special = json.load(f)
