@@ -311,6 +311,8 @@ class CountdownTimer:
                 input_hour.set_value(0)
                 input_minute.set_value(0)
                 input_second.set_value(0)
+                add_button.enable()
+                sub_button.enable()
                 cd_status = True
             else:
                 ui.notify("请输入时间", type="negative")
@@ -322,6 +324,8 @@ class CountdownTimer:
             self._paused_event.clear()  # Pause the timer
             resume_button.enable()
             pause_button.disable()
+            add_button.disable()
+            sub_button.disable()
             cd_status = False
 
     def resume(self):
@@ -331,6 +335,8 @@ class CountdownTimer:
             self._paused_event.set()  # Resume the timer
             pause_button.enable()
             resume_button.disable()
+            add_button.enable()
+            sub_button.enable()
             cd_status = True
 
     async def stop(self, label):
@@ -345,6 +351,8 @@ class CountdownTimer:
             cancel_button.disable()
             pause_button.disable()
             resume_button.disable()
+            add_button.disable()
+            sub_button.disable()
             cd_status = False
 
     def set_time(self, time):
@@ -355,8 +363,8 @@ class CountdownTimer:
                 self._task.cancel()
 
         # 更新起始时间和剩余时间
-        self._start_time = time + 1
-        self._remaining_time = time + 1
+        self._start_time = time
+        self._remaining_time = time
 
         # 更新 UI 上的显示
         hour, minute = divmod(self._remaining_time, 3600)
@@ -710,8 +718,8 @@ def gift():
     with ui.dialog() as dialog, ui.card(align_items="center"):
         with ui.row():
             ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-            ui.button("礼物统计", on_click=lambda: gift_count_setting_dialog())
-            ui.button("刷新礼物", on_click=lambda: refresh_gift())
+            ui.button("投喂挑战", on_click=lambda: gift_count_setting_dialog())
+            ui.button("更新礼物数据", on_click=lambda: refresh_gift())
         ui.button("关闭", on_click=lambda: dialog.close())
 
     dialog.open()
@@ -742,13 +750,6 @@ def sub_time():
 def save_config():
     with open("config.json", "w+", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
-
-def change_count_status():
-    save_config()
-    if count_status_switch.value:
-        count_status_capture_label.set_visibility(True)
-    else:
-        count_status_capture_label.set_visibility(False)
 
 async def check_b_connect_status():
     global b_connect_status
@@ -964,10 +965,12 @@ with ui.card(align_items="center").classes("absolute-center"):
 
     with ui.row():
         # Add time Button
-        ui.button("增加时长", on_click=lambda: add_time())
+        add_button = ui.button("增加时长", on_click=lambda: add_time())
+        add_button.disable()
 
         # Sub Time Button
-        ui.button("减少时长", on_click=lambda: sub_time())
+        sub_button = ui.button("减少时长", on_click=lambda: sub_time())
+        sub_button.disable()
 
         # Gift Setting button
         ui.button("礼物设置", on_click=lambda: gift())
@@ -977,12 +980,11 @@ with ui.card(align_items="center").classes("absolute-center"):
 
     with ui.row():
         b_connect_switch = ui.switch("连接弹幕服务器", value=False, on_change=lambda: check_b_connect_status())
-        count_status_switch = ui.switch("启用礼物统计", value=False, on_change=lambda: change_count_status())
+        count_status_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
         count_status_switch.disable()
 
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
-    count_status_capture_label = ui.label(f"OBS礼物统计浏览器源URL：http://127.0.0.1:{port}/capture_gift")
-    count_status_capture_label.set_visibility(False)
+    ui.label(f"OBS投喂挑战浏览器源URL：http://127.0.0.1:{port}/capture_gift")
 
 with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
