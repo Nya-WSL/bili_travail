@@ -170,3 +170,4 @@ version.txt
 packages/*
 /driver
 *.html
+/.nicegui

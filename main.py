@@ -56,6 +56,9 @@ if not os.path.exists("config.json"):
     else:
         shutil.copy("config.example.json", "config.json")
 
+if not os.path.exists(".nicegui/storage-general.json"):
+    app.storage.general["gift_challenge_count"] = ""
+
 # 检查data文件夹状态
 if not os.path.exists("data"):
     os.mkdir("data")
@@ -141,6 +144,7 @@ async def start_handler():
 
     finally:
         await session.close()
+        b_connect_switch.set_value(False)
 
 
 # 获取礼物信息
@@ -914,8 +918,8 @@ async def check_b_connect_status():
             gift_challenge_switch.enable()
             b_connect_status = True # 设置弹幕服务器连接状态
             asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
-            ui.notify("已连接", type="positive")
-            print(f"[INFO] 已成功连接至{room_id.value}")
+            ui.notify(f"正在尝试连接至 {room_id.value}")
+            print(f"[INFO] 正在尝试连接至 {room_id.value}")
 
     # 如果连接弹幕服务器开关为关且房间号不为空
     elif not b_connect_switch.value and room_id.value != "":
@@ -923,7 +927,8 @@ async def check_b_connect_status():
         gift_challenge_switch.disable()
         b_connect_status = False
         await client.stop_and_close() # 断开弹幕服务器ws连接并关闭blivedm客户端
-        ui.notify("已断开连接", type="positive")
+        ui.notify("已断开连接", type="warning")
+        print("[WARN] 已断开连接，这通常是因为手动关闭了连接或者房间号不正确")
 
 
 # 打开界面预览弹窗
@@ -1105,11 +1110,41 @@ with ui.card(align_items="center").classes("absolute-center"):
     gift_play_unit_main.set_visibility(False)
     gift_play_text_main.set_visibility(False)
 
+    ui.separator()
+
     # 时间输入框
     with ui.row():
         input_hour = ui.number("时", value=0, min=0).style("width: 100px")
         input_minute = ui.number("分", value=0, min=0).style("width: 100px")
         input_second = ui.number("秒", value=0, min=0).style("width: 100px")
+
+    # 倒计时按钮
+    with ui.row():
+        # Start button
+        start_button = ui.button('开始', on_click=lambda: start_task())
+        start_button.disable()
+
+        # Pause button
+        pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause())
+        pause_button.disable()
+
+        # Resume button
+        resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
+        resume_button.disable()
+
+        # Stop button
+        cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop(time_badge))
+        cancel_button.disable()
+
+        # Add time Button
+        add_button = ui.button("手动增加", on_click=lambda: add_time())
+        add_button.disable()
+
+        # Sub Time Button
+        sub_button = ui.button("手动减少", on_click=lambda: sub_time())
+        sub_button.disable()
+
+    ui.separator()
 
     # 房间号和颜色输入框，颜色只在about和capture页面生效
     with ui.row():
@@ -1117,45 +1152,26 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.color_input(label="倒计时颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
 
-    # 倒计时按钮
-    with ui.row():
-        # Start button
-        start_button = ui.button('开始加班', on_click=lambda: start_task())
-        start_button.disable()
-
-        # Pause button
-        pause_button = ui.button('暂停加班', on_click=lambda: countdown_timer.pause())
-        pause_button.disable()
-
-        # Resume button
-        resume_button = ui.button('继续加班', on_click=lambda: countdown_timer.resume())
-        resume_button.disable()
-
-        # Stop button
-        cancel_button = ui.button('停止加班', on_click=lambda: countdown_timer.stop(time_badge))
-        cancel_button.disable()
-
-        # Add time Button
-        add_button = ui.button("增加时长", on_click=lambda: add_time())
-        add_button.disable()
-
-        # Sub Time Button
-        sub_button = ui.button("减少时长", on_click=lambda: sub_time())
-        sub_button.disable()
-
-    # 按钮组
-    with ui.row():
-        # Gift Setting button
-        ui.button("礼物设置", on_click=lambda: gift())
-        
-        # Show gift list button
-        ui.button("界面预览", on_click=lambda: open_capture())
-
     # 开关组
     with ui.row():
         b_connect_switch = ui.switch("连接弹幕服务器", value=False, on_change=lambda: check_b_connect_status())
         gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
         gift_challenge_switch.disable()
+
+    # 按钮组
+    with ui.row():
+        # Gift Setting button
+        # ui.button("礼物设置", on_click=lambda: gift())
+        ui.button("加班礼物设置", on_click=lambda: gift())
+        ui.button("投喂挑战设置", on_click=lambda: gift())
+        
+        # Show gift list button
+        ui.button("界面预览", on_click=lambda: open_capture())
+        # Show gift list button
+        ui.button("更新礼物数据", on_click=lambda: open_capture())
+
+
+    ui.separator()
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
