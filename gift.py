@@ -16,7 +16,9 @@ class BiliGiftManager:
         :param time: 礼物时长
         """
 
-        url = "https://nya-wsl.com/bili_travail/gift/gift_img.json"
+        url = "https://nya-wsl.com/bili_travail/gift/gift_img.json" # 服务器url
+
+        # 尝试从服务器获取数据
         try:
             get_basic_gift = requests.get(url)
             if get_basic_gift.status_code == 200:
@@ -30,6 +32,8 @@ class BiliGiftManager:
                     json.dump(time_dict, f, ensure_ascii=False, indent=4)
             else:
                 raise ValueError("[ERROR] 无法获取Nya-WSL服务器存档数据...")
+
+        # 读取内置数据
         except:
             print("[ERROR] 联网获取礼物数据失败...")
             print("[INIT] 尝试重构基础礼物数据...")
@@ -97,7 +101,7 @@ class BiliGiftManager:
             else:
                 gift_name = "error"
 
-            # 将标签和URL对应起来
+            # 将标签和URL对应
             gift_mapping[gift_name] = img_url
             if 'error' in gift_mapping:
                 del gift_mapping['error']
@@ -106,8 +110,10 @@ class BiliGiftManager:
                 "舰长": "guard-level-3.png",
                 "提督": "guard-level-2.png",
                 "总督": "guard-level-1.png"
-            }
+            } # 舰队列表
+
             url = "https://nya-wsl.com/images/bili_travail/"
+
             for k,v in guard.items():
                 if not os.path.exists(f"data/{k}"):
                     gift_mapping[k] = url + v
@@ -120,7 +126,6 @@ class BiliGiftManager:
                 print(f"URL: {url} -> 标签: {name}")
 
         if write_img:
-            # 写入json文件
             with open(img_path, "w", encoding="utf-8") as file:
                 json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
 
@@ -128,7 +133,6 @@ class BiliGiftManager:
             tmp_dict = {}
             for k,v in gift_mapping.items():
                 tmp_dict[k] = time
-            # 写入json文件
             with open(time_path, "w", encoding="utf-8") as file:
                 json.dump(tmp_dict, file, ensure_ascii=False, indent=4)
 
@@ -136,6 +140,7 @@ class BiliGiftManager:
             # 返回字典
             return gift_mapping
 
+    # 删除文件
     def remove_h5_file(self, h5_path):
         try:
             os.remove(h5_path)

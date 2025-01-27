@@ -7,6 +7,8 @@
 # 2025/01/27
 # 数据源直播间:1815222606
 # ===============================
+
+# 基础礼物数据
 gift_mapping = {
     "小花花": "https://s1.hdslb.com/bfs/live/8b40d0470890e7d573995383af8a8ae074d485d9.png@100w_100h.webp",
     "舰长": "https://nya-wsl.com/images/bili_travail/guard-level-3.png",
@@ -98,6 +100,7 @@ gift_mapping = {
     "鸿运小电视": "https://s1.hdslb.com/bfs/live/037ff1f5dbf1cb996a39cedc8b67fcdb04b00cdc.png@100w_100h.webp"
 }
 
+# 盲盒数据
 blind_box = {
     "星月盲盒": {
         "小蛋糕": "",
