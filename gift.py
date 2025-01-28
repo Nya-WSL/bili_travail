@@ -40,8 +40,15 @@ class BiliGiftManager:
             print("[INIT] 尝试重构基础礼物数据...")
             time_dict = {}
             gift_mapping = gift_map.gift_mapping
+            blind_box = gift_map.blind_box
+
             for gift in gift_mapping.keys():
                 time_dict[gift] = time
+            for v in blind_box.values():
+                gift_mapping.update(v)
+                for gift in v.keys():
+                    time_dict[gift] = time
+
             with open(time_path, "w+", encoding="utf-8") as f:
                 json.dump(time_dict, f, ensure_ascii=False, indent=4)
             with open(img_path, "w+", encoding="utf-8") as f:

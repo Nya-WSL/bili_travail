@@ -18,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.16.0-alpha"
+version = "0.16.2-alpha"
 
 # ================================
 # 检查环境状态
@@ -1260,7 +1260,7 @@ with ui.card(align_items="center").classes("absolute-center"):
     ui.separator()
 
     with ui.row():
-        ui.color_input(label="倒计时颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+        ui.color_input(label="强调色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
         # Show gift list button
         ui.button("界面预览", on_click=lambda: open_capture())
