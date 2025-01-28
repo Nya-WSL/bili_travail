@@ -18,10 +18,14 @@ def version_log(current_version):
                 latest_version = latest_version.text # 服务器返回内容
             else:
                 print("无法连接至服务器，版本更新检查失败...")
+                print("─────────────────────────────────────────────────────")
                 latest_version = "Error"
+                return latest_version
         except:
             print("无法连接至服务器，版本更新检查失败...")
+            print("─────────────────────────────────────────────────────")
             latest_version = "Error" # 如果请求均失败版本信息设为"Error"
+            return latest_version
 
     if current_version != latest_version:
         if latest_version != "Error":
@@ -31,6 +35,11 @@ def version_log(current_version):
         else:
             print("已是最新版本！")
             print("─────────────────────────────────────────────────────")
+    else:
+            print("已是最新版本！")
+            print("─────────────────────────────────────────────────────")
+
+    return latest_version
 
 # 项目信息
 def start_log(current_version):

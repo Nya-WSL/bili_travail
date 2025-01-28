@@ -103,24 +103,39 @@ gift_mapping = {
 # 盲盒数据
 blind_box = {
     "星月盲盒": {
-        "小蛋糕": "",
-        "星与月": "",
-        "情书": "",
-        "少女祈祷": "",
-        "冲鸭": "",
-        "星河入梦": "",
-        "落樱缤纷": "",
+        "小蛋糕": "https://s1.hdslb.com/bfs/live/309db349ba6307dc5437e9fb83c9ce86c56d3346.png",
+        "星与月": "https://s1.hdslb.com/bfs/live/142bb568ea6f90af22a48945f47514d6151d0ac3.png",
+        "情书": "https://s1.hdslb.com/bfs/live/14dafbf217618f0931c08897e0b3eefc00d0da22.png",
+        "少女祈祷": "https://s1.hdslb.com/bfs/live/3f59e679d630dbc2fc54216f23a3bea50bc636c0.png",
+        "冲鸭": "https://s1.hdslb.com/bfs/live/6e35fb88d5f038890a7ac8849158628a2bcce22d.png",
+        "星河入梦": "https://s1.hdslb.com/bfs/live/311930350df3b8e467d13b992e62344ca1e3664f.png",
+        "落樱缤纷": "https://s1.hdslb.com/bfs/live/30718e4c1cb21d14798c7739d7808994f411170c.png",
     },
     "心动盲盒": {
-        
-    },
-    "奇遇盲盒": {
-        
+        "电影票": "https://s1.hdslb.com/bfs/live/20864a10beaea541c7dce264d5bbc56676d63e4f.png",
+        "棉花糖": "https://s1.hdslb.com/bfs/live/b555682af41551c28f8ad19dc5c4ed87943c84f4.png",
+        "爱心抱枕": "https://s1.hdslb.com/bfs/live/824714c830966d7bec381e35ef808b1f478e21ee.png",
+        "绮彩权杖": "https://s1.hdslb.com/bfs/live/5cecbf274a4205ef76ed3f11c6540f0c6743363c.png",
+        "时空之站": "https://s1.hdslb.com/bfs/live/9ee53aedda3c891fdf23d35c14b3bdc4e0504a97.png",
+        "龙吟法杖": "https://s1.hdslb.com/bfs/live/9cc47284f07d0a0c2421f2ab3b6351c4a24d2f9f.png",
+        "浪漫城堡": "https://s1.hdslb.com/bfs/live/216fac597b3c5619d56ed332bcf5f880ea657e8e.png"
     },
     "闪耀盲盒": {
-        
+        "幻影飞船": "https://s1.hdslb.com/bfs/live/5f6a9d8d80943515c9cb7aea789ce8188e2b84d7.png",
+        "龙运亨通": "https://s1.hdslb.com/bfs/live/3c64da5de7579f28136d7c4e01ff2687d618389a.png",
+        "龙吟法杖": "https://s1.hdslb.com/bfs/live/9cc47284f07d0a0c2421f2ab3b6351c4a24d2f9f.png",
+        "时空之站": "https://s1.hdslb.com/bfs/live/9ee53aedda3c891fdf23d35c14b3bdc4e0504a97.png",
+        "机械幻想": "https://s1.hdslb.com/bfs/live/2f3b0c0407308d5603b504390ae2473116829793.png",
+        "旅行日记": "https://s1.hdslb.com/bfs/live/16ec07eebfe768bab3d28421dccc35dd0cc90132.png",
+        "璀璨钻石": "https://s1.hdslb.com/bfs/live/a0031d70323d085203c57272758520fe95bfeec0.png"
     },
     "至尊盲盒": {
-        
+        "奇幻之城": "https://s1.hdslb.com/bfs/live/6b7745e07edf7b99fe85860af6a06c53f60c0b5a.png",
+        "龙运亨通": "https://s1.hdslb.com/bfs/live/3c64da5de7579f28136d7c4e01ff2687d618389a.png",
+        "龙吟法杖": "https://s1.hdslb.com/bfs/live/9cc47284f07d0a0c2421f2ab3b6351c4a24d2f9f.png",
+        "星际启航": "https://s1.hdslb.com/bfs/live/c329eded2b05cd6a03b34626233028e4d9ddd9b9.png",
+        "许愿精灵": "https://s1.hdslb.com/bfs/live/a02afd18fc93670e9adb6da42675bb5aba92c587.png",
+        "绮彩权杖": "https://s1.hdslb.com/bfs/live/5cecbf274a4205ef76ed3f11c6540f0c6743363c.png",
+        "璀璨钻石": "https://s1.hdslb.com/bfs/live/a0031d70323d085203c57272758520fe95bfeec0.png"
     },
 }

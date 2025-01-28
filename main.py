@@ -1,4 +1,5 @@
 # Local Packages
+import blive_crower
 import gift as get_gift
 import log as cmd_log
 from blivedm import blivedm
@@ -17,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.15.0-alpha"
+version = "0.16.0-alpha"
 
 # ================================
 # 检查环境状态
@@ -149,9 +150,15 @@ async def start_handler():
 
 # 获取礼物信息
 class BiliHandler(blivedm.BaseHandler):
+    heart_count = 0
     # 心跳数据
     def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
+        self.heart_count += 1
         print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
+        if self.heart_count < 2:
+            b_connect_switch.set_value(True)
+            b_connect_switch.set_text("已连接弹幕服务器")
+            print(f"[INFO] 已成功连接至 {room_id.value}")
 
     # 弹幕数据
     # def _on_danmaku(self, client: blivedm.BLiveClient, message: web_models.DanmakuMessage):
@@ -489,37 +496,42 @@ class CountdownTimer:
 # GUI
 # ================================
 
-# 礼物设置
-def gift():
+### 礼物设置
 
-    # 倒计时设置弹窗
-    def cd_setting_dialog():
-        # 设置数值输入框是否允许可视/编辑
-        def show():
-            if status.value == "add" or status.value == "sub":
-                time.set_visibility(True)
-            else:
-                time.set_visibility(False)
-            if status.value == "random":
-                min.set_visibility(True)
-                max.set_visibility(True)
-            else:
-                min.set_visibility(False)
-                max.set_visibility(False)
-            if status.value == "double" or status.value == "clear" or status.value == "random":
-                time.disable()
-            else:
-                time.enable()
-            if status.value == "delete":
-                time.disable()
+# 倒计时设置弹窗
+def cd_setting_dialog():
+    # 设置数值输入框是否允许可视/编辑
+    def show():
+        if status.value == "add" or status.value == "sub":
+            time.set_visibility(True)
+        else:
+            time.set_visibility(False)
+        if status.value == "random":
+            min.set_visibility(True)
+            max.set_visibility(True)
+        else:
+            min.set_visibility(False)
+            max.set_visibility(False)
+        if status.value == "double" or status.value == "clear" or status.value == "random":
+            time.disable()
+        else:
+            time.enable()
+        if status.value == "delete":
+            time.disable()
 
-        # 确定按钮
-        def run():
-            global refresh_capture_cd
-            with open("data/gifts.json", "r+", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special.json", "r", encoding="utf-8") as f:
-                special = json.load(f)
+    # 确定按钮
+    def run():
+        global refresh_capture_cd
+        with open("data/gifts.json", "r+", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+        if gift_name.value == None or time.value < 0:
+            if gift_name.value == None:
+                ui.notify("请选择礼物", type="negative")
+            if time.value < 0:
+                ui.notify("时间不能是负数", type="negative")
+        else:
             if status.value == "add":
                 gifts[gift_name.value] = int(time.value)
                 if gift_name.value in special:
@@ -534,7 +546,7 @@ def gift():
                 special[gift_name.value] = "double"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | 双倍'
+                result = f'添加成功，{gift_name.value} | 加倍'
             elif status.value == "clear":
                 special[gift_name.value] = "clear"
                 if gift_name.value in gifts:
@@ -568,122 +580,145 @@ def gift():
             refresh_capture_cd = True # 设置capture刷新状态
             cd_dialog.close() # 关闭弹窗
 
-        # 重置按钮
-        def reset():
-            global refresh_capture
-            with open("data/gifts.json", "r+", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special.json", "r+", encoding="utf-8") as f:
-                special = json.load(f)
-            for k in gifts.keys():
-                gifts[k] = 0
-            special = {}
-            with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, ensure_ascii=False, indent=4)
-            with open("data/special.json", "w+", encoding="utf-8") as f:
-                json.dump(special, f, ensure_ascii=False, indent=4)
-            refresh_capture = True
-            cd_dialog.close()
+    # 重置按钮
+    def reset():
+        global refresh_capture
+        with open("data/gifts.json", "r+", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r+", encoding="utf-8") as f:
+            special = json.load(f)
+        for k in gifts.keys():
+            gifts[k] = 0
+        special = {}
+        with open("data/gifts.json", "w+", encoding="utf-8") as f:
+            json.dump(gifts, f, ensure_ascii=False, indent=4)
+        with open("data/special.json", "w+", encoding="utf-8") as f:
+            json.dump(special, f, ensure_ascii=False, indent=4)
+        refresh_capture = True
+        cd_dialog.close()
 
-        # 设置预览
-        def gift_list_fun():
-            with open("data/gifts.json", "r", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special.json", "r", encoding="utf-8") as f:
-                special = json.load(f)
-            ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
-            # ui.separator()
-            for k,v in gifts.items():
-                if config["show_zero"]: # 如果配置文件的"show_zero"为True，则显示值为0的礼物
+    # 设置预览
+    def gift_list_fun():
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+        ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
+        # ui.separator()
+        for k,v in gifts.items():
+            if config["show_zero"]: # 如果配置文件的"show_zero"为True，则显示值为0的礼物
+                with ui.row().classes('w-full'):
+                    ui.label(k)
+                    ui.space()
+                    if v < 0:
+                        ui.label(f"{int(v)}秒")
+                    else:
+                        ui.label(f"+{int(v)}秒")
+            else:
+                if v != 0:
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
-                        ui.label(f"{v}秒")
-                else:
-                    if v != 0:
-                        with ui.row().classes('w-full'):
-                            ui.label(k)
-                            ui.space()
-                            ui.label(f"{v}秒")
+                        if v < 0:
+                            ui.label(f"{int(v)}秒")
+                        else:
+                            ui.label(f"+{int(v)}秒")
 
-            if special != {}: # 如果特殊礼物的数据不是空的
-                for k,v in special.items():
-                    if type(v) == list:
-                        with ui.row().classes('w-full'):
-                            ui.label(k)
-                            ui.space()
+        if special != {}: # 如果特殊礼物的数据不是空的
+            for k,v in special.items():
+                if type(v) == list:
+                    with ui.row().classes('w-full'):
+                        ui.label(k)
+                        ui.space()
+                        if v[1] < 0:
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}秒")
+                        elif v[0] < 0 and v[1] != 0:
+                            ui.label(f"{int(v[0])} ~ +{v[1]}秒")
+                        elif v[0] < 0 and v[1] == 0:
+                            ui.label(f"{int(v[0])} ~ {v[1]}秒")
+                        elif v[0] == 0 and v[1] == 0:
                             ui.label(f"{v[0]} ~ {v[1]}秒")
-                    else:
-                        with ui.row().classes('w-full'):
-                            ui.label(k)
-                            ui.space()
+                        elif v[0] == 0 and v[1] != 0:
+                            ui.label(f"{v[0]} ~ +{v[1]}秒")
+                        else:
+                            ui.label(f"+{v[0]} ~ +{v[1]}秒")
+                else:
+                    with ui.row().classes('w-full'):
+                        ui.label(k)
+                        ui.space()
 
-                            # 格式化输出
-                            if v == "clear":
-                                v = "清空"
-                            if v == "double":
-                                v = "加倍"
-                            ui.label(v)
-            ui.separator() # 分割线
+                        # 格式化输出
+                        if v == "clear":
+                            v = "清空"
+                        if v == "double":
+                            v = "加倍"
+                        ui.label(v)
+        ui.separator() # 分割线
 
-        # 弹窗
-        with ui.dialog() as cd_dialog, ui.card(align_items="center"):
-            with open("data/gifts.json", "r", encoding="utf-8") as f:
-                gifts = json.load(f)
-            gift_list_fun()
-            with ui.row(align_items="center"):
-                gifts_name = []
-                for k,v in gifts.items():
-                    gifts_name.append(k)
-                gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
+    # 弹窗
+    with ui.dialog() as cd_dialog, ui.card(align_items="center"):
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+        gift_list_fun()
+        with ui.row(align_items="center"):
+            gifts_name = []
+            for k,v in gifts.items():
+                gifts_name.append(k)
+            gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
 
-            status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "随机", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
+        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "随机", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
 
-            # 数值输入框
-            with ui.row():
-                min = ui.number("随机最小数(秒)", value=0)
-                max = ui.number("随机最大数(秒)", value=0)
-                time = ui.number(label="时长(秒)", value=0)
-                time.set_visibility(False)
-                min.set_visibility(False)
-                max.set_visibility(False)
+        # 数值输入框
+        with ui.row():
+            min = ui.number("随机最小数(秒)", value=0)
+            max = ui.number("随机最大数(秒)", value=0)
+            time = ui.number(label="时长(秒)", value=0, min=0)
+            time.set_visibility(False)
+            min.set_visibility(False)
+            max.set_visibility(False)
 
-            # 按钮
-            with ui.row():
-                ui.button('提交', on_click=lambda: run())
-                ui.button("重置全部", on_click=lambda: reset())
-                ui.button('关闭', on_click=lambda: cd_dialog.close())
+        # 按钮
+        with ui.row():
+            ui.button('提交', on_click=lambda: run())
+            ui.button("重置全部", on_click=lambda: reset())
+            ui.button('关闭', on_click=lambda: cd_dialog.close())
 
-        cd_dialog.open() # 打开弹窗
+    cd_dialog.open() # 打开弹窗
 
-    # 投喂挑战弹窗
-    def gift_count_setting_dialog():
-        global gift_play_unit
-        global gift_play_text
-        def show():
-            if status.value == "add" or status.value == "sub":
-                number.set_visibility(True)
-            else:
-                number.set_visibility(False)
-            if status.value == "random":
-                min.set_visibility(True)
-                max.set_visibility(True)
-            else:
-                min.set_visibility(False)
-                max.set_visibility(False)
-            if status.value == "double" or status.value == "clear" or status.value == "random":
-                number.disable()
-            else:
-                number.enable()
-            if status.value == "delete":
-                number.disable()
+# 投喂挑战弹窗
+def gift_count_setting_dialog():
+    global gift_play_unit
+    global gift_play_text
+    def show():
+        if status.value == "add" or status.value == "sub":
+            number.set_visibility(True)
+        else:
+            number.set_visibility(False)
+        if status.value == "random":
+            min.set_visibility(True)
+            max.set_visibility(True)
+        else:
+            min.set_visibility(False)
+            max.set_visibility(False)
+        if status.value == "double" or status.value == "clear" or status.value == "random":
+            number.disable()
+        else:
+            number.enable()
+        if status.value == "delete":
+            number.disable()
 
-        def run():
-            global refresh_capture_gift
-            with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special_count.json", "r", encoding="utf-8") as f:
-                special = json.load(f)
+    def run():
+        global refresh_capture_gift
+        with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special_count.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+        if gift_name.value == None or number.value < 0:
+            if gift_name.value == None:
+                ui.notify("请选择礼物", type="negative")
+            if number.value < 0:
+                ui.notify("数量不能是负数", type="negative")
+        else:
             if status.value == "add":
                 gifts[gift_name.value] = int(number.value)
                 if gift_name.value in special:
@@ -698,7 +733,7 @@ def gift():
                 special[gift_name.value] = "double"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | 双倍'
+                result = f'添加成功，{gift_name.value} | 加倍'
             elif status.value == "clear":
                 special[gift_name.value] = "clear"
                 if gift_name.value in gifts:
@@ -731,144 +766,114 @@ def gift():
             refresh_capture_gift = True
             gift_count_dialog.close()
 
-        def reset():
-            global refresh_capture
-            with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special_count.json", "r+", encoding="utf-8") as f:
-                special = json.load(f)
-            for k in gifts.keys():
-                gifts[k] = 0
-            special = {}
-            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, ensure_ascii=False, indent=4)
-            with open("data/special_count.json", "w+", encoding="utf-8") as f:
-                json.dump(special, f, ensure_ascii=False, indent=4)
-            refresh_capture = True
-            gift_count_dialog.close()
+    def reset():
+        global refresh_capture
+        with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special_count.json", "r+", encoding="utf-8") as f:
+            special = json.load(f)
+        for k in gifts.keys():
+            gifts[k] = 0
+        special = {}
+        with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+            json.dump(gifts, f, ensure_ascii=False, indent=4)
+        with open("data/special_count.json", "w+", encoding="utf-8") as f:
+            json.dump(special, f, ensure_ascii=False, indent=4)
+        refresh_capture = True
+        gift_count_dialog.close()
 
-        def gift_list_fun():
-            with open("data/gifts_count.json", "r", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special_count.json", "r", encoding="utf-8") as f:
-                special = json.load(f)
-            ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
-            # ui.separator()
-            for k,v in gifts.items():
-                if config["show_zero"]:
+    def gift_list_fun():
+        with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special_count.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+        ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
+        # ui.separator()
+        for k,v in gifts.items():
+            if config["show_zero"]:
+                with ui.row().classes('w-full'):
+                    ui.label(k)
+                    ui.space()
+                    ui.label(f"{v}")
+            else:
+                if v != 0:
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
                         ui.label(f"{v}")
+        if special != {}:
+            for k,v in special.items():
+                if type(v) == list:
+                    with ui.row().classes('w-full'):
+                        ui.label(k)
+                        ui.space()
+                        ui.label(f"{v[0]} ~ {v[1]}")
                 else:
-                    if v != 0:
-                        with ui.row().classes('w-full'):
-                            ui.label(k)
-                            ui.space()
-                            ui.label(f"{v}")
-            if special != {}:
-                for k,v in special.items():
-                    if type(v) == list:
-                        with ui.row().classes('w-full'):
-                            ui.label(k)
-                            ui.space()
-                            ui.label(f"{v[0]} ~ {v[1]}")
-                    else:
-                        with ui.row().classes('w-full'):
-                            ui.label(k)
-                            ui.space()
-                            if v == "clear":
-                                v = "清空"
-                            if v == "double":
-                                v = "加倍"
-                            ui.label(v)
-            ui.separator()
+                    with ui.row().classes('w-full'):
+                        ui.label(k)
+                        ui.space()
+                        if v == "clear":
+                            v = "清空"
+                        if v == "double":
+                            v = "加倍"
+                        ui.label(v)
+        ui.separator()
 
-        with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
-            if not os.path.exists("data/gifts_count.json"):
-                with open("data/gifts.json", "r", encoding="utf-8") as f:
-                    gifts = json.load(f)
-                with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
-                    json.dump(gifts, f, ensure_ascii=False, indent=4)
-            if not os.path.exists("data/special_count.json"):
-                with open("data/special_count.json", "w+", encoding="utf-8") as f:
-                    json.dump({}, f, ensure_ascii=False, indent=4)
-
-            with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+    with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
+        if not os.path.exists("data/gifts_count.json"):
+            with open("data/gifts.json", "r", encoding="utf-8") as f:
                 gifts = json.load(f)
+            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+        if not os.path.exists("data/special_count.json"):
+            with open("data/special_count.json", "w+", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=4)
 
-            gift_list_fun()
-            with ui.row(align_items="center"):
-                gifts_name = []
-                for k,v in gifts.items():
-                    gifts_name.append(k)
-                gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
+        with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
 
-            status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "clear": "清空", "random": "随机", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
-            with ui.row():
-                min = ui.number("随机最小数", value=0)
-                max = ui.number("随机最大数", value=0)
-                number = ui.number(label="数量", value=0).style("width: 150px")
+        gift_list_fun()
+        with ui.row(align_items="center"):
+            gifts_name = []
+            for k,v in gifts.items():
+                gifts_name.append(k)
+            gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
 
-                # 自定义单位、项目输入框
-                if gift_play_unit_main != "":
-                    gift_play_unit = ui.input("单位", value=gift_play_unit_main.text, on_change=lambda e: gift_play_unit_main.set_text(e.value))
-                else:
-                    gift_play_unit = ui.input("单位", on_change=lambda e: gift_play_unit_main.set_text(e.value))
-                if gift_play_text_main != "":
-                    gift_play_text = ui.input("项目", value=gift_play_text_main.text, on_change=lambda e: gift_play_text_main.set_text(e.value))
-                else:
-                    gift_play_text = ui.input("项目", on_change=lambda e: gift_play_text_main.set_text(e.value))
-
-                number.set_visibility(False)
-                min.set_visibility(False)
-                max.set_visibility(False)
-
-            with ui.row():
-                ui.button('提交', on_click=lambda: run())
-                ui.button("重置", on_click=lambda: reset())
-                ui.button('关闭', on_click=lambda: gift_count_dialog.close())
-
-        gift_count_dialog.open()
-
-    # 更新礼物数据
-    def refresh_gift():
-        # 重置本地数据
-        def reset_gift_data():
-            GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
-            reset_dialog.close()
-
-        ROOM_ID = room_id.value
-        if ROOM_ID == "":
-            ui.notify("请先填入房间号！", type="negative")
-        else:
-            try:
-                int(ROOM_ID) # 判断ROOM_ID是否是数字
-                GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
-                html_content = GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
-                # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
-                if html_content:
-                    GiftManager.convert_h5_to_json(ROOM_ID)
-                else:
-                    with ui.dialog() as reset_dialog, ui.card(align_items="center"):
-                        with ui.row():
-                            ui.label("更新礼物数据失败。是否重置本地数据？")
-                        ui.button("确定", on_click=lambda: reset_gift_data())
-                        ui.button("取消", on_click=lambda: dialog.close())
-
-                    reset_dialog.open()
-            except:
-                ui.notify("房间号似乎有误？", type="negative")
-
-    # 礼物设置弹窗
-    with ui.dialog() as dialog, ui.card(align_items="center"):
+        status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "clear": "清空", "random": "随机", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
-            ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-            ui.button("投喂挑战", on_click=lambda: gift_count_setting_dialog())
-            ui.button("更新礼物数据", on_click=lambda: refresh_gift())
-        ui.button("关闭", on_click=lambda: dialog.close())
+            min = ui.number("随机最小数", value=0)
+            max = ui.number("随机最大数", value=0)
+            number = ui.number(label="数量", value=0, min=0).style("width: 150px")
 
-    dialog.open()
+            # 自定义单位、项目输入框
+            if gift_play_unit_main != "":
+                gift_play_unit = ui.input("单位", value=gift_play_unit_main.text, on_change=lambda e: gift_play_unit_main.set_text(e.value))
+            else:
+                gift_play_unit = ui.input("单位", on_change=lambda e: gift_play_unit_main.set_text(e.value))
+            if gift_play_text_main != "":
+                gift_play_text = ui.input("项目", value=gift_play_text_main.text, on_change=lambda e: gift_play_text_main.set_text(e.value))
+            else:
+                gift_play_text = ui.input("项目", on_change=lambda e: gift_play_text_main.set_text(e.value))
+
+            number.set_visibility(False)
+            min.set_visibility(False)
+            max.set_visibility(False)
+
+        with ui.row():
+            ui.button('提交', on_click=lambda: run())
+            ui.button("重置全部", on_click=lambda: reset())
+            ui.button('关闭', on_click=lambda: gift_count_dialog.close())
+
+    gift_count_dialog.open()
+
+# 礼物设置弹窗
+# with ui.dialog() as dialog, ui.card(align_items="center"):
+#     with ui.row():
+#         ui.button("加班设置", on_click=lambda: cd_setting_dialog())
+#         ui.button("投喂挑战", on_click=lambda: gift_count_setting_dialog())
+#     ui.button("关闭", on_click=lambda: dialog.close())
+
+# dialog.open()
 
 # 运行倒计时
 def start_task():
@@ -908,28 +913,40 @@ def save_config():
 # 检查弹幕服务器连接状态
 async def check_b_connect_status():
     global b_connect_status
-    # 如果连接弹幕服务器开关为开
-    if b_connect_switch.value:
-        if room_id.value == "": # 如果房间号为空
-            ui.notify("请输入房间号", type="negative")
-            b_connect_switch.set_value(False) # 重置开关为关
-        else:
-            start_button.enable()
-            gift_challenge_switch.enable()
-            b_connect_status = True # 设置弹幕服务器连接状态
-            asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
-            ui.notify(f"正在尝试连接至 {room_id.value}")
-            print(f"[INFO] 正在尝试连接至 {room_id.value}")
 
     # 如果连接弹幕服务器开关为关且房间号不为空
-    elif not b_connect_switch.value and room_id.value != "":
+    if b_connect_switch.value == False and room_id.value != "":
         start_button.disable()
         gift_challenge_switch.disable()
         b_connect_status = False
         await client.stop_and_close() # 断开弹幕服务器ws连接并关闭blivedm客户端
-        ui.notify("已断开连接", type="warning")
-        print("[WARN] 已断开连接，这通常是因为手动关闭了连接或者房间号不正确")
+        ui.notify("已断开连接，这通常是因为手动关闭了连接或房间号不正确")
+        b_connect_switch.set_value(False)
+        b_connect_switch.set_text("连接至弹幕服务器")
+        print("[WARN] 已断开连接，这通常是因为手动关闭了连接或房间号不正确")
 
+    # 
+    if b_connect_switch.value == "null":
+        if not b_connect_status:
+            asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
+            b_connect_switch.set_value("null")
+            b_connect_switch.set_text("尝试连接弹幕服务器")
+            print(f"[INFO] 正在尝试连接至 {room_id.value}")
+            b_connect_status = True # 设置弹幕服务器连接状态
+        else:
+            b_connect_switch.set_value(True)
+
+    # 如果连接弹幕服务器开关为开
+    if b_connect_switch.value == True:
+        if room_id.value == "": # 如果房间号为空
+            ui.notify("请输入房间号", type="negative")
+            b_connect_switch.set_value(False) # 重置开关为关
+
+        if b_connect_status:
+            start_button.enable()
+            gift_challenge_switch.enable()
+        else:
+            b_connect_switch.set_value("null")
 
 # 打开界面预览弹窗
 def open_capture():
@@ -938,10 +955,71 @@ def open_capture():
         ui.label("如OBS未刷新，请点击：浏览器源 → 刷新当前页面缓存")
         with ui.row():
             ui.button("加班预览", on_click=lambda: ui.navigate.to("/capture_cd", new_tab=True)).on(type="click", handler=lambda: dialog.close())
-            ui.button("统计预览", on_click=lambda: ui.navigate.to("/capture_gift", new_tab=True)).on(type="click", handler=lambda: dialog.close())
+            ui.button("挑战预览", on_click=lambda: ui.navigate.to("/capture_gift", new_tab=True)).on(type="click", handler=lambda: dialog.close())
             ui.button("关闭", on_click=lambda: dialog.close())
 
     dialog.open()
+
+# 更新礼物数据
+async def refresh_gift():
+    # 重置本地数据
+    def reset_gift_data():
+        try:
+            GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+            ui.notify("重置成功", type="negative")
+            reset_dialog.close()
+        except:
+            ui.notify("重置失败", type="positive")
+
+    ROOM_ID = room_id.value
+    if ROOM_ID == "":
+        ui.notify("请先填入房间号！", type="negative")
+    else:
+        
+        int(ROOM_ID) # 判断ROOM_ID是否是数字
+        GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
+        html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
+        # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
+        if html_content:
+            print("[INFO] 正在格式化数据...")
+            GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
+            print("[INFO] 礼物数据更新完成!")
+            ui.notify("礼物数据更新完成", type="positive")
+        else:
+            with ui.dialog() as reset_dialog, ui.card(align_items="center"):
+                with ui.row():
+                    ui.label("更新礼物数据失败。是否重置本地数据？")
+                ui.button("确定", on_click=lambda: reset_gift_data())
+                ui.button("取消", on_click=lambda: reset_dialog.close())
+
+            reset_dialog.open()
+
+
+# 检查版本更新按钮
+async def check_update():
+    def version_dialog():
+        with ui.dialog() as dialog, ui.card(align_items="center"):
+            ui.label(f"当前版本：{version} | 最新版本：{status}")
+
+            with ui.row():
+                ui.button("gtihub", on_click=lambda: ui.navigate.to(f"https://github.com/Nya-WSL/bili_travail/releases/tag/v{status}", new_tab=True))
+                ui.button("Nya-WSL", on_click=lambda: ui.navigate.to(f"https://nya-wsl.com/bili_travail/releases/{status}.zip", new_tab=True))
+                ui.button("Nya-WSL Cloud", on_click=lambda: ui.navigate.to(f"https://cloud.nya-wsl.cn/ms-drive/bili_travail/releases/", new_tab=True))
+                ui.button("取消", on_click=lambda: dialog.close())
+
+        dialog.open()
+
+    ui.notify("检查更新中...")
+    await asyncio.sleep(2)
+    status = cmd_log.version_log(version)
+    if status != version:
+        if status != "Error":
+            version_dialog()
+        else:
+            ui.notify("检查更新失败！", type="negative")
+    else:
+        ui.notify("已是最新版本！", type="positive")
+
 
 # 倒计时预览
 @ui.page("/capture_cd", title="capture | bili_travail")
@@ -987,7 +1065,10 @@ def capture():
                         ui.image().bind_source_from(gift_img, k)
                     ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                     ui.space()
-                    ui.label(f"{v}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                    if v < 0:
+                        ui.label(f"{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                    else:
+                        ui.label(f"+{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
@@ -995,7 +1076,10 @@ def capture():
                             ui.image().bind_source_from(gift_img, k)
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        if v < 0:
+                            ui.label(f"{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        else:
+                            ui.label(f"+{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
@@ -1004,7 +1088,18 @@ def capture():
                             ui.image().bind_source_from(gift_img, k)
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v[0]} ~ {v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        if v[1] < 0:
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] < 0 and v[1] != 0:
+                            ui.label(f"{int(v[0])} ~ +{v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] < 0 and v[1] == 0:
+                            ui.label(f"{int(v[0])} ~ {v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] == 0 and v[1] == 0:
+                            ui.label(f"{v[0]} ~ {v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] == 0 and v[1] != 0:
+                            ui.label(f"{v[0]} ~ +{v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        else:
+                            ui.label(f"+{v[0]} ~ +{v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
@@ -1078,7 +1173,18 @@ def capture():
                             ui.image().bind_source_from(gift_img, k)
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        if v[1] < 0:
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] < 0 and v[1] != 0:
+                            ui.label(f"{int(v[0])} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] < 0 and v[1] == 0:
+                            ui.label(f"{int(v[0])} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] == 0 and v[1] == 0:
+                            ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v[0] == 0 and v[1] != 0:
+                            ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        else:
+                            ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
@@ -1110,13 +1216,13 @@ with ui.card(align_items="center").classes("absolute-center"):
     gift_play_unit_main.set_visibility(False)
     gift_play_text_main.set_visibility(False)
 
-    ui.separator()
-
     # 时间输入框
     with ui.row():
         input_hour = ui.number("时", value=0, min=0).style("width: 100px")
         input_minute = ui.number("分", value=0, min=0).style("width: 100px")
         input_second = ui.number("秒", value=0, min=0).style("width: 100px")
+        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
+        gift_challenge_switch.disable()
 
     # 倒计时按钮
     with ui.row():
@@ -1149,29 +1255,30 @@ with ui.card(align_items="center").classes("absolute-center"):
     # 房间号和颜色输入框，颜色只在about和capture页面生效
     with ui.row():
         room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id") # 实时写入房间号到配置文件
+        b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+
+    ui.separator()
+
+    with ui.row():
         ui.color_input(label="倒计时颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
-
-    # 开关组
-    with ui.row():
-        b_connect_switch = ui.switch("连接弹幕服务器", value=False, on_change=lambda: check_b_connect_status())
-        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
-        gift_challenge_switch.disable()
+        # Show gift list button
+        ui.button("界面预览", on_click=lambda: open_capture())
 
     # 按钮组
     with ui.row():
         # Gift Setting button
         # ui.button("礼物设置", on_click=lambda: gift())
-        ui.button("加班礼物设置", on_click=lambda: gift())
-        ui.button("投喂挑战设置", on_click=lambda: gift())
-        
-        # Show gift list button
-        ui.button("界面预览", on_click=lambda: open_capture())
-        # Show gift list button
-        ui.button("更新礼物数据", on_click=lambda: open_capture())
-
+        ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
+        ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
 
     ui.separator()
+
+    with ui.row():
+        # Update gift data button
+        ui.button("更新礼物数据", on_click=lambda: refresh_gift())
+        # Check update button
+        ui.button("检查版本更新", on_click=lambda: check_update())
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
@@ -1203,11 +1310,11 @@ def _():
                     msg_index.append(k)
                 msg_index.remove("group_a")
                 msg = text.json()[random.choice(msg_index)]
-                ui.chat_message(msg["text_a"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
-                ui.chat_message(msg["text_b"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
+                ui.chat_message(msg["text_a"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
+                ui.chat_message(msg["text_b"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
             else:
-                ui.chat_message(text.json()["group_a"]["text_a"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
-                ui.chat_message(text.json()["group_a"]["text_b"], avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
+                ui.chat_message(text.json()["group_a"]["text_a"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
+                ui.chat_message(text.json()["group_a"]["text_b"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
         else:
             if os.path.exists("data/text_a.txt"):
                 with open("data/text_a.txt", "r", encoding="utf-8") as f:
@@ -1225,8 +1332,8 @@ def _():
                 with open("data/text_b.txt", "w", encoding="utf-8") as f:
                     f.write(text_b)
 
-            ui.chat_message(text_a, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696", name="高橋はるき", text_html=True, sent=True)
-            ui.chat_message(text_b, avatar="https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930", name="狐日泽", text_html=True)
+            ui.chat_message(text_a, avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
+            ui.chat_message(text_b, avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
 
         # 项目介绍
         ui.html('A Project of <u><a href="https://nya-wsl.com" target="_blank">Nya-WSL</a></u>.')
@@ -1235,17 +1342,23 @@ def _():
         ui.separator()
 
         # 开发组成员显示
+        ui.label(f"联系我们").classes("text-2xl").style(f"color: {config['text_color']}")
         with ui.row():
             with ui.column(align_items="center"):
                 with ui.link(target="https://space.bilibili.com/16748991", new_tab=True):
                     with ui.avatar():
-                        ui.image("https://q1.qlogo.cn/g?b=qq&s=100&nk=1357515696")
+                        ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"))
                 ui.badge("高橋はるき", outline=True)
             with ui.column(align_items="center"):
                 with ui.link(target="https://space.bilibili.com/8907402", new_tab=True):
                     with ui.avatar():
-                        ui.image("https://q1.qlogo.cn/g?b=qq&s=100&nk=1095530930")
+                        ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
                 ui.badge("狐日泽", outline=True)
+            # with ui.column(align_items="center"):
+            #     with ui.link(target="https://space.bilibili.com/3546729020394298/", new_tab=True):
+            #         with ui.avatar():
+            #             ui.image(blive_crower.get_bili_img("https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"))
+            #     ui.badge("千蚀vita", outline=True)
         ui.separator()
 
         # 联系我们

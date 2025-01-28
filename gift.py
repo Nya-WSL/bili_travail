@@ -1,5 +1,6 @@
 import os
 import json
+import aiofiles
 import requests
 import blive_crower
 import gift_mapping as gift_map
@@ -61,8 +62,9 @@ class BiliGiftManager:
 
         # 使用blive_crower爬取所连接的直播间h5代码
         self.html_content = blive_crower.get_bili_h5(room_id, h5_path, headless)
+        return self.html_content
 
-    def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gifts_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, show = False, return_dict = False):
+    async def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gifts_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, show = False, return_dict = False):
         """
         爬取并解析B站直播间礼物标签和URL，保存为JSON文件
         :param h5_path: 解析的HTML文件的路径，需指定到文件
@@ -75,8 +77,8 @@ class BiliGiftManager:
         :param return_dict: 是否返回解析结果的字典
         """
 
-        with open(h5_path, "r", encoding="utf-8") as f:
-            html_content = f.read()
+        async with aiofiles.open(h5_path, "r", encoding="utf-8") as f:
+            html_content = await f.read()
 
         soup = BeautifulSoup(html_content, 'html.parser') # 使用BeautifulSoup解析HTML
 
