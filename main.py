@@ -1,4 +1,7 @@
 # Local Packages
+from itertools import count
+
+from annotated_types import T
 import blive_crower
 import gift as get_gift
 import log as cmd_log
@@ -7,6 +10,7 @@ import blivedm.blivedm.models.web as web_models
 
 # Third Party Packages
 import os
+import sys
 import json
 import shutil
 import random
@@ -18,7 +22,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.16.3-alpha"
+version = "0.17.0-dev"
 
 # ================================
 # 检查环境状态
@@ -85,7 +89,7 @@ async def init_config():
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
-            html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
+            html_content = GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
             if not html_content:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
                 GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
             else:  # 格式化B站礼物数据为json
@@ -94,12 +98,19 @@ async def init_config():
             # 如果没有room_id，则从Nya-WSL服务器或本地注入方式写入
             GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
 
-    # 初始化special.json数据
+    # 初始化数据
     if not os.path.exists("data/special.json"):
         with open("data/special.json", "w+", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
 
-init_config()
+    if not os.path.exists("data/gifts_count.json"):
+        shutil.copy("data/gifts.json", "data/gifts_count.json")
+
+    if not os.path.exists("data/special_count.json"):
+        with open("data/special_count.json", "w+", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
+
+asyncio.run(init_config())
 
 # ================================
 # 程序运行
@@ -566,12 +577,6 @@ def cd_setting_dialog():
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
                 result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}秒随机'
-            elif status.value == "delete":
-                if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
-                if gift_name.value in special:
-                    special.pop(gift_name.value)
-                result = f'删除成功 → {gift_name.value}'
 
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -584,20 +589,50 @@ def cd_setting_dialog():
 
     # 重置按钮
     def reset():
-        global refresh_capture
+        def double_check():
+            global refresh_capture_cd
+            with open("data/gifts.json", "r+", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special.json", "r+", encoding="utf-8") as f:
+                special = json.load(f)
+            for k in gifts.keys():
+                gifts[k] = 0
+            special = {}
+            with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+            with open("data/special.json", "w+", encoding="utf-8") as f:
+                json.dump(special, f, ensure_ascii=False, indent=4)
+            refresh_capture_cd = True
+            double_check_dialog.close()
+            cd_dialog.close()
+
+        with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
+            ui.label("是否确认重置所有礼物？")
+
+            ui.button("确认重置", on_click=lambda: double_check())
+            ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+
+        double_check_dialog.open()
+
+    def delete():
+        global refresh_capture_cd
         with open("data/gifts.json", "r+", encoding="utf-8") as f:
             gifts = json.load(f)
         with open("data/special.json", "r+", encoding="utf-8") as f:
             special = json.load(f)
-        for k in gifts.keys():
-            gifts[k] = 0
-        special = {}
+        if gift_name.value in gifts:
+            gifts[gift_name.value] = 0
+        if gift_name.value in special:
+            special.pop(gift_name.value)
+        result = f'删除成功 → {gift_name.value}'
         with open("data/gifts.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
         with open("data/special.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
-        refresh_capture = True
-        cd_dialog.close()
+
+        ui.notify(result, type="positive")
+        refresh_capture_cd = True # 设置capture刷新状态
+        cd_dialog.close() # 关闭弹窗
 
     # 设置预览
     def gift_list_fun():
@@ -668,7 +703,7 @@ def cd_setting_dialog():
                 gifts_name.append(k)
             gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
 
-        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "随机", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
+        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
 
         # 数值输入框
         with ui.row():
@@ -682,6 +717,7 @@ def cd_setting_dialog():
         # 按钮
         with ui.row():
             ui.button('提交', on_click=lambda: run())
+            ui.button("删除", on_click=lambda: delete())
             ui.button("重置全部", on_click=lambda: reset())
             ui.button('关闭', on_click=lambda: cd_dialog.close())
 
@@ -753,12 +789,6 @@ def gift_count_setting_dialog():
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
                 result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}随机'
-            elif status.value == "delete":
-                if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
-                if gift_name.value in special:
-                    special.pop(gift_name.value)
-                result = f'删除成功 → {gift_name.value}'
 
             with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -769,20 +799,49 @@ def gift_count_setting_dialog():
             gift_count_dialog.close()
 
     def reset():
-        global refresh_capture
+        def double_check():
+            global refresh_capture_gift
+            with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special_count.json", "r+", encoding="utf-8") as f:
+                special = json.load(f)
+            for k in gifts.keys():
+                gifts[k] = 0
+            special = {}
+            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                json.dump(gifts, f, ensure_ascii=False, indent=4)
+            with open("data/special_count.json", "w+", encoding="utf-8") as f:
+                json.dump(special, f, ensure_ascii=False, indent=4)
+            refresh_capture_gift = True
+            gift_count_dialog.close()
+
+        with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
+            ui.label("是否确认重置所有礼物？")
+
+            ui.button("确认重置", on_click=lambda: double_check())
+            ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+
+        double_check_dialog.open()
+
+    def delete():
+        global refresh_capture_gift
         with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
             gifts = json.load(f)
         with open("data/special_count.json", "r+", encoding="utf-8") as f:
             special = json.load(f)
-        for k in gifts.keys():
-            gifts[k] = 0
-        special = {}
+        if gift_name.value in gifts:
+            gifts[gift_name.value] = 0
+        if gift_name.value in special:
+            special.pop(gift_name.value)
+        result = f'删除成功 → {gift_name.value}'
         with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
         with open("data/special_count.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
-        refresh_capture = True
-        gift_count_dialog.close()
+
+        ui.notify(result, type="positive")
+        refresh_capture_gift = True # 设置capture刷新状态
+        gift_count_dialog.close() # 关闭弹窗
 
     def gift_list_fun():
         with open("data/gifts_count.json", "r", encoding="utf-8") as f:
@@ -822,15 +881,6 @@ def gift_count_setting_dialog():
         ui.separator()
 
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
-        if not os.path.exists("data/gifts_count.json"):
-            with open("data/gifts.json", "r", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, ensure_ascii=False, indent=4)
-        if not os.path.exists("data/special_count.json"):
-            with open("data/special_count.json", "w+", encoding="utf-8") as f:
-                json.dump({}, f, ensure_ascii=False, indent=4)
-
         with open("data/gifts_count.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
 
@@ -841,7 +891,7 @@ def gift_count_setting_dialog():
                 gifts_name.append(k)
             gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
 
-        status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "clear": "清空", "random": "随机", "delete": "删除"}, on_change=lambda: show()).classes('items-center')
+        status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
             min = ui.number("随机最小数", value=0)
             max = ui.number("随机最大数", value=0)
@@ -863,6 +913,7 @@ def gift_count_setting_dialog():
 
         with ui.row():
             ui.button('提交', on_click=lambda: run())
+            ui.button("删除", on_click=lambda: delete())
             ui.button("重置全部", on_click=lambda: reset())
             ui.button('关闭', on_click=lambda: gift_count_dialog.close())
 
@@ -1385,4 +1436,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=True)
+ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[800, 900], reconnect_timeout=15)
