@@ -18,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.16.2-alpha"
+version = "0.16.3-alpha"
 
 # ================================
 # 检查环境状态
@@ -76,28 +76,30 @@ port = config["port"]
 
 GiftManager = get_gift.BiliGiftManager()
 
-# 初始化gifts.json数据
-# 确保礼物数据文件存在，如果不存在，则先进行初始化礼物数据
-if not os.path.exists("data/gifts.json"):
-    # 如果配置文件中包含房间号，则传入；否则会触发 init_gift
-    room_id = config.get("room_id", "")
+async def init_config():
+    # 初始化gifts.json数据
+    # 确保礼物数据文件存在，如果不存在，则先进行初始化礼物数据
+    if not os.path.exists("data/gifts.json"):
+        # 如果配置文件中包含房间号，则传入；否则会触发 init_gift
+        room_id = config.get("room_id", "")
 
-    # 如果配置文件中有room_id，则使用该房间号
-    if room_id:
-        html_content = GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
-        if not html_content:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
+        # 如果配置文件中有room_id，则使用该房间号
+        if room_id:
+            html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
+            if not html_content:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
+                GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+            else:  # 格式化B站礼物数据为json
+                await GiftManager.convert_h5_to_json(room_id)
+        else:
+            # 如果没有room_id，则从Nya-WSL服务器或本地注入方式写入
             GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
-        else:  # 格式化B站礼物数据为json
-            GiftManager.convert_h5_to_json(room_id)
-    else:
-        # 如果没有room_id，则从Nya-WSL服务器或本地注入方式写入
-        GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
 
-# 初始化special.json数据
-if not os.path.exists("data/special.json"):
-    with open("data/special.json", "w+", encoding="utf-8") as f:
-        json.dump({}, f, ensure_ascii=False, indent=4)
+    # 初始化special.json数据
+    if not os.path.exists("data/special.json"):
+        with open("data/special.json", "w+", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
 
+init_config()
 
 # ================================
 # 程序运行
@@ -982,7 +984,7 @@ async def refresh_gift():
         # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
         if html_content:
             print("[INFO] 正在格式化数据...")
-            GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
+            await GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
             print("[INFO] 礼物数据更新完成!")
             ui.notify("礼物数据更新完成", type="positive")
         else:
@@ -1023,7 +1025,7 @@ async def check_update():
 
 # 倒计时预览
 @ui.page("/capture_cd", title="capture | bili_travail")
-def capture():
+async def capture():
     # 检查是否需要刷新页面
     def check_cd_refresh():
         global refresh_capture_cd
@@ -1035,16 +1037,22 @@ def capture():
     # 初始化礼物列表
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    if os.path.exists("data/gifts.json"):
-        with open("data/gifts.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
-    else:
-        gifts = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False, return_dict=True)
-    if os.path.exists("data/gift_img.json"):
-        with open("data/gift_img.json", "r", encoding="utf-8") as f:
-            gift_img = json.load(f)
-    else:
-        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False, return_dict=True)
+
+
+    if not os.path.exists("data/gifts.json"):
+        await GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False)
+
+    with open("data/gifts.json", "r", encoding="utf-8") as f:
+        gifts = json.load(f)
+
+
+    if not os.path.exists("data/gift_img.json"):
+        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False)
+
+    with open("data/gift_img.json", "r", encoding="utf-8") as f:
+        gift_img = json.load(f)
+
+
     if os.path.exists("data/special.json"):
         with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
@@ -1126,16 +1134,22 @@ def capture():
     # 礼物列表
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    if os.path.exists("data/gifts_count.json"):
-        with open("data/gifts_count.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
-    else:
-        gifts = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False, time_path="data/gifts_count.json", return_dict=True)
-    if os.path.exists("data/gift_img.json"):
-        with open("data/gift_img.json", "r", encoding="utf-8") as f:
-            gift_img = json.load(f)
-    else:
-        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False, return_dict=True)
+
+
+    if not os.path.exists("data/gifts_count.json"):
+        gifts = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False, time_path="data/gifts_count.json")
+
+    with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+        gifts = json.load(f)
+
+
+    if not os.path.exists("data/gift_img.json"):
+        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False)
+
+    with open("data/gift_img.json", "r", encoding="utf-8") as f:
+        gift_img = json.load(f)
+
+
     if os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "r", encoding="utf-8") as f:
             special = json.load(f)

@@ -71,7 +71,7 @@ class BiliGiftManager:
         self.html_content = blive_crower.get_bili_h5(room_id, h5_path, headless)
         return self.html_content
 
-    async def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gifts_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, show = False, return_dict = False):
+    async def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, show = False):
         """
         爬取并解析B站直播间礼物标签和URL，保存为JSON文件
         :param h5_path: 解析的HTML文件的路径，需指定到文件
@@ -81,7 +81,6 @@ class BiliGiftManager:
         :param time_path: write_time保存JSON文件的路径，需指定到文件
         :param time: 礼物时长
         :param show: 是否打印解析结果
-        :param return_dict: 是否返回解析结果的字典
         """
 
         async with aiofiles.open(h5_path, "r", encoding="utf-8") as f:
@@ -124,7 +123,7 @@ class BiliGiftManager:
             url = "https://nya-wsl.com/images/bili_travail/"
 
             for k,v in guard.items():
-                if not os.path.exists(f"data/{k}"):
+                if not os.path.exists(f"data/{v}"):
                     gift_mapping[k] = url + v
                 else:
                     gift_mapping[k] = f"data/{v}"
@@ -145,9 +144,6 @@ class BiliGiftManager:
             with open(time_path, "w", encoding="utf-8") as file:
                 json.dump(tmp_dict, file, ensure_ascii=False, indent=4)
 
-        if return_dict:
-            # 返回字典
-            return gift_mapping
 
     # 删除文件
     def remove_h5_file(self, h5_path):

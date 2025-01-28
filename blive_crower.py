@@ -40,7 +40,7 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
 
     if os.path.exists(os.getcwd()+r"\\driver\\msedgedriver\\win64") == False:                                 # 若webdriver不存在则下载并运行
         print("[INFO] 未找到 Edge WebDriver 环境...下载中...")
-        os.system(f"selenium-manager.exe --cache-path {cache_path} --browser edge")
+        os.system(f'selenium-manager.exe --cache-path "{cache_path}" --browser edge')
         print("[INFO] Edge WebDriver 环境下载完成...")
         dir_list = os.listdir(os.getcwd()+r"\\driver\\msedgedriver\\win64")
         pattern = '*'
@@ -152,7 +152,7 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             async with aiofiles.open(h5_path, "a", encoding="utf-8") as file:
                 await file.write(driver.page_source)
         except Exception:
-            print(f"[ERROR] 未能获取直播间专属礼物数据(或...")
+            print(f"[ERROR] 未能获取直播间专属礼物数据...")
         print("[INFO] 等待缓存数据...")
         await asyncio.sleep(3)
 
