@@ -55,7 +55,7 @@ class BiliGiftManager:
                 json.dump(gift_mapping, f, ensure_ascii=False, indent=4)
             print("[INIT] 数据已重构为基础预设...")
 
-    def get_live_h5(self, room_id, h5_path = "data/saved_page.html", headless = True):
+    async def get_live_h5(self, room_id, h5_path = "data/saved_page.html", headless = True):
         """
         爬取B站直播间
         :param room_id: 房间号
@@ -68,7 +68,7 @@ class BiliGiftManager:
         self.h5_path = h5_path
 
         # 使用blive_crower爬取所连接的直播间h5代码
-        self.html_content = blive_crower.get_bili_h5(room_id, h5_path, headless)
+        self.html_content = await blive_crower.get_bili_h5(room_id, h5_path, headless)
         return self.html_content
 
     async def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, show = False):

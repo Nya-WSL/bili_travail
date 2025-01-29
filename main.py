@@ -1,7 +1,4 @@
 # Local Packages
-from itertools import count
-
-from annotated_types import T
 import blive_crower
 import gift as get_gift
 import log as cmd_log
@@ -22,7 +19,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.17.0-dev"
+version = "0.17.0-alpha"
 
 # ================================
 # 检查环境状态
@@ -35,6 +32,35 @@ refresh_capture_cd = False  # 初始倒计时化刷新状态
 refresh_capture_gift = False  # 初始化投喂挑战刷新状态
 b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
+reset_inherit_status = False # 初始化重置继承倒计时状态
+
+def format_seconds(seconds):
+    """
+    格式化时间
+    :param seconds: 秒数
+    """
+    # 处理符号：正数加 `+`，负数加 `-`，0 不加符号
+    if seconds > 0:
+        sign = "+"
+    elif seconds < 0:
+        sign = "-"
+    else:
+        sign = ""
+    # 取绝对值计算
+    seconds = abs(seconds)
+    # 转换为小时、分钟和秒，转化为整数型格式
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds = int(seconds % 60)
+    # 格式化输出
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}小时")
+    if minutes > 0:  # 只有分钟 > 0 时才显示 "分"
+        parts.append(f"{minutes}分")
+    if seconds > 0 or (hours == 0 and minutes == 0):  # 有秒或时分均为 0 时，才显示秒
+        parts.append(f"{seconds}秒")
+    return sign + "".join(parts)  # 返回结果，注意是字符串形式
 
 # 检查配置文件状态
 # 如配置文件不存在，则注入示例文件/使用内置预设
@@ -62,7 +88,10 @@ if not os.path.exists("config.json"):
         shutil.copy("config.example.json", "config.json")
 
 if not os.path.exists(".nicegui/storage-general.json"):
-    app.storage.general["gift_challenge_count"] = ""
+    app.storage.general["gift_challenge_count"] = 0
+    app.storage.general["gift_challenge_unit"] = ""
+    app.storage.general["gift_challenge_text"] = ""
+    app.storage.general["countdown_time"] = 0
 
 # 检查data文件夹状态
 if not os.path.exists("data"):
@@ -89,11 +118,11 @@ async def init_config():
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
-            html_content = GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
+            html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
             if not html_content:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
                 GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
             else:  # 格式化B站礼物数据为json
-                await GiftManager.convert_h5_to_json(room_id)
+                await GiftManager.convert_h5_to_json(h5_path=f"data/{room_id}.html")
         else:
             # 如果没有room_id，则从Nya-WSL服务器或本地注入方式写入
             GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
@@ -167,11 +196,11 @@ class BiliHandler(blivedm.BaseHandler):
     # 心跳数据
     def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
         self.heart_count += 1
-        print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
+        # print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
         if self.heart_count < 2:
             b_connect_switch.set_value(True)
             b_connect_switch.set_text("已连接弹幕服务器")
-            print(f"[INFO] 已成功连接至 {room_id.value}")
+            # print(f"[INFO] 已成功连接至 {room_id.value}")
 
     # 弹幕数据
     # def _on_danmaku(self, client: blivedm.BLiveClient, message: web_models.DanmakuMessage):
@@ -222,7 +251,7 @@ class BiliHandler(blivedm.BaseHandler):
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
-                    print(result, changed_num)
+                    # print(result, changed_num)
 
             if cd_status:  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
@@ -242,23 +271,21 @@ class BiliHandler(blivedm.BaseHandler):
                     if gift in special:
                         if special[gift] == "double":
                             changed_time = tmp_time * (2 * int(num))
-                            result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
                         if special[gift] == "clear":
                             changed_time = 3
-                            result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
+                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
                         if type(special[gift]) == list:
                             random_time = random.randint(special[gift][0], special[gift][1])
                             changed_time = tmp_time + random_time
-                            result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
+                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
-                        result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+                        result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
-                    # 时间数据格式化
-                    hour, minute = divmod(changed_time, 3600)
-                    minute, second = divmod(minute, 60)
-                    print(result, "%02d:%02d:%02d" % (hour, minute, second))
+
+                    # 重置主界面预览文本
 
 
     # def _on_buy_guard(self, client: blivedm.BLiveClient, message: web_models.GuardBuyMessage):
@@ -320,7 +347,7 @@ class BiliHandler(blivedm.BaseHandler):
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
-                    print(result, changed_num)
+                    # print(result, changed_num)
 
             if cd_status:  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
@@ -340,23 +367,21 @@ class BiliHandler(blivedm.BaseHandler):
                     if gift in special:
                         if special[gift] == "double":
                             changed_time = tmp_time * (2 * int(num))
-                            result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time}秒\nurl:{message.gift_img}\n总时长："
+                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
                         if special[gift] == "clear":
                             changed_time = 3
-                            result = f"礼物：{gift}\n数量：{num}\n加时：{changed_time - tmp_time}秒\nurl:{message.gift_img}\n总时长："
+                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
                         if type(special[gift]) == list:
                             random_time = random.randint(special[gift][0], special[gift][1])
                             changed_time = tmp_time + random_time
-                            result = f"礼物：{gift}\n数量：{num}\n加时：{random_time}秒\nurl:{message.gift_img}\n总时长："
+                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
-                        result = f"礼物：{gift}\n数量：{num}\n加时：{gifts[gift] * int(num)}秒\n总时长："
+                        result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
-                    # 时间数据格式化
-                    hour, minute = divmod(changed_time, 3600)
-                    minute, second = divmod(minute, 60)
-                    print(result, "%02d:%02d:%02d" % (hour, minute, second))
+
+                    # 重置主界面预览文本
 
     # ================================
     # 醒目留言
@@ -396,26 +421,17 @@ class CountdownTimer:
             pause_button.enable()
 
             self._remaining_time -= 1 # 倒计时减1s
+            app.storage.general["countdown_time"] = self._remaining_time
 
             # 格式化时间数据
             minute, second = divmod(self._remaining_time, 60)
             hour, minute = divmod(minute, 60)
             label.set_text("%02d:%02d:%02d" % (hour, minute, second))
-            print("剩余时间：%02d:%02d:%02d" % (hour, minute, second))
             await asyncio.sleep(1) # 异步阻塞1s
 
         # 判断倒计时状态
         if self._remaining_time <= 0:
-            # 重置时钟
-            label.set_text("00:00:00")
-
-            # 设置按钮状态
-            start_button.enable()
-            cancel_button.disable()
-            add_button.disable()
-            sub_button.disable()
-            resume_button.disable()
-            pause_button.disable()
+            await self.stop(time_badge)
 
             # 倒计时结束后重置时间输入框
             input_hour.set_value(0)
@@ -438,9 +454,11 @@ class CountdownTimer:
                 # 设置按钮状态
                 add_button.enable()
                 sub_button.enable()
+                cancel_button.set_text("停止")
                 cd_status = True # 设置倒计时运行状态
             else:
                 ui.notify("请输入时间", type="negative")
+                self._running = False
 
     # 暂停倒计时
     async def pause(self):
@@ -471,17 +489,31 @@ class CountdownTimer:
         global cd_status
         if self._running:
             self._running = False
-            self._remaining_time = self._start_time  # Reset the timer
+            self._paused = False
             if self._task:
                 self._task.cancel() # 结束协程
             label.set_text("00:00:00")
+            app.storage.general["countdown_time"] = 0
+            self._start_time = int(app.storage.general["countdown_time"])
+            self._remaining_time = self._start_time  # Reset the timer
             start_button.enable()
             cancel_button.disable()
             pause_button.disable()
             resume_button.disable()
             add_button.disable()
             sub_button.disable()
+            input_hour.set_value(0)
+            input_minute.set_value(0)
+            input_second.set_value(0)
             cd_status = False
+        else:
+            if reset_inherit_status:
+                label.set_text("00:00:00")
+                app.storage.general["countdown_time"] = 0
+                self._start_time = int(app.storage.general["countdown_time"])
+                self._remaining_time = self._start_time  # Reset the timer
+                cancel_button.set_text("停止")
+                cancel_button.disable()
 
     # 设置倒计时
     def set_time(self, time):
@@ -504,6 +536,24 @@ class CountdownTimer:
         if not self._running:
             self._running = True
             self._task = asyncio.create_task(self._run(time_badge))
+
+    # 继承倒计时
+    def inherit_time(self, time):
+        # 如果计时器正在运行，首先停止它
+        if self._running:
+            self._running = False
+            if self._task:
+                self._task.cancel()
+
+        # 更新起始时间和剩余时间
+        self._start_time = time
+        self._remaining_time = time
+
+        # 更新 UI 上的显示
+        hour, minute = divmod(self._remaining_time, 3600)
+        minute, second = divmod(minute, 60)
+        time_badge.set_text("%02d:%02d:%02d" % (hour, minute, second))
+
 
 # ================================
 # GUI
@@ -549,12 +599,12 @@ def cd_setting_dialog():
                 gifts[gift_name.value] = int(time.value)
                 if gift_name.value in special:
                     special.pop(gift_name.value)
-                result = f'添加成功，{gift_name.value} | +{time.value}秒'
+                result = f'添加成功，{gift_name.value} | {format_seconds(time.value)}'
             elif status.value == "sub":
                 gifts[gift_name.value] = float(f"-{time.value}")
                 if gift_name.value in special:
                     special.pop(gift_name.value)
-                result = f'添加成功，{gift_name.value} | -{time.value}秒'
+                result = f'添加成功，{gift_name.value} | {format_seconds(time.value)}'
             elif status.value == "double":
                 special[gift_name.value] = "double"
                 if gift_name.value in gifts:
@@ -576,7 +626,7 @@ def cd_setting_dialog():
                     ui.notify("随机的值为空", type="negative")
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}秒随机'
+                result = f'添加成功，{gift_name.value} | {format_seconds(min.value)} ~ {format_seconds(max.value)}随机'
 
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -609,8 +659,9 @@ def cd_setting_dialog():
         with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
             ui.label("是否确认重置所有礼物？")
 
-            ui.button("确认重置", on_click=lambda: double_check())
-            ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+            with ui.row():
+                ui.button("确认重置", on_click=lambda: double_check())
+                ui.button("取消重置", on_click=lambda: double_check_dialog.close())
 
         double_check_dialog.open()
 
@@ -648,18 +699,18 @@ def cd_setting_dialog():
                     ui.label(k)
                     ui.space()
                     if v < 0:
-                        ui.label(f"{int(v)}秒")
+                        ui.label(format_seconds(v))
                     else:
-                        ui.label(f"+{int(v)}秒")
+                        ui.label(format_seconds(v))
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
                         if v < 0:
-                            ui.label(f"{int(v)}秒")
+                            ui.label(format_seconds(v))
                         else:
-                            ui.label(f"+{int(v)}秒")
+                            ui.label(format_seconds(v))
 
         if special != {}: # 如果特殊礼物的数据不是空的
             for k,v in special.items():
@@ -667,18 +718,7 @@ def cd_setting_dialog():
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
-                        if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}秒")
-                        elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}秒")
-                        elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}秒")
-                        elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}秒")
-                        elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}秒")
-                        else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}秒")
+                        ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
                 else:
                     with ui.row().classes('w-full'):
                         ui.label(k)
@@ -818,8 +858,9 @@ def gift_count_setting_dialog():
         with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
             ui.label("是否确认重置所有礼物？")
 
-            ui.button("确认重置", on_click=lambda: double_check())
-            ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+            with ui.row():
+                ui.button("确认重置", on_click=lambda: double_check())
+                ui.button("取消重置", on_click=lambda: double_check_dialog.close())
 
         double_check_dialog.open()
 
@@ -899,22 +940,44 @@ def gift_count_setting_dialog():
 
             # 自定义单位、项目输入框
             if gift_play_unit_main != "":
-                gift_play_unit = ui.input("单位", value=gift_play_unit_main.text, on_change=lambda e: gift_play_unit_main.set_text(e.value))
+                gift_play_unit = ui.input("单位", value=gift_play_unit_main.text, on_change=lambda e: gift_play_unit_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_unit")
             else:
-                gift_play_unit = ui.input("单位", on_change=lambda e: gift_play_unit_main.set_text(e.value))
+                gift_play_unit = ui.input("单位", on_change=lambda e: gift_play_unit_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_unit")
             if gift_play_text_main != "":
-                gift_play_text = ui.input("项目", value=gift_play_text_main.text, on_change=lambda e: gift_play_text_main.set_text(e.value))
+                gift_play_text = ui.input("项目", value=gift_play_text_main.text, on_change=lambda e: gift_play_text_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_text")
             else:
-                gift_play_text = ui.input("项目", on_change=lambda e: gift_play_text_main.set_text(e.value))
+                gift_play_text = ui.input("项目", on_change=lambda e: gift_play_text_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_text")
 
             number.set_visibility(False)
             min.set_visibility(False)
             max.set_visibility(False)
 
+        def change_challenge_count(status):
+            def double_check():
+                if status == "add":
+                    app.storage.general["gift_challenge_count"] += 1
+                elif status == "sub":
+                    if app.storage.general["gift_challenge_count"] > 0:
+                        app.storage.general["gift_challenge_count"] -= 1
+                elif status == "reset":
+                    app.storage.general["gift_challenge_count"] = 0
+
+            with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
+                ui.label("是否确认重置计数？")
+
+                with ui.row():
+                    ui.button("确认重置", on_click=lambda: double_check())
+                    ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+
+            double_check_dialog.open()
+
         with ui.row():
             ui.button('提交', on_click=lambda: run())
             ui.button("删除", on_click=lambda: delete())
             ui.button("重置全部", on_click=lambda: reset())
+            ui.button("重置计数", on_click=lambda: change_challenge_count("reset"))
+            # ui.button("加1", on_click=lambda: change_challenge_count("add"))
+            # ui.button("减1", on_click=lambda: change_challenge_count("sub"))
             ui.button('关闭', on_click=lambda: gift_count_dialog.close())
 
     gift_count_dialog.open()
@@ -928,10 +991,20 @@ def gift_count_setting_dialog():
 
 # dialog.open()
 
+def init_task():
+    global countdown_timer
+    global reset_inherit_status
+    countdown_timer = CountdownTimer(int(time_badge_inherit.text))
+    if app.storage.general["countdown_time"] != 0: # 如果存在可继承的倒计时
+        cancel_button.set_text("重置")
+        cancel_button.enable()
+        reset_inherit_status = True # 设置重置继承倒计时状态为True
+
 # 运行倒计时
 def start_task():
-    global countdown_timer
-    countdown_timer = CountdownTimer((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value)
+    if countdown_timer._start_time == 0:
+        countdown_timer._start_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
+        countdown_timer._remaining_time = countdown_timer._start_time
     countdown_timer.start(time_badge)
 
 
@@ -976,7 +1049,6 @@ async def check_b_connect_status():
         ui.notify("已断开连接，这通常是因为手动关闭了连接或房间号不正确")
         b_connect_switch.set_value(False)
         b_connect_switch.set_text("连接至弹幕服务器")
-        print("[WARN] 已断开连接，这通常是因为手动关闭了连接或房间号不正确")
 
     # 
     if b_connect_switch.value == "null":
@@ -984,7 +1056,6 @@ async def check_b_connect_status():
             asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
-            print(f"[INFO] 正在尝试连接至 {room_id.value}")
             b_connect_status = True # 设置弹幕服务器连接状态
         else:
             b_connect_switch.set_value(True)
@@ -1034,9 +1105,9 @@ async def refresh_gift():
         html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
         # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
         if html_content:
-            print("[INFO] 正在格式化数据...")
+            # print("[INFO] 正在格式化数据...")
             await GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
-            print("[INFO] 礼物数据更新完成!")
+            # print("[INFO] 礼物数据更新完成!")
             ui.notify("礼物数据更新完成", type="positive")
         else:
             with ui.dialog() as reset_dialog, ui.card(align_items="center"):
@@ -1091,6 +1162,7 @@ async def capture():
 
 
     if not os.path.exists("data/gifts.json"):
+        await init_config()
         await GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False)
 
     with open("data/gifts.json", "r", encoding="utf-8") as f:
@@ -1098,7 +1170,8 @@ async def capture():
 
 
     if not os.path.exists("data/gift_img.json"):
-        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False)
+        await init_config()
+        await GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False)
 
     with open("data/gift_img.json", "r", encoding="utf-8") as f:
         gift_img = json.load(f)
@@ -1125,9 +1198,9 @@ async def capture():
                     ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                     ui.space()
                     if v < 0:
-                        ui.label(f"{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
                     else:
-                        ui.label(f"+{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
@@ -1136,9 +1209,9 @@ async def capture():
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
                         if v < 0:
-                            ui.label(f"{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
                         else:
-                            ui.label(f"+{int(v)}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
@@ -1147,18 +1220,7 @@ async def capture():
                             ui.image().bind_source_from(gift_img, k)
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}秒").classes("text-3xl").style(f"color: {config['text_color']}")
-                        elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
-                        elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
-                        elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
-                        elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
-                        else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}秒").classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
@@ -1174,7 +1236,7 @@ async def capture():
 
 # 投喂挑战预览
 @ui.page("/capture_gift", title="capture | bili_travail")
-def capture():
+async def capture():
     def check_gift_refresh():
         global refresh_capture_gift
         if refresh_capture_gift:
@@ -1188,14 +1250,16 @@ def capture():
 
 
     if not os.path.exists("data/gifts_count.json"):
-        gifts = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False, time_path="data/gifts_count.json")
+        await init_config()
+        await GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_img=False, time_path="data/gifts_count.json")
 
     with open("data/gifts_count.json", "r", encoding="utf-8") as f:
         gifts = json.load(f)
 
 
     if not os.path.exists("data/gift_img.json"):
-        gift_img = GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False)
+        await init_config()
+        await GiftManager.convert_h5_to_json(f"data/{config['room_id']}.html", write_time=False)
 
     with open("data/gift_img.json", "r", encoding="utf-8") as f:
         gift_img = json.load(f)
@@ -1274,9 +1338,11 @@ with open("config.json", "r", encoding="utf-8") as f:
 # 创建主界面
 with ui.card(align_items="center").classes("absolute-center"):
     time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl") # 创建时钟
-    gift_challenge_count = ui.badge("0") # 投喂挑战总数
-    gift_play_unit_main = ui.label() # 投喂挑战单位
-    gift_play_text_main = ui.label() # 投喂挑战项目
+    time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
+    time_badge_inherit.set_visibility(False)
+    gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 将结果写入storage) # 投喂挑战总数
+    gift_play_unit_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_unit") # 投喂挑战单位
+    gift_play_text_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_text") # 投喂挑战项目
     gift_challenge_count.set_visibility(False)
     gift_play_unit_main.set_visibility(False)
     gift_play_text_main.set_visibility(False)
@@ -1337,7 +1403,12 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
         ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
 
-    ui.separator()
+    # with ui.card():
+    #     msg1 = ui.label()
+    #     msg2 = ui.label()
+    #     msg3 = ui.label()
+    #     msg4 = ui.label()
+    #     msg5 = ui.label()
 
     with ui.row():
         # Update gift data button
@@ -1349,9 +1420,13 @@ with ui.card(align_items="center").classes("absolute-center"):
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
     ui.label(f"OBS投喂挑战浏览器源URL：http://127.0.0.1:{port}/capture_gift")
 
+    init_task()
+    countdown_timer.inherit_time(int(time_badge_inherit.text))
+
 # about按钮
 with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
+
 
 # about页面
 @ui.page('/about')
@@ -1407,23 +1482,25 @@ def _():
         ui.separator()
 
         # 开发组成员显示
-        ui.label(f"联系我们").classes("text-2xl").style(f"color: {config['text_color']}")
-        with ui.row():
+        with ui.row(align_items="center"):
             with ui.column(align_items="center"):
+                ui.label("代码架构").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/16748991", new_tab=True):
                     with ui.avatar():
                         ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"))
                 ui.badge("高橋はるき", outline=True)
             with ui.column(align_items="center"):
+                ui.label("代码开发").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/8907402", new_tab=True):
                     with ui.avatar():
                         ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
                 ui.badge("狐日泽", outline=True)
-            # with ui.column(align_items="center"):
-            #     with ui.link(target="https://space.bilibili.com/3546729020394298/", new_tab=True):
-            #         with ui.avatar():
-            #             ui.image(blive_crower.get_bili_img("https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"))
-            #     ui.badge("千蚀vita", outline=True)
+            with ui.column(align_items="center"):
+                ui.label("特别感谢").classes("text-blue")
+                with ui.link(target="https://space.bilibili.com/3546729020394298/", new_tab=True):
+                    with ui.avatar():
+                        ui.image(blive_crower.get_bili_img("https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"))
+                ui.badge("千蚀vita", outline=True)
         ui.separator()
 
         # 联系我们
