@@ -23,7 +23,7 @@ class BiliGiftManager:
         try:
             get_basic_gift = requests.get(url)
             if get_basic_gift.status_code == 200:
-                print("[INIT] 成功获取Nya-WSL服务器存档数据...")
+                # print("[INIT] 成功获取Nya-WSL服务器存档数据...")
                 time_dict = {}
                 for gift in get_basic_gift.keys():
                     time_dict[gift] = time
@@ -36,8 +36,8 @@ class BiliGiftManager:
 
         # 读取内置数据
         except:
-            print("[ERROR] 联网获取礼物数据失败...")
-            print("[INIT] 尝试重构基础礼物数据...")
+            # print("[ERROR] 联网获取礼物数据失败...")
+            # print("[INIT] 尝试重构基础礼物数据...")
             time_dict = {}
             gift_mapping = gift_map.gift_mapping
             blind_box = gift_map.blind_box
@@ -53,7 +53,7 @@ class BiliGiftManager:
                 json.dump(time_dict, f, ensure_ascii=False, indent=4)
             with open(img_path, "w+", encoding="utf-8") as f:
                 json.dump(gift_mapping, f, ensure_ascii=False, indent=4)
-            print("[INIT] 数据已重构为基础预设...")
+            # print("[INIT] 数据已重构为基础预设...")
 
     async def get_live_h5(self, room_id, h5_path = "data/saved_page.html", headless = True):
         """
@@ -128,10 +128,10 @@ class BiliGiftManager:
                 else:
                     gift_mapping[k] = f"data/{v}"
 
-        if show:
-            # 打印映射结果
-            for url, name in gift_mapping.items():
-                print(f"URL: {url} -> 标签: {name}")
+        # if show:
+        #     # 打印映射结果
+        #     for url, name in gift_mapping.items():
+        #         print(f"URL: {url} -> 标签: {name}")
 
         if write_img:
             with open(img_path, "w", encoding="utf-8") as file:
@@ -150,6 +150,8 @@ class BiliGiftManager:
         try:
             os.remove(h5_path)
         except FileNotFoundError:
-            print(f"[WARNING] 文件 {h5_path} 不存在，跳过删除")
+            # print(f"[WARNING] 文件 {h5_path} 不存在，跳过删除")
+            pass
         except PermissionError:
-            print(f"[ERROR] 没有权限删除文件：{h5_path}")
+            # print(f"[ERROR] 没有权限删除文件：{h5_path}")
+            pass

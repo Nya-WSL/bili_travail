@@ -5,6 +5,7 @@ import fnmatch
 import asyncio
 import aiofiles
 import requests
+from nicegui import ui
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.edge.service import Service
@@ -28,6 +29,7 @@ def get_bili_img(url):
 async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True):
     get_bili_h5_status = True
     # 环境初始化
+    ui.notify("正在更新礼物数据...可能会导致进程短暂卡死")
     cache_path = os.getcwd()+r"\\driver"                  # 定义下载路径
     options = Options()                                   # 配置 Selenium WebDriver
     if headless:
@@ -39,16 +41,16 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
     options.add_argument("--mute-audio")                  # 静音音频
 
     if os.path.exists(os.getcwd()+r"\\driver\\msedgedriver\\win64") == False:                                 # 若webdriver不存在则下载并运行
-        print("[INFO] 未找到 Edge WebDriver 环境...下载中...")
+        # print("[INFO] 未找到 Edge WebDriver 环境...下载中...")
         os.system(f'selenium-manager.exe --cache-path "{cache_path}" --browser edge')
-        print("[INFO] Edge WebDriver 环境下载完成...")
+        # print("[INFO] Edge WebDriver 环境下载完成...")
         dir_list = os.listdir(os.getcwd()+r"\\driver\\msedgedriver\\win64")
         pattern = '*'
         latest_dir = fnmatch.filter(dir_list, pattern)[-1]
         driver_path = os.getcwd()+r"\\driver\\msedgedriver\\win64\\"+latest_dir+r"\\msedgedriver.exe"         # 指定浏览器路径
         service = Service(driver_path)                                                                        # 使用 Service 指定已下载的路径
         driver = webdriver.Edge(service=service, options=options)                                             # 创建 Edge WebDriver 实例
-        print("[INFO] 创建 Edge WebDriver 实例中...")
+        # print("[INFO] 创建 Edge WebDriver 实例中...")
     else:
         try:
             dir_list = os.listdir(os.getcwd()+r"\\driver\\msedgedriver\\win64")                               # 尝试在文件夹内寻找是否存在msedgedriver.exe,若存在则直接运行
@@ -58,12 +60,13 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             service = Service(driver_path)
             driver = webdriver.Edge(service=service, options=options)
         except:
-            print("[ERROR] Edge WebDriver 环境已损坏...重新下载中...")                                                    # 如抛出错误则重新下载
+            # print("[ERROR] Edge WebDriver 环境已损坏...重新下载中...")                                                    # 如抛出错误则重新下载
             os.system(f"selenium-manager.exe --cache-path {cache_path} --browser edge")
             driver = webdriver.Edge(service=service, options=options)
-            print("[INFO] Edge WebDriver 环境下载完成...")
+            # print("[INFO] Edge WebDriver 环境下载完成...")
         else:
-            print("[INFO] 创建 Edge WebDriver 实例中...")
+            # print("[INFO] 创建 Edge WebDriver 实例中...")
+            pass
 
     # 目标 URL
     url = f"https://live.bilibili.com/{room_id}"
@@ -82,7 +85,8 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
         actions = ActionChains(driver)
         actions.move_to_element(button).perform()
         button.click()
-        print("[INFO] 成功获取基础礼物数据...")
+        # print("[INFO] 成功获取基础礼物数据...")
+        ui.notify("成功获取基础礼物数据", type="positive")
 
     except Exception:
         get_bili_h5_status = False
@@ -100,11 +104,13 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             actions = ActionChains(driver)
             actions.move_to_element(button).perform()
             button.click()
-            print("[INFO] 成功获取PK礼物数据...")
+            # print("[INFO] 成功获取PK礼物数据...")
+            ui.notify("成功获取PK礼物数据", type="positive")
             async with aiofiles.open(h5_path, "a", encoding="utf-8") as file:
                 await file.write(driver.page_source)
         except Exception:
-            print(f"[ERROR] 未能获取PK礼物数据...")
+            # print(f"[ERROR] 未能获取PK礼物数据...")
+            ui.notify("未能获取PK礼物数据", type="warning")
 
 
         # 模拟click进入粉丝团
@@ -116,11 +122,13 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             actions = ActionChains(driver)
             actions.move_to_element(button).perform()
             button.click()
-            print("[INFO] 成功获取粉丝团专属礼物数据...")
+            # print("[INFO] 成功获取粉丝团专属礼物数据...")
+            ui.notify("成功获取粉丝团专属礼物数据", type="positive")
             async with aiofiles.open(h5_path, "a", encoding="utf-8") as file:
                 await file.write(driver.page_source)
         except Exception:
-            print(f"[ERROR] 未能获取粉丝团专属礼物数据...")
+            # print(f"[ERROR] 未能获取粉丝团专属礼物数据...")
+            ui.notify("未能获取粉丝团专属礼物数据", type="warning")
 
 
         # 模拟click进入航海
@@ -132,11 +140,13 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             actions = ActionChains(driver)
             actions.move_to_element(button).perform()
             button.click()
-            print("[INFO] 成功获取航海专属礼物数据...")
+            # print("[INFO] 成功获取航海专属礼物数据...")
+            ui.notify("成功获取航海专属礼物数据", type="positive")
             async with aiofiles.open(h5_path, "a", encoding="utf-8") as file:
                 await file.write(driver.page_source)
         except Exception:
-            print(f"[ERROR] 未能获取航海专属礼物数据...")
+            # print(f"[ERROR] 未能获取航海专属礼物数据...")
+            ui.notify("未能获取航海专属礼物数据", type="warning")
 
 
         # 模拟click进入专属礼物
@@ -148,15 +158,19 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             actions = ActionChains(driver)
             actions.move_to_element(button).perform()
             button.click()
-            print("[INFO] 成功获取直播间专属礼物数据...")
+            # print("[INFO] 成功获取直播间专属礼物数据...")
+            ui.notify("成功获取直播间专属礼物数据", type="positive")
             async with aiofiles.open(h5_path, "a", encoding="utf-8") as file:
                 await file.write(driver.page_source)
         except Exception:
-            print(f"[ERROR] 未能获取直播间专属礼物数据...")
-        print("[INFO] 等待缓存数据...")
+            # print(f"[ERROR] 未能获取直播间专属礼物数据...")
+            ui.notify("未能获取直播间专属礼物数据", type="warning")
+        # print("[INFO] 等待缓存数据...")
+        ui.notify("等待缓存数据")
         await asyncio.sleep(3)
 
-        print("[INFO] 数据缓存完成!")
+        # print("[INFO] 数据缓存完成!")
+        ui.notify("数据缓存完成", type="positive")
 
     # 关闭浏览器
     driver.quit()

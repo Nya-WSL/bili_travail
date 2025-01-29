@@ -7,19 +7,18 @@ import blivedm.blivedm.models.web as web_models
 
 # Third Party Packages
 import os
-import sys
 import json
+import time
 import shutil
 import random
 import asyncio
 import aiohttp
 import requests
-import datetime
 import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.17.1-alpha"
+version = "0.17.2-alpha"
 
 # ================================
 # 检查环境状态
@@ -145,10 +144,6 @@ asyncio.run(init_config())
 # 程序运行
 # ================================
 
-# 命令行打屏
-cmd_log.start_log(version)  # 打印程序名称
-cmd_log.version_log(version)  # 检查版本更新
-
 # 弹幕数据连接
 async def start_handler():
     global client
@@ -241,14 +236,21 @@ class BiliHandler(blivedm.BaseHandler):
                             changed_num = 0
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
-                                random_num = random.randint(special[gift][0], special[gift][1]) # 从列表第一位和第二位的范围内随机抽一个int值
-                                changed_num = int(gift_challenge_count.text) + random_num # 目前总数 + random_num生成的随机数
-                                result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
+                                # random_num = random.randint(special[gift][0], special[gift][1]) # 从列表第一位和第二位的范围内随机抽一个int值
+                                # changed_num = int(gift_challenge_count.text) + (random_num * num) # 目前总数 + random_num生成的随机数
+                            total_changed_num = 0
+                            for i in range(num):
+                                random_num = random.randint(special[gift][0], special[gift][1] + 1)
+                                total_changed_num += random_num
+                                i += 1
+                            changed_num = int(gift_challenge_count.text) + total_changed_num
+                            result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
 
                     # 如果收到的礼物不在special.json中
                     else:  
                         changed_num = (gifts[gift] * int(num)) + int(gift_challenge_count.text) # （设定的值 * 礼物数量） + 目前总数
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
+
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
                     # print(result, changed_num)
@@ -276,8 +278,12 @@ class BiliHandler(blivedm.BaseHandler):
                             changed_time = 3
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
                         if type(special[gift]) == list:
-                            random_time = random.randint(special[gift][0], special[gift][1])
-                            changed_time = tmp_time + random_time
+                            total_changed_time = 0
+                            for i in range(num):
+                                random_time = random.randint(special[gift][0], special[gift][1] + 1)
+                                total_changed_time += random_time
+                                i += 1
+                            changed_time = tmp_time + total_changed_time
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
@@ -1057,17 +1063,34 @@ async def check_b_connect_status():
     global b_connect_status
 
     # 如果连接弹幕服务器开关为关且房间号不为空
-    if b_connect_switch.value == False and room_id.value != "":
-        start_button.disable()
-        gift_challenge_switch.disable()
-        b_connect_status = False
-        await client.stop_and_close() # 断开弹幕服务器ws连接并关闭blivedm客户端
-        ui.notify("已断开连接，这通常是因为手动关闭了连接或房间号不正确")
-        b_connect_switch.set_value(False)
-        b_connect_switch.set_text("连接至弹幕服务器")
+    if b_connect_switch.value == False:
+        if room_id.value == "":
+            if not b_connect_status:
+                b_connect_switch.set_value(False)
+                return
+            else:
+                start_button.disable()
+                gift_challenge_switch.disable()
+                b_connect_status = False
+                await client.stop_and_close() # 断开弹幕服务器ws连接并关闭blivedm客户端
+                ui.notify("已断开连接，这通常是因为手动关闭了连接或房间号不正确")
+                b_connect_switch.set_value(False)
+                b_connect_switch.set_text("连接至弹幕服务器")
+        else:
+            start_button.disable()
+            gift_challenge_switch.disable()
+            b_connect_status = False
+            await client.stop_and_close() # 断开弹幕服务器ws连接并关闭blivedm客户端
+            ui.notify("已断开连接，这通常是因为手动关闭了连接或房间号不正确")
+            b_connect_switch.set_value(False)
+            b_connect_switch.set_text("连接至弹幕服务器")
 
     # 
     if b_connect_switch.value == "null":
+        if room_id.value == "":
+            b_connect_switch.set_value(False)
+            return
+
         if not b_connect_status:
             asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
             b_connect_switch.set_value("null")
@@ -1081,6 +1104,7 @@ async def check_b_connect_status():
         if room_id.value == "": # 如果房间号为空
             ui.notify("请输入房间号", type="negative")
             b_connect_switch.set_value(False) # 重置开关为关
+            return
 
         if b_connect_status:
             start_button.enable()
@@ -1133,33 +1157,6 @@ async def refresh_gift():
                 ui.button("取消", on_click=lambda: reset_dialog.close())
 
             reset_dialog.open()
-
-
-# 检查版本更新按钮
-async def check_update():
-    def version_dialog():
-        with ui.dialog() as dialog, ui.card(align_items="center"):
-            ui.label(f"当前版本：{version} | 最新版本：{status}")
-
-            with ui.row():
-                ui.button("gtihub", on_click=lambda: ui.navigate.to(f"https://github.com/Nya-WSL/bili_travail/releases/tag/v{status}", new_tab=True))
-                ui.button("Nya-WSL", on_click=lambda: ui.navigate.to(f"https://nya-wsl.com/bili_travail/releases/{status}.zip", new_tab=True))
-                ui.button("Nya-WSL Cloud", on_click=lambda: ui.navigate.to(f"https://cloud.nya-wsl.cn/ms-drive/bili_travail/releases/", new_tab=True))
-                ui.button("取消", on_click=lambda: dialog.close())
-
-        dialog.open()
-
-    ui.notify("检查更新中...")
-    await asyncio.sleep(2)
-    status = cmd_log.version_log(version)
-    if status != version:
-        if status != "Error":
-            version_dialog()
-        else:
-            ui.notify("检查更新失败！", type="negative")
-    else:
-        ui.notify("已是最新版本！", type="positive")
-
 
 # 倒计时预览
 @ui.page("/capture_cd", title="capture | bili_travail")
@@ -1356,8 +1353,34 @@ async def capture():
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
+# 检查版本更新按钮
+def check_update(init = False):
+    def version_dialog():
+        with ui.dialog() as dialog, ui.card(align_items="center"):
+            ui.label(f"当前版本：{version} | 最新版本：{status}")
+
+            with ui.row():
+                ui.button("gtihub", on_click=lambda: ui.navigate.to(f"https://github.com/Nya-WSL/bili_travail/releases/tag/v{status}", new_tab=True))
+                ui.button("Nya-WSL", on_click=lambda: ui.navigate.to(f"https://nya-wsl.com/bili_travail/releases/{status}.zip", new_tab=True))
+                ui.button("Nya-WSL Cloud", on_click=lambda: ui.navigate.to(f"https://cloud.nya-wsl.cn/ms-drive/bili_travail/releases/", new_tab=True))
+                ui.button("取消", on_click=lambda: dialog.close())
+
+        dialog.open()
+
+    status = cmd_log.version_log(version)
+    if status != version:
+        if status != "Error":
+            ui.notify("检查到可用更新", type="positive")
+            if not init:
+                version_dialog()
+        else:
+            ui.notify("检查更新失败", type="negative")
+    else:
+        ui.notify("已是最新版本", type="positive")
+
 # 创建主界面
 with ui.card(align_items="center").classes("absolute-center"):
+    check_update(True)
     time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl") # 创建时钟
     time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
     time_badge_inherit.set_visibility(False)
