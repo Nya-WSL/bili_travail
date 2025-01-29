@@ -19,7 +19,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 
 # ================================
 # 检查环境状态
@@ -902,14 +902,30 @@ def gift_count_setting_dialog():
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
-                        ui.label(f"{v}")
+                        if v < 0:
+                            ui.label(f"{int(v)}{gift_play_unit_main.text}")
+                        elif v > 0:
+                            ui.label(f"+{int(v)}{gift_play_unit_main.text}")
+                        else:
+                            ui.label(f"{int(v)}{gift_play_unit_main.text}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
-                        ui.label(f"{v[0]} ~ {v[1]}")
+                        if v[1] < 0:
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}{gift_play_unit_main.text}")
+                        elif v[0] < 0 and v[1] != 0:
+                            ui.label(f"{int(v[0])} ~ +{v[1]}{gift_play_unit_main.text}")
+                        elif v[0] < 0 and v[1] == 0:
+                            ui.label(f"{int(v[0])} ~ {v[1]}{gift_play_unit_main.text}")
+                        elif v[0] == 0 and v[1] == 0:
+                            ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}")
+                        elif v[0] == 0 and v[1] != 0:
+                            ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
+                        else:
+                            ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
                 else:
                     with ui.row().classes('w-full'):
                         ui.label(k)
@@ -1293,7 +1309,12 @@ async def capture():
                             ui.image().bind_source_from(gift_img, k)
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{v}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        if v < 0:
+                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        elif v > 0:
+                            ui.label(f"+{int(v)}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        else:
+                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
