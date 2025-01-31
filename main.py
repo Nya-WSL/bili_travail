@@ -14,11 +14,12 @@ import random
 import asyncio
 import aiohttp
 import requests
+import datetime
 import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.17.2-alpha"
+version = "0.18.0-dev"
 
 # ================================
 # 检查环境状态
@@ -1447,14 +1448,25 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
         ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
 
-    # with ui.card():
-    #     msg1 = ui.label()
-    #     msg2 = ui.label()
-    #     msg3 = ui.label()
-    #     msg4 = ui.label()
-    #     msg5 = ui.label()
+    def gift_list_show(img, name):
+        with open("data/gift_img.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+
+        with gift_scroll:
+            with ui.row():
+                ui.label(f"{datetime.datetime.now().strftime('%H:%M:%S')} 高桥老师 赠送").classes("text-l")
+                with ui.avatar(color="").classes("w-6 h-6"):
+                    ui.image(gifts[img])
+                ui.label(f"{name}x12").classes("text-l")
+                ui.label("加时12小时").classes("text-l")
+        gift_scroll.scroll_to(percent=1)
+
+    with ui.card(align_items="stretch").classes("w-full"):
+        with ui.scroll_area().classes('h-32') as gift_scroll:
+            gift_list_show()
 
     with ui.row():
+        ui.button("礼物测试", on_click=lambda: gift_list_show())
         # Update gift data button
         ui.button("更新礼物数据", on_click=lambda: refresh_gift())
         # Check update button
