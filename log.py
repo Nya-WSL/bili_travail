@@ -8,11 +8,11 @@ def version_log(current_version):
     :param current_version: 当前程序版本
     """
     # url = ["https://github.com/Nya-WSL/bili_travail/releases/download/version/version", "https://nya-wsl.com/bili_travail/version.txt"]
-    url = ["https://nya-wsl.com/bili_travail/version.txt", "https://cloud.nya-wsl.cn/ms-drive/bili_travail/version.txt"]
+    url = ["http://version.nya-wsl.cn/bili_travail/version.txt", "https://nya-wsl.com/bili_travail/version.txt"]
     try:
         latest_version = requests.get(url[0]).text.replace("\n", "") # 优先从GitHub Release获取版本信息
         if latest_version == "Not Found": # GitHub的返回内容为"Not Found"，一般意味着版本文件不存在或仓库无访问权限
-            raise ValueError("From github to get version info was error") # 抛出错误
+            raise ValueError("From Nya-WSL CN to get version info was error") # 抛出错误
     except:
         try:
             latest_version = requests.get(url[1]) # 从Nya-WSL服务器获取版本信息
