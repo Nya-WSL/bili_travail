@@ -211,8 +211,8 @@ class BiliHandler(blivedm.BaseHandler):
         num = message.num
         uname = message.uname
         result = ""
-        if gift.split() > 8:
-            gift_name = gift.split()[0-5] + "..."
+        if len(uname.split()) > 8:
+            uname = gift.split()[0-5] + "..."
 
         # 收到礼物后执行函数
         if b_connect_status:  # True则已连接至弹幕服务器
@@ -236,11 +236,11 @@ class BiliHandler(blivedm.BaseHandler):
                         if special[gift] == "double": # 加倍挑战
                             changed_num = int(gift_challenge_count.text) * (2 * int(num))
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
-                            gift_list_show(uname, gift_name, num, f"{2 * int(num-1)}倍")
+                            gift_list_show(uname, gift, num, f"{2 * int(num-1)}倍")
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
-                            gift_list_show(uname, gift_name, num, "清空")
+                            gift_list_show(uname, gift, num, "清空")
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
                                 # random_num = random.randint(special[gift][0], special[gift][1]) # 从列表第一位和第二位的范围内随机抽一个int值
                                 # changed_num = int(gift_challenge_count.text) + (random_num * num) # 目前总数 + random_num生成的随机数
@@ -251,7 +251,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 i += 1
                             changed_num = int(gift_challenge_count.text) + total_changed_num
                             result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
-                            gift_list_show(uname, gift_name, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
+                            gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
 
                     # 如果收到的礼物不在special.json中
                     else:  
@@ -261,7 +261,7 @@ class BiliHandler(blivedm.BaseHandler):
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
                     # print(result, changed_num)
-                    gift_list_show(uname, gift_name, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
+                    gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
 
             if cd_status:  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
@@ -282,9 +282,11 @@ class BiliHandler(blivedm.BaseHandler):
                         if special[gift] == "double":
                             changed_time = tmp_time * (2 * int(num))
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
+                            gift_list_show(uname, gift, num, f"{2 * int(num-1)}倍")
                         if special[gift] == "clear":
                             changed_time = 3
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
+                            gift_list_show(uname, gift, num, "清空")
                         if type(special[gift]) == list:
                             total_changed_time = 0
                             for i in range(num):
@@ -293,14 +295,13 @@ class BiliHandler(blivedm.BaseHandler):
                                 i += 1
                             changed_time = tmp_time + total_changed_time
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
+                            gift_list_show(uname, gift, num, format_seconds(total_changed_time))
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
                         result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
+                        gift_list_show(uname, gift, num, format_seconds(gifts[gift] * int(num)))
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
-                    if gift.split() > 8:
-                        gift = gift.split()[0-6] + "..."
-                    gift_list_show(uname, gift, num, changed_num)
 
                     # 重置主界面预览文本
 
