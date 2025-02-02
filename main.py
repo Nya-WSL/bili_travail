@@ -204,8 +204,7 @@ class BiliHandler(blivedm.BaseHandler):
 
     # 礼物数据
     def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
-        # print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {message.uname} 赠送{message.gift_name}x{message.num}'
-        #       f' （{message.coin_type}瓜子x{message.total_coin}）')
+        print(message)
 
         gift = message.gift_name
         num = message.num
@@ -257,11 +256,12 @@ class BiliHandler(blivedm.BaseHandler):
                     else:  
                         changed_num = (gifts[gift] * int(num)) + int(gift_challenge_count.text) # （设定的值 * 礼物数量） + 目前总数
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
+                        gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
 
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
                     # print(result, changed_num)
-                    gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
+
 
             if cd_status:  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
@@ -283,10 +283,12 @@ class BiliHandler(blivedm.BaseHandler):
                             changed_time = tmp_time * (2 * int(num))
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
                             gift_list_show(uname, gift, num, f"{2 * int(num-1)}倍")
+
                         if special[gift] == "clear":
                             changed_time = 3
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
                             gift_list_show(uname, gift, num, "清空")
+
                         if type(special[gift]) == list:
                             total_changed_time = 0
                             for i in range(num):
@@ -296,6 +298,7 @@ class BiliHandler(blivedm.BaseHandler):
                             changed_time = tmp_time + total_changed_time
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
                             gift_list_show(uname, gift, num, format_seconds(total_changed_time))
+
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
                         result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
@@ -1146,37 +1149,44 @@ def open_capture():
 
 # 更新礼物数据
 async def refresh_gift():
-    # 重置本地数据
-    def reset_gift_data():
-        try:
-            GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
-            ui.notify("重置成功", type="negative")
-            reset_dialog.close()
-        except:
-            ui.notify("重置失败", type="positive")
-
     ROOM_ID = room_id.value
     if ROOM_ID == "":
         ui.notify("请先填入房间号！", type="negative")
     else:
-        
-        int(ROOM_ID) # 判断ROOM_ID是否是数字
-        GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
-        html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
-        # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
-        if html_content:
-            # print("[INFO] 正在格式化数据...")
-            await GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
-            # print("[INFO] 礼物数据更新完成!")
-            ui.notify("礼物数据更新完成", type="positive")
-        else:
-            with ui.dialog() as reset_dialog, ui.card(align_items="center"):
-                with ui.row():
-                    ui.label("更新礼物数据失败。是否重置本地数据？")
-                ui.button("确定", on_click=lambda: reset_gift_data())
-                ui.button("取消", on_click=lambda: reset_dialog.close())
+        async def check_refresh():
+            int(ROOM_ID) # 判断ROOM_ID是否是数字
+            GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
+            html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
+            # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
+            if html_content:
+                # print("[INFO] 正在格式化数据...")
+                await GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
+                # print("[INFO] 礼物数据更新完成!")
+                ui.notify("礼物数据更新完成", type="positive")
+            else:
+                # 重置本地数据
+                def reset_gift_data():
+                    try:
+                        GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+                        ui.notify("重置成功", type="negative")
+                        reset_dialog.close()
+                    except:
+                        ui.notify("重置失败", type="positive")
 
-            reset_dialog.open()
+                with ui.dialog() as reset_dialog, ui.card(align_items="center"):
+                    with ui.row():
+                        ui.label("更新礼物数据失败。是否重置本地数据？")
+                    ui.button("确定", on_click=lambda: reset_gift_data())
+                    ui.button("取消", on_click=lambda: reset_dialog.close())
+
+                reset_dialog.open()
+
+        with ui.dialog() as check_dialog, ui.card(align_items="center"):
+            ui.label("更新礼物数据可能会导致进程反复卡死一段时间，在运行倒计时和投喂挑战的时候不建议更新，是否确认更新？")
+            ui.button("确定", on_click=lambda: check_refresh())
+            ui.button("取消", on_click=lambda: check_dialog.close())
+
+        check_dialog.open()
 
 # 倒计时预览
 @ui.page("/capture_cd", title="capture | bili_travail")
@@ -1228,43 +1238,43 @@ async def capture():
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                    ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     ui.space()
                     if v < 0:
-                        ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     else:
-                        ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         ui.space()
                         if v < 0:
-                            ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         else:
-                            ui.label(format_seconds(v)).classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         ui.space()
-                        ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         ui.space()
                         if v == "clear":
                             v = "清空"
                         if v == "double":
                             v = "加倍"
-                        ui.label(v).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
     ui.timer(5, callback=lambda: check_cd_refresh())
 
 # 投喂挑战预览
@@ -1316,9 +1326,9 @@ async def capture():
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                    ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     ui.space()
-                    ui.label(f"{v}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                    ui.label(f"{v}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
@@ -1327,11 +1337,11 @@ async def capture():
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
                         if v < 0:
-                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v > 0:
-                            ui.label(f"+{int(v)}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"+{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         else:
-                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
@@ -1341,28 +1351,28 @@ async def capture():
                         ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
                         ui.space()
                         if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl").style(f"color: {config['text_color']}")
+                            ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         ui.space()
                         if v == "clear":
                             v = "清空"
                         if v == "double":
                             v = "加倍"
-                        ui.label(v).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
     ui.timer(5, callback=lambda: check_gift_refresh())
 
 # ================================

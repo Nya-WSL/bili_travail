@@ -29,7 +29,6 @@ def get_bili_img(url):
 async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True):
     get_bili_h5_status = True
     # 环境初始化
-    ui.notify("正在更新礼物数据...可能会导致进程短暂卡死")
     cache_path = os.getcwd()+r"\\driver"                  # 定义下载路径
     options = Options()                                   # 配置 Selenium WebDriver
     if headless:
