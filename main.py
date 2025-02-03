@@ -26,7 +26,7 @@ version = "0.18.0-dev"
 
 # 初始化NiceGUI
 app.storage.general.indent = True  # 格式化storage
-app.add_static_files('/static', 'static')   # 创建虚拟路径  
+app.add_static_files('/static', 'static')   # 创建虚拟路径
 refresh_capture_cd = False  # 初始倒计时化刷新状态
 refresh_capture_gift = False  # 初始化投喂挑战刷新状态
 b_connect_status = False # 初始化弹幕服务器连接状态
@@ -1531,6 +1531,15 @@ def _():
         ui.badge(f"v{version}", outline=True)
 
         # 私货
+        def read_or_create_file(file_path, default_content):
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    return f.read()
+            else:
+                with open(file_path, "w+", encoding="utf-8") as f:
+                    f.write(default_content)
+                return default_content
+
         text = requests.get("https://nya-wsl.com/bili_travail/chat_msg.json")
         text.encoding = "utf-8"
         if text.status_code == 200 or not config["local_text"]: # 如果请求状态为200且配置文件未启用本地文本
@@ -1546,21 +1555,8 @@ def _():
                 ui.chat_message(text.json()["group_a"]["text_a"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
                 ui.chat_message(text.json()["group_a"]["text_b"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
         else:
-            if os.path.exists("data/text_a.txt"):
-                with open("data/text_a.txt", "r", encoding="utf-8") as f:
-                    text_a = f.read()
-            else:
-                text_a = "代码没写完，哪有脸睡觉"
-                with open("data/text_a.txt", "w", encoding="utf-8") as f:
-                    f.write(text_a)
-
-            if os.path.exists("data/text_b.txt"):
-                with open("data/text_b.txt", "r", encoding="utf-8") as f:
-                    text_b = f.read()
-            else:
-                text_a = 'alias cd="sudo rm -rf"'
-                with open("data/text_b.txt", "w", encoding="utf-8") as f:
-                    f.write(text_b)
+            text_a = read_or_create_file("data/text_a.txt", "代码没写完，哪有脸睡觉")
+            text_b = read_or_create_file("data/text_b.txt", 'alias cd="sudo rm -rf"')
 
             ui.chat_message(text_a, avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
             ui.chat_message(text_b, avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
