@@ -69,7 +69,7 @@ if not os.path.exists("config.json"):
             config = {
     "room_id": "",
     "port": 65000,
-    "native": False,
+    "native": True,
     "show_zero": False,
     "SESSDATA": "",
     "background_image": [
@@ -197,10 +197,9 @@ class BiliHandler(blivedm.BaseHandler):
             b_connect_switch.set_value(True)
             b_connect_switch.set_text("已连接弹幕服务器")
             # print(f"[INFO] 已成功连接至 {room_id.value}")
+        if not config["native"]:
+            print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
 
-    # 弹幕数据
-    # def _on_danmaku(self, client: blivedm.BLiveClient, message: web_models.DanmakuMessage):
-    #     print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}] {message.uname}：{message.msg}')
 
     # 礼物数据
     def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
@@ -213,7 +212,52 @@ class BiliHandler(blivedm.BaseHandler):
         if len(uname.split()) > 8:
             uname = gift.split()[0-5] + "..."
 
-        # 收到礼物后执行函数
+        self._on_gift_play(gift, num, uname)
+
+
+    # 舰队数据
+    def _on_user_toast_v2(self, client: blivedm.BLiveClient, message: web_models.UserToastV2Message):
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+
+        tmp_time = countdown_timer.get_tmp_time()
+        gift = message.guard_level
+        uname = message.username
+
+        if gift == 1:
+            gift = "总督"
+        elif gift == 2:
+            gift = "提督"
+        elif gift == 3:
+            gift = "舰长"
+        else:
+            gift = "神秘物种"
+
+        num = message.num
+        result = ""
+
+        if len(uname.split()) > 8:
+            uname = gift.split()[0-5] + "..."
+
+        self._on_gift_play(gift, num, uname)
+
+    # ================================
+    # 醒目留言
+    # 待开发
+    # ================================
+    def _on_super_chat(self, client: blivedm.BLiveClient, message: web_models.SuperChatMessage):
+    #     print(f'[{client.room_id}] 醒目留言 ¥{message.price} {message.uname}：{message.message}')
+        return {"price": message.price}
+
+    # def _on_interact_word(self, client: blivedm.BLiveClient, message: web_models.InteractWordMessage):
+    #     if message.msg_type == 1:
+    #         print(f'[{client.room_id}] {message.username} 进入房间')
+
+
+    # 收到礼物后执行函数
+    def _on_gift_play(self, gift, num, uname):
         if b_connect_status:  # True则已连接至弹幕服务器
             if gift_challenge_switch.value:  # True则为投喂挑战开关为开状态
                 # 检查投喂挑战数据文件是否存在
@@ -235,7 +279,7 @@ class BiliHandler(blivedm.BaseHandler):
                         if special[gift] == "double": # 加倍挑战
                             changed_num = int(gift_challenge_count.text) * (2 * int(num))
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
-                            gift_list_show(uname, gift, num, f"{2 * int(num-1)}倍")
+                            gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
@@ -256,12 +300,12 @@ class BiliHandler(blivedm.BaseHandler):
                     else:  
                         changed_num = (gifts[gift] * int(num)) + int(gift_challenge_count.text) # （设定的值 * 礼物数量） + 目前总数
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
-                        gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
+                        if gifts[gift] != 0:
+                            gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
 
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
                     # print(result, changed_num)
-
 
             if cd_status:  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
@@ -282,7 +326,7 @@ class BiliHandler(blivedm.BaseHandler):
                         if special[gift] == "double":
                             changed_time = tmp_time * (2 * int(num))
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
-                            gift_list_show(uname, gift, num, f"{2 * int(num-1)}倍")
+                            gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
 
                         if special[gift] == "clear":
                             changed_time = 3
@@ -302,127 +346,10 @@ class BiliHandler(blivedm.BaseHandler):
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
                         result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
-                        gift_list_show(uname, gift, num, format_seconds(gifts[gift] * int(num)))
+                        if gifts[gift] != 0:
+                            gift_list_show(uname, gift, num, format_seconds(gifts[gift] * int(num)))
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
-
-                    # 重置主界面预览文本
-
-
-    # def _on_buy_guard(self, client: blivedm.BLiveClient, message: web_models.GuardBuyMessage):
-    #     print(f'[{client.room_id}] {message.username} 上舰，guard_level={message.guard_level}')
-
-    # 舰队数据
-    def _on_user_toast_v2(self, client: blivedm.BLiveClient, message: web_models.UserToastV2Message):
-        with open("data/gifts.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
-        with open("data/special.json", "r", encoding="utf-8") as f:
-            special = json.load(f)
-
-        tmp_time = countdown_timer.get_tmp_time()
-        gift = message.guard_level
-        uname = message.username
-
-        if gift == 1:
-            gift = "总督"
-        elif gift == 2:
-            gift = "提督"
-        elif gift == 3:
-            gift = "舰长"
-        else:
-            gift = "神秘物种"
-        num = message.num
-        result = ""
-
-        # 收到上舰后执行函数
-        if b_connect_status:  # True则已连接至弹幕服务器
-            if gift_challenge_switch.value:  # True则为投喂挑战开关为开状态
-                # 检查投喂挑战数据文件是否存在
-                if os.path.exists("data/gifts_count.json"):
-                    with open("data/gifts_count.json", "r", encoding="utf-8") as f:
-                        gifts = json.load(f)
-                    with open("data/special_count.json", "r", encoding="utf-8") as f:
-                        special = json.load(f)
-
-                    # 如果上舰数据没有该等级则写入
-                    if gift not in gifts:
-                        if gift not in special:
-                            gifts[gift] = 0
-                            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
-                                json.dump(gifts, f, indent=4, ensure_ascii=False)
-
-                    # 如果收到的上舰在special.json中
-                    if gift in special:
-                        if special[gift] == "double": # 加倍挑战
-                            changed_num = int(gift_challenge_count.text) * (2 * int(num))
-                            result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
-                        if special[gift] == "clear": # 清空挑战
-                            changed_num = 0
-                            result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
-                        if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
-                                random_num = random.randint(special[gift][0], special[gift][1]) # 从列表第一位和第二位的范围内随机抽一个int值
-                                changed_num = int(gift_challenge_count.text) + random_num # 目前总数 + random_num生成的随机数
-                                result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
-
-                    # 如果收到的上舰不在special.json中
-                    else:  
-                        changed_num = (gifts[gift] * int(num)) + int(gift_challenge_count.text) # （设定的值 * 礼物数量） + 目前总数
-                        result = f"礼物：{gift}\n数量：{num}\n总数量："
-                    gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
-                    gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
-                    # print(result, changed_num)
-                    if gift.split() > 8:
-                        gift = gift.split()[0-6] + "..."
-                    gift_list_show(uname, gift, num, changed_num)
-
-            if cd_status:  # True则倒计时为启动状态
-                if os.path.exists("data/gifts.json"):
-                    with open("data/gifts.json", "r", encoding="utf-8") as f:
-                        gifts = json.load(f)
-                    with open("data/special.json", "r", encoding="utf-8") as f:
-                        special = json.load(f)
-
-                    tmp_time = countdown_timer.get_tmp_time() # 获取当前倒计时
-
-                    if gift not in gifts:
-                        if gift not in special:
-                            gifts[gift] = 0
-                            with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                                json.dump(gifts, f, indent=4, ensure_ascii=False)
-
-                    if gift in special:
-                        if special[gift] == "double":
-                            changed_time = tmp_time * (2 * int(num))
-                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
-                        if special[gift] == "clear":
-                            changed_time = 3
-                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
-                        if type(special[gift]) == list:
-                            random_time = random.randint(special[gift][0], special[gift][1])
-                            changed_time = tmp_time + random_time
-                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
-                    else:
-                        changed_time = (gifts[gift] * int(num)) + tmp_time
-                        result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
-
-                    countdown_timer.set_time(changed_time) # 重设倒计时数据
-                    if gift.split() > 8:
-                        gift = gift.split()[0-6] + "..."
-                    gift_list_show(uname, gift, num, changed_time)
-
-                    # 重置主界面预览文本
-
-    # ================================
-    # 醒目留言
-    # 待开发
-    # ================================
-    def _on_super_chat(self, client: blivedm.BLiveClient, message: web_models.SuperChatMessage):
-    #     print(f'[{client.room_id}] 醒目留言 ¥{message.price} {message.uname}：{message.message}')
-        return {"price": message.price}
-
-    # def _on_interact_word(self, client: blivedm.BLiveClient, message: web_models.InteractWordMessage):
-    #     if message.msg_type == 1:
-    #         print(f'[{client.room_id}] {message.username} 进入房间')
 
 # 倒计时类
 class CountdownTimer:
@@ -770,7 +697,7 @@ def cd_setting_dialog():
             gifts_name = []
             for k,v in gifts.items():
                 gifts_name.append(k)
-            gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
+            gift_name = ui.select(label="礼物选择", options=gifts_name, with_input=True, clearable=True).style("width: 200px")
 
         status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
 
@@ -975,7 +902,7 @@ def gift_count_setting_dialog():
             gifts_name = []
             for k,v in gifts.items():
                 gifts_name.append(k)
-            gift_name = ui.select(label="礼物选择", options=gifts_name).style("width: 200px")
+            gift_name = ui.select(label="礼物选择", options=gifts_name, with_input=True, clearable=True).style("width: 200px")
 
         status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
@@ -1115,6 +1042,8 @@ async def check_b_connect_status():
             return
 
         if not b_connect_status:
+            if config["SESSDATA"] == "":
+                ui.notify("SESSDATA为空，历史礼物功能可能无法显示用户名", type="warning")
             asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
@@ -1193,7 +1122,7 @@ async def refresh_gift():
         check_dialog.open()
 
 # 倒计时预览
-@ui.page("/capture_cd", title="capture | bili_travail")
+@ui.page("/capture_cd", title="倒计时 | bili_travail")
 async def capture():
     # 检查是否需要刷新页面
     def check_cd_refresh():
@@ -1282,7 +1211,7 @@ async def capture():
     ui.timer(5, callback=lambda: check_cd_refresh())
 
 # 投喂挑战预览
-@ui.page("/capture_gift", title="capture | bili_travail")
+@ui.page("/capture_gift", title="投喂挑战 | bili_travail")
 async def capture():
     def check_gift_refresh():
         global refresh_capture_gift
@@ -1338,7 +1267,7 @@ async def capture():
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         ui.space()
                         if v < 0:
                             ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
@@ -1352,7 +1281,7 @@ async def capture():
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         ui.space()
                         if v[1] < 0:
                             ui.label(f"{int(v[0])} ~ {int(v[1])}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
@@ -1404,7 +1333,7 @@ def check_update(init = False):
     status = cmd_log.version_log(version)
     if status != version:
         if status != "Error":
-            ui.notify("检查到可用更新", type="positive")
+            ui.notify("检查到可用更新", type="info")
             if not init:
                 version_dialog()
         else:
