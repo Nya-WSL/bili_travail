@@ -1358,7 +1358,7 @@ def check_update(init = False):
 
         dialog.open()
 
-    if not config["native"]:
+    if config["native"]:
         status = cmd_log.version_log(version)
         if status != version:
             if status != "Error":
