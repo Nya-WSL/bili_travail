@@ -8,7 +8,6 @@ import blivedm.blivedm.models.web as web_models
 # Third Party Packages
 import os
 import json
-import time
 import shutil
 import random
 import asyncio
@@ -70,6 +69,7 @@ if not os.path.exists("config.json"):
             config = {
     "room_id": "",
     "port": 65000,
+    "native": False,
     "show_zero": False,
     "SESSDATA": "",
     "background_image": [
@@ -118,7 +118,7 @@ async def init_config():
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
-            html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html")
+            html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html", init=True)
             if not html_content:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
                 GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
             else:  # 格式化B站礼物数据为json
@@ -1154,6 +1154,9 @@ async def refresh_gift():
         ui.notify("请先填入房间号！", type="negative")
     else:
         async def check_refresh():
+            check_dialog.close()
+            ui.notify("正在更新礼物数据，请稍后...", type="info")
+            await asyncio.sleep(1)
             int(ROOM_ID) # 判断ROOM_ID是否是数字
             GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
             html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
@@ -1183,8 +1186,9 @@ async def refresh_gift():
 
         with ui.dialog() as check_dialog, ui.card(align_items="center"):
             ui.label("更新礼物数据可能会导致进程反复卡死一段时间，在运行倒计时和投喂挑战的时候不建议更新，是否确认更新？")
-            ui.button("确定", on_click=lambda: check_refresh())
-            ui.button("取消", on_click=lambda: check_dialog.close())
+            with ui.row():
+                ui.button("确定", on_click=lambda: check_refresh())
+                ui.button("取消", on_click=lambda: check_dialog.close())
 
         check_dialog.open()
 
@@ -1599,4 +1603,7 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[800, 900], reconnect_timeout=15)
+if config["native"]:
+    ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[800, 900], reconnect_timeout=15)
+else:
+    ui.run(host="0.0.0.0", port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", show=False, reconnect_timeout=15)

@@ -55,12 +55,13 @@ class BiliGiftManager:
                 json.dump(gift_mapping, f, ensure_ascii=False, indent=4)
             # print("[INIT] 数据已重构为基础预设...")
 
-    async def get_live_h5(self, room_id, h5_path = "data/saved_page.html", headless = True):
+    async def get_live_h5(self, room_id, h5_path = "data/saved_page.html", headless = True, init = False):
         """
         爬取B站直播间
         :param room_id: 房间号
         :param h5_path: 解析的HTML文件的路径，需指定到文件
         :param headless: 无头模式
+        :param init: 是否处于初始化状态
         """
 
         # 初始化变量
@@ -68,10 +69,10 @@ class BiliGiftManager:
         self.h5_path = h5_path
 
         # 使用blive_crower爬取所连接的直播间h5代码
-        self.html_content = await blive_crower.get_bili_h5(room_id, h5_path, headless)
+        self.html_content = await blive_crower.get_bili_h5(room_id, h5_path, headless, init)
         return self.html_content
 
-    async def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, show = False):
+    async def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0):
         """
         爬取并解析B站直播间礼物标签和URL，保存为JSON文件
         :param h5_path: 解析的HTML文件的路径，需指定到文件
@@ -80,7 +81,6 @@ class BiliGiftManager:
         :param img_path: write_img保存JSON文件的路径，需指定到文件
         :param time_path: write_time保存JSON文件的路径，需指定到文件
         :param time: 礼物时长
-        :param show: 是否打印解析结果
         """
 
         async with aiofiles.open(h5_path, "r", encoding="utf-8") as f:
