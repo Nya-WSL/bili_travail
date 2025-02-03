@@ -18,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.18.0-dev"
+version = "0.18.0-alpha"
 
 # ================================
 # 检查环境状态
@@ -203,8 +203,6 @@ class BiliHandler(blivedm.BaseHandler):
 
     # 礼物数据
     def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
-        print(message)
-
         gift = message.gift_name
         num = message.num
         uname = message.uname
@@ -217,14 +215,10 @@ class BiliHandler(blivedm.BaseHandler):
 
     # 舰队数据
     def _on_user_toast_v2(self, client: blivedm.BLiveClient, message: web_models.UserToastV2Message):
-        with open("data/gifts.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
-        with open("data/special.json", "r", encoding="utf-8") as f:
-            special = json.load(f)
-
-        tmp_time = countdown_timer.get_tmp_time()
         gift = message.guard_level
+        num = message.num
         uname = message.username
+        result = ""
 
         if gift == 1:
             gift = "总督"
@@ -234,9 +228,6 @@ class BiliHandler(blivedm.BaseHandler):
             gift = "舰长"
         else:
             gift = "神秘物种"
-
-        num = message.num
-        result = ""
 
         if len(uname.split()) > 8:
             uname = gift.split()[0-5] + "..."
@@ -643,6 +634,25 @@ def cd_setting_dialog():
 
     # 设置预览
     def gift_list_fun():
+        def del_gift(is_special, k):
+            global refresh_capture_cd
+            with open("data/gifts.json", "r", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special.json", "r", encoding="utf-8") as f:
+                special = json.load(f)
+
+            if is_special:
+                special.pop(k)
+                with open("data/special.json", "w+", encoding="utf-8") as f:
+                    json.dump(special, f, ensure_ascii=False, indent=4)
+            else:
+                gifts[k] = 0
+                with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                    json.dump(gifts, f, ensure_ascii=False, indent=4)
+
+            refresh_capture_cd = True
+            cd_dialog.close()
+
         with open("data/gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
         with open("data/special.json", "r", encoding="utf-8") as f:
@@ -654,19 +664,14 @@ def cd_setting_dialog():
                 with ui.row().classes('w-full'):
                     ui.label(k)
                     ui.space()
-                    if v < 0:
-                        ui.label(format_seconds(v))
-                    else:
-                        ui.label(format_seconds(v))
+                    ui.label(format_seconds(v))
             else:
                 if v != 0:
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
-                        if v < 0:
-                            ui.label(format_seconds(v))
-                        else:
-                            ui.label(format_seconds(v))
+                        ui.label(format_seconds(v))
+                        ui.button("删除", on_click=lambda k = k: del_gift(False, k))
 
         if special != {}: # 如果特殊礼物的数据不是空的
             for k,v in special.items():
@@ -675,6 +680,7 @@ def cd_setting_dialog():
                         ui.label(k)
                         ui.space()
                         ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
                 else:
                     with ui.row().classes('w-full'):
                         ui.label(k)
@@ -686,6 +692,7 @@ def cd_setting_dialog():
                         if v == "double":
                             v = "加倍"
                         ui.label(v)
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
         ui.separator() # 分割线
 
     # 弹窗
@@ -841,6 +848,25 @@ def gift_count_setting_dialog():
         gift_count_dialog.close() # 关闭弹窗
 
     def gift_list_fun():
+        def del_gift(is_special, k):
+            global refresh_capture_gift
+            with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+                gifts = json.load(f)
+            with open("data/special_count.json", "r", encoding="utf-8") as f:
+                special = json.load(f)
+
+            if is_special:
+                special.pop(k)
+                with open("data/special_count.json", "w+", encoding="utf-8") as f:
+                    json.dump(special, f, ensure_ascii=False, indent=4)
+            else:
+                gifts[k] = 0
+                with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+                    json.dump(gifts, f, ensure_ascii=False, indent=4)
+
+            refresh_capture_gift = True
+            gift_count_dialog.close()
+
         with open("data/gifts_count.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
         with open("data/special_count.json", "r", encoding="utf-8") as f:
@@ -858,12 +884,12 @@ def gift_count_setting_dialog():
                     with ui.row().classes('w-full'):
                         ui.label(k)
                         ui.space()
-                        if v < 0:
+                        if v <= 0:
                             ui.label(f"{int(v)}{gift_play_unit_main.text}")
                         elif v > 0:
                             ui.label(f"+{int(v)}{gift_play_unit_main.text}")
-                        else:
-                            ui.label(f"{int(v)}{gift_play_unit_main.text}")
+                        ui.button("删除", on_click=lambda k = k: del_gift(False, k))
+
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
@@ -882,6 +908,7 @@ def gift_count_setting_dialog():
                             ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
                         else:
                             ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
                 else:
                     with ui.row().classes('w-full'):
                         ui.label(k)
@@ -891,6 +918,7 @@ def gift_count_setting_dialog():
                         if v == "double":
                             v = "加倍"
                         ui.label(v)
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
         ui.separator()
 
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
@@ -1330,20 +1358,24 @@ def check_update(init = False):
 
         dialog.open()
 
-    status = cmd_log.version_log(version)
-    if status != version:
-        if status != "Error":
-            ui.notify("检查到可用更新", type="info")
-            if not init:
-                version_dialog()
+    if not config["native"]:
+        status = cmd_log.version_log(version)
+        if status != version:
+            if status != "Error":
+                ui.notify("检查到可用更新", type="info")
+                if not init:
+                    version_dialog()
+            else:
+                ui.notify("检查更新失败", type="negative")
         else:
-            ui.notify("检查更新失败", type="negative")
+            ui.notify("已是最新版本", type="positive")
     else:
-        ui.notify("已是最新版本", type="positive")
+        ui.notify("Web模式不支持检查更新", type="warning")
 
 # 创建主界面
 with ui.card(align_items="center").classes("absolute-center"):
-    check_update(True)
+    if config["native"]:
+        check_update(True)
     time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl") # 创建时钟
     time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
     time_badge_inherit.set_visibility(False)
@@ -1429,7 +1461,6 @@ with ui.card(align_items="center").classes("absolute-center"):
             tmp_label.set_visibility(False)
 
     with ui.row():
-        ui.button("礼物测试", on_click=lambda: gift_list_show("高桥老师", "梦幻游乐园", 12, "+12小时"))
         # Update gift data button
         ui.button("更新礼物数据", on_click=lambda: refresh_gift())
         # Check update button
