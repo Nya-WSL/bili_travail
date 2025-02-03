@@ -46,45 +46,39 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
     else:
         msedgedriver = "msedgedriver"
 
-    driver_work_path = os.getcwd() + "/driver/msedgedriver/" + (os.listdir(os.getcwd() + "/driver/msedgedriver")[0])
-    if os.path.exists(driver_work_path) == False:                                 # 若webdriver不存在则下载并运行
+    driver_work_path = os.path.join(os.getcwd(), "driver", "msedgedriver")
+
+    def get_driver_path():
+        os_list = os.listdir(driver_work_path)[0]                                                                     # 尝试在文件夹内寻找是否存在msedgedriver.exe,若存在则直接运行
+        ver_list = os.listdir(os.path.join(driver_work_path, os_list))
+        pattern = '*'
+        latest_dir = fnmatch.filter(ver_list, pattern)[-1]                                                            # 获取最新版本
+        driver_path = os.path.join(driver_work_path, os_list, latest_dir, f"{msedgedriver}")
+        return driver_path
+
+    if os.path.exists(driver_work_path) == False:                                                                     # 若webdriver不存在则下载并运行
         # print("[INFO] 未找到 Edge WebDriver 环境...下载中...")
         if platform.system() == 'Windows':
             os.system(f'selenium-manager.exe --cache-path "{cache_path}" --browser edge')
         else:
             os.system(f"./selenium-manager --cache-path {cache_path} --browser edge")
-        # print("[INFO] Edge WebDriver 环境下载完成...")
-        dir_list = os.listdir(driver_work_path)
-        pattern = '*'
-        latest_dir = fnmatch.filter(dir_list, pattern)[-1]
-        driver_path = driver_work_path + "/" + latest_dir + f"/{msedgedriver}"         # 指定浏览器路径
-        service = Service(driver_path)                                                                        # 使用 Service 指定已下载的路径
-        driver = webdriver.Edge(service=service, options=options)                                             # 创建 Edge WebDriver 实例
-        # print("[INFO] 创建 Edge WebDriver 实例中...")
-    else:
-        try:
-            dir_list = os.listdir(driver_work_path)                               # 尝试在文件夹内寻找是否存在msedgedriver.exe,若存在则直接运行
-            pattern = '*'
-            latest_dir = fnmatch.filter(dir_list, pattern)[-1]
-            driver_path = driver_work_path + "/" + latest_dir + f"/{msedgedriver}"
-            service = Service(driver_path)
-            driver = webdriver.Edge(service=service, options=options)
-        except:
-            # print("[ERROR] Edge WebDriver 环境已损坏...重新下载中...")                                                    # 如抛出错误则重新下载
-            if platform.system() == 'Windows':
-                os.system(f'selenium-manager.exe --cache-path "{cache_path}" --browser edge')
-            else:
-                os.system(f"./selenium-manager --cache-path {cache_path} --browser edge")
-            driver = webdriver.Edge(service=service, options=options)
-            # print("[INFO] Edge WebDriver 环境下载完成...")
+
+    try:
+        service = Service(get_driver_path())
+        driver = webdriver.Edge(service=service, options=options)
+    except:
+        # print("[ERROR] Edge WebDriver 环境已损坏...重新下载中...")                                                    # 如抛出错误则重新下载
+        if platform.system() == 'Windows':
+            os.system(f'selenium-manager.exe --cache-path "{cache_path}" --browser edge')
         else:
-            # print("[INFO] 创建 Edge WebDriver 实例中...")
-            pass
+            os.system(f"./selenium-manager --cache-path {cache_path} --browser edge")
+        service = Service(get_driver_path())
+        driver = webdriver.Edge(service=service, options=options)
+        # print("[INFO] Edge WebDriver 环境下载完成...")
 
     # 目标 URL
     url = f"https://live.bilibili.com/{room_id}"
     driver.get(url)
-
 
     # 模拟click进入gift-panel
     button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[3]/div[1]/div"
@@ -105,6 +99,7 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
     except Exception:
         print(1)
         get_bili_h5_status = False
+
 
     if get_bili_h5_status:
         async with aiofiles.open(h5_path, "w+", encoding="utf-8") as file:
@@ -195,7 +190,7 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
 
         # print("[INFO] 数据缓存完成!")
         if not init:
-            ui.notify("数据缓存完成", type="positive")
+            ui.notify("数据缓存完成", type="info")
 
     # 关闭浏览器
     driver.quit()

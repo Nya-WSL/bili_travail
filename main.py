@@ -18,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.18.0-alpha"
+version = "0.18.1-alpha"
 
 # ================================
 # 检查环境状态
@@ -1142,7 +1142,9 @@ async def refresh_gift():
                 reset_dialog.open()
 
         with ui.dialog() as check_dialog, ui.card(align_items="center"):
-            ui.label("更新礼物数据可能会导致进程反复卡死一段时间，在运行倒计时和投喂挑战的时候不建议更新，是否确认更新？")
+            ui.label("请不要在倒计时和投喂挑战功能运行时更新。")
+            ui.label("更新礼物数据前，请先暂停倒计时与投喂挑战。")
+            ui.label("是否进行更新？")
             with ui.row():
                 ui.button("确定", on_click=lambda: check_refresh())
                 ui.button("取消", on_click=lambda: check_dialog.close())
@@ -1369,8 +1371,6 @@ def check_update(init = False):
                 ui.notify("检查更新失败", type="negative")
         else:
             ui.notify("已是最新版本", type="positive")
-    else:
-        ui.notify("Web模式不支持检查更新", type="warning")
 
 # 创建主界面
 with ui.card(align_items="center").classes("absolute-center"):
@@ -1463,8 +1463,10 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         # Update gift data button
         ui.button("更新礼物数据", on_click=lambda: refresh_gift())
-        # Check update button
-        ui.button("检查版本更新", on_click=lambda: check_update())
+
+        if config["native"]:
+            # Check update button
+            ui.button("检查版本更新", on_click=lambda: check_update())
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
