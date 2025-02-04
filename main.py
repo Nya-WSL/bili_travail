@@ -963,6 +963,8 @@ def gift_count_setting_dialog():
                 elif status == "reset":
                     app.storage.general["gift_challenge_count"] = 0
 
+                double_check_dialog.close()
+
             with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
                 ui.label("是否确认重置计数？")
 
