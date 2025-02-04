@@ -1,5 +1,5 @@
 import os
-import time
+import json
 import base64
 import fnmatch
 import asyncio
@@ -41,7 +41,11 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
     # options.add_argument("--enable-unsafe-swiftshader")
     options.add_argument("--mute-audio")                  # 静音音频
 
-    if platform.system() == 'Windows':
+    system = platform.system()
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    if system == 'Windows':
         msedgedriver = "msedgedriver.exe"
     else:
         msedgedriver = "msedgedriver"
@@ -58,20 +62,28 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
 
     if os.path.exists(driver_work_path) == False:                                                                     # 若webdriver不存在则下载并运行
         # print("[INFO] 未找到 Edge WebDriver 环境...下载中...")
-        if platform.system() == 'Windows':
+        if system == 'Windows':
             os.system(f'selenium-manager.exe --cache-path "{cache_path}" --browser edge')
         else:
-            os.system(f"./selenium-manager --cache-path {cache_path} --browser edge")
+            os.system(f"chmod +x selenium-manager && ./selenium-manager --cache-path {cache_path} --browser edge")
 
     try:
+        if system == "Linux":
+            if config["clean_cache"]:
+                os.system("echo 3 > /proc/sys/vm/drop_caches")
         service = Service(get_driver_path())
         driver = webdriver.Edge(service=service, options=options)
     except:
         # print("[ERROR] Edge WebDriver 环境已损坏...重新下载中...")                                                    # 如抛出错误则重新下载
-        if platform.system() == 'Windows':
+        if system == 'Windows':
             os.system(f'selenium-manager.exe --cache-path "{cache_path}" --browser edge')
         else:
-            os.system(f"./selenium-manager --cache-path {cache_path} --browser edge")
+            os.system(f"chmod +x selenium-manager && ./selenium-manager --cache-path {cache_path} --browser edge")
+
+        if system == "Linux":
+            if config["clean_cache"]:
+                os.system("echo 3 > /proc/sys/vm/drop_caches")
+
         service = Service(get_driver_path())
         driver = webdriver.Edge(service=service, options=options)
         # print("[INFO] Edge WebDriver 环境下载完成...")
@@ -84,6 +96,9 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
     button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[3]/div[1]/div"
 
     try:
+        if system == "Linux":
+            if config["clean_cache"]:
+                os.system("echo 3 > /proc/sys/vm/drop_caches")
         # 捕捉按钮状态是否可用，不可用则等待10秒
         button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, button_xpath))
@@ -97,11 +112,16 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             ui.notify("成功获取基础礼物数据", type="positive")
 
     except Exception:
-        print(1)
+        if system == "Linux":
+            if config["clean_cache"]:
+                os.system("echo 3 > /proc/sys/vm/drop_caches")
         get_bili_h5_status = False
 
 
     if get_bili_h5_status:
+        if system == "Linux":
+            if config["clean_cache"]:
+                os.system("echo 3 > /proc/sys/vm/drop_caches")
         async with aiofiles.open(h5_path, "w+", encoding="utf-8") as file:
             await file.write(driver.page_source)
 
@@ -194,4 +214,7 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
 
     # 关闭浏览器
     driver.quit()
+    if system == "Linux":
+        if config["clean_cache"]:
+            os.system("echo 3 > /proc/sys/vm/drop_caches")
     return get_bili_h5_status

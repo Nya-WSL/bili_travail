@@ -18,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.18.1-alpha"
+version = "0.18.2-alpha"
 
 # ================================
 # 检查环境状态
@@ -70,6 +70,7 @@ if not os.path.exists("config.json"):
     "room_id": "",
     "port": 65000,
     "native": True,
+    "clean_cache": False,
     "show_zero": False,
     "SESSDATA": "",
     "background_image": [
@@ -1373,6 +1374,9 @@ def check_update(init = False):
             ui.notify("已是最新版本", type="positive")
 
 # 创建主界面
+if not config["native"]:
+    ui.query('body').style(f'background: url("static/bg_server.png") 0px 0px/cover')
+
 with ui.card(align_items="center").classes("absolute-center"):
     if config["native"]:
         check_update(True)
