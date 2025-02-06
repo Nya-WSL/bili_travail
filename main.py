@@ -11,6 +11,7 @@ import json
 import shutil
 import random
 import asyncio
+import hashlib
 import aiohttp
 import requests
 import datetime
@@ -18,7 +19,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.18.2-alpha"
+version = "0.19.0-dev"
 
 # ================================
 # 检查环境状态
@@ -1163,7 +1164,7 @@ async def capture():
         if refresh_capture_cd:
             refresh_capture_cd = False
             # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
-            ui.navigate.to("/capture_cd")
+            ui.navigate.reload()
 
     # 初始化礼物列表
     with open("config.json", "r", encoding="utf-8") as f:
@@ -1251,7 +1252,7 @@ async def capture():
         if refresh_capture_gift:
             refresh_capture_gift = False
             # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
-            ui.navigate.to("/capture_gift")
+            ui.navigate.reload()
 
     # 礼物列表
     with open("config.json", "r", encoding="utf-8") as f:

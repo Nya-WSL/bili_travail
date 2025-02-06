@@ -171,3 +171,5 @@ packages/*
 /driver
 *.html
 /.nicegui
+passwd.json
+users.json
