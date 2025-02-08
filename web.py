@@ -11,7 +11,6 @@ import json
 import shutil
 import random
 import asyncio
-import hashlib
 import aiohttp
 import requests
 import datetime
@@ -70,7 +69,6 @@ if not os.path.exists("config.json"):
             config = {
     "room_id": "",
     "port": 65000,
-    "native": True,
     "clean_cache": False,
     "show_zero": False,
     "SESSDATA": "",
@@ -199,8 +197,7 @@ class BiliHandler(blivedm.BaseHandler):
             b_connect_switch.set_value(True)
             b_connect_switch.set_text("已连接弹幕服务器")
             # print(f"[INFO] 已成功连接至 {room_id.value}")
-        if not config["native"]:
-            print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
+        print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
 
 
     # 礼物数据
@@ -1350,39 +1347,10 @@ async def capture():
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
-# 检查版本更新按钮
-def check_update(init = False):
-    def version_dialog():
-        with ui.dialog() as dialog, ui.card(align_items="center"):
-            ui.label(f"当前版本：{version} | 最新版本：{status}")
-
-            with ui.row():
-                ui.button("gtihub", on_click=lambda: ui.navigate.to(f"https://github.com/Nya-WSL/bili_travail/releases/tag/v{status}", new_tab=True))
-                ui.button("Nya-WSL", on_click=lambda: ui.navigate.to(f"https://nya-wsl.com/bili_travail/releases/{status}.zip", new_tab=True))
-                ui.button("Nya-WSL Cloud", on_click=lambda: ui.navigate.to(f"https://cloud.nya-wsl.cn/ms-drive/bili_travail/releases/", new_tab=True))
-                ui.button("取消", on_click=lambda: dialog.close())
-
-        dialog.open()
-
-    if config["native"]:
-        status = cmd_log.version_log(version)
-        if status != version:
-            if status != "Error":
-                ui.notify("检查到可用更新", type="info")
-                if not init:
-                    version_dialog()
-            else:
-                ui.notify("检查更新失败", type="negative")
-        else:
-            ui.notify("已是最新版本", type="positive")
-
 # 创建主界面
-if not config["native"]:
-    ui.query('body').style(f'background: url("static/bg_server.png") 0px 0px/cover')
+ui.query('body').style(f'background: url("static/bg_server.png") 0px 0px/cover')
 
 with ui.card(align_items="center").classes("absolute-center"):
-    if config["native"]:
-        check_update(True)
     time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl") # 创建时钟
     time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
     time_badge_inherit.set_visibility(False)
@@ -1470,10 +1438,6 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         # Update gift data button
         ui.button("更新礼物数据", on_click=lambda: refresh_gift())
-
-        if config["native"]:
-            # Check update button
-            ui.button("检查版本更新", on_click=lambda: check_update())
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
@@ -1568,7 +1532,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-if config["native"]:
-    ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[800, 900], reconnect_timeout=15)
-else:
-    ui.run(host="0.0.0.0", port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", show=False, reconnect_timeout=15)
+ui.run(host="0.0.0.0", port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", show=False, reconnect_timeout=15)
