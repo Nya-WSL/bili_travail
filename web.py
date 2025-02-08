@@ -1,7 +1,6 @@
 # Local Packages
 import blive_crower
 import gift as get_gift
-import log as cmd_log
 from blivedm import blivedm
 import blivedm.blivedm.models.web as web_models
 
@@ -10,15 +9,18 @@ import os
 import json
 import shutil
 import random
+import hashlib
 import asyncio
 import aiohttp
 import requests
 import datetime
+import platform
 import http.cookies
 from typing import *
 from nicegui import ui, app
+from datetime import timedelta
 
-version = "0.19.0-dev"
+version = "0.19.0-web_dev"
 
 # ================================
 # 检查环境状态
@@ -31,7 +33,7 @@ refresh_capture_cd = False  # 初始倒计时化刷新状态
 refresh_capture_gift = False  # 初始化投喂挑战刷新状态
 b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
-reset_inherit_status = False # 初始化重置继承倒计时状态
+inherit_status = False # 初始化重置继承倒计时状态
 
 def format_seconds(seconds):
     """
@@ -81,7 +83,8 @@ if not os.path.exists("config.json"):
     ],
     "color": "#5898d4",
     "text_color": "#000000",
-    "local_text": False
+    "local_text": False,
+    "domain": ""
 }
             json.dump(config, f, indent=4, ensure_ascii=False)
     else:
@@ -343,105 +346,112 @@ class BiliHandler(blivedm.BaseHandler):
 
 # 倒计时类
 class CountdownTimer:
-    def __init__(self, start_time):
-        self._start_time = start_time # 初始化开始时间
-        self._remaining_time = start_time # 初始化剩余时间
-        self._paused = False # 初始化暂停状态
-        self._running = False # 初始化运行状态
-        self._paused_event = asyncio.Event() # 初始化event
-        self._paused_event.set()  # Initially not paused
-        self._task = None # 初始化task
+    def __init__(self):
+        self._remaining = timedelta(seconds=0)
 
-    # 获取当前倒计时
     def get_tmp_time(self):
-        return float(self._remaining_time)
+        '''
+        获取倒计时剩余时间
+        '''
+        return self._remaining.seconds
 
-    # 倒计时运行函数
-    async def _run(self, label):
-        while self._running and self._remaining_time > 0:
-            if self._paused:
-                await self._paused_event.wait()  # Wait until unpaused
+    # 运行倒计时
+    def start(self, hour, minute, second):
+        global cd_status, inherit_status
+        if cd_status:
+            ui.notify("倒计时已在运行中", type="negative")
+
+        elif inherit_status:
+            cd_status = True
+            self.timer = app.timer(1, self.update)
             # 设置按钮状态
             start_button.disable()
             cancel_button.enable()
             pause_button.enable()
+            add_button.enable()
+            sub_button.enable()
+            cancel_button.set_text("停止")
+            inherit_status = False
 
-            self._remaining_time -= 1 # 倒计时减1s
-            app.storage.general["countdown_time"] = self._remaining_time
+        elif hour == 0 and minute == 0 and second == 0:
+            ui.notify("请输入时间", type="negative")
 
-            # 格式化时间数据
-            minute, second = divmod(self._remaining_time, 60)
-            hour, minute = divmod(minute, 60)
-            label.set_text("%02d:%02d:%02d" % (hour, minute, second))
-            await asyncio.sleep(1) # 异步阻塞1s
+        else:
+            cd_status = True # 设置倒计时运行状态
+            self._remaining = timedelta(hours=hour, minutes=minute, seconds=second)
+            self.timer = app.timer(1, self.update)
+            # 重置时间输入框
+            input_hour.set_value(0)
+            input_minute.set_value(0)
+            input_second.set_value(0)
+            # 设置按钮状态
+            start_button.disable()
+            cancel_button.enable()
+            pause_button.enable()
+            add_button.enable()
+            sub_button.enable()
+            cancel_button.set_text("停止")
 
-        # 判断倒计时状态
-        if self._remaining_time <= 0:
-            await self.stop(time_badge)
-
-            # 倒计时结束后重置时间输入框
+    def update(self):
+        global cd_status
+        if self._remaining > timedelta(seconds=0):
+            self._remaining -= timedelta(seconds=1)
+            time_badge.set_text(format_timer(self._remaining.seconds))
+        else:
+            cd_status = False
+            self._remaining = timedelta(seconds=0)
+            self.timer.cancel()
+            time_badge.set_text("00:00:00")
             input_hour.set_value(0)
             input_minute.set_value(0)
             input_second.set_value(0)
 
-    # 运行倒计时
-    def start(self, label):
-        global cd_status
-        # 如果倒计时未在运行
-        if not self._running:
-            self._running = True # 修改运行状态
-            self._remaining_time = self._start_time  # 设置开始时间
-            if self._remaining_time != 0: # 防止写入0时开始倒计时
-                self._task = asyncio.create_task(self._run(label)) # 创建倒计时协程
-                # 重置时间输入框
-                input_hour.set_value(0)
-                input_minute.set_value(0)
-                input_second.set_value(0)
-                # 设置按钮状态
-                add_button.enable()
-                sub_button.enable()
-                cancel_button.set_text("停止")
-                cd_status = True # 设置倒计时运行状态
-            else:
-                ui.notify("请输入时间", type="negative")
-                self._running = False
+        app.storage.general["countdown_time"] = self._remaining.seconds
 
     # 暂停倒计时
-    async def pause(self):
+    def pause(self):
         global cd_status
-        if self._running and not self._paused: # 如果倒计时在运行且没有暂停
-            self._paused = True
-            self._paused_event.clear()  # Pause the timer
-            resume_button.enable()
-            pause_button.disable()
-            add_button.disable()
-            sub_button.disable()
-            cd_status = False
+        self.timer.active = False
+
+        # 设置按钮状态
+        resume_button.enable()
+        pause_button.disable()
+        add_button.disable()
+        sub_button.disable()
+
+        # 设置倒计时状态
+        cd_status = False
 
     # 继续倒计时
     def resume(self):
         global cd_status
-        if self._running and self._paused:
-            self._paused = False
-            self._paused_event.set()  # Resume the timer
-            pause_button.enable()
-            resume_button.disable()
-            add_button.enable()
-            sub_button.enable()
-            cd_status = True
+        self.timer.active = True
+
+        # 设置按钮状态
+        pause_button.enable()
+        resume_button.disable()
+        add_button.enable()
+        sub_button.enable()
+
+        # 设置倒计时状态
+        cd_status = True
 
     # 停止倒计时
-    async def stop(self, label):
+    def stop(self):
         global cd_status
-        if self._running:
-            self._running = False
-            self._paused = False
-            if self._task:
-                self._task.cancel() # 结束协程
-            label.set_text("00:00:00")
+
+        # 如果重置继承
+        if inherit_status:
             app.storage.general["countdown_time"] = 0
-            self._start_time = int(app.storage.general["countdown_time"])
-            self._remaining_time = self._start_time  # Reset the timer
+            self._remaining = timedelta(seconds=0)
+            time_badge.set_text("00:00:00")
+            cancel_button.set_text("停止")
+            cancel_button.disable()
+        else:
+            app.storage.general["countdown_time"] = 0
+            self._remaining = timedelta(seconds=0)
+
+            # 设置按钮状态
             start_button.enable()
             cancel_button.disable()
             pause_button.disable()
@@ -451,54 +461,13 @@ class CountdownTimer:
             input_hour.set_value(0)
             input_minute.set_value(0)
             input_second.set_value(0)
+
+            # 设置倒计时状态
             cd_status = False
-        else:
-            if reset_inherit_status:
-                label.set_text("00:00:00")
-                app.storage.general["countdown_time"] = 0
-                self._start_time = int(app.storage.general["countdown_time"])
-                self._remaining_time = self._start_time  # Reset the timer
-                cancel_button.set_text("停止")
-                cancel_button.disable()
 
     # 设置倒计时
     def set_time(self, time):
-        # 如果计时器正在运行，首先停止它
-        if self._running:
-            self._running = False
-            if self._task:
-                self._task.cancel()
-
-        # 更新起始时间和剩余时间
-        self._start_time = time
-        self._remaining_time = time
-
-        # 更新 UI 上的显示
-        hour, minute = divmod(self._remaining_time, 3600)
-        minute, second = divmod(minute, 60)
-        time_badge.set_text("%02d:%02d:%02d" % (hour, minute, second))
-
-        # 如果计时器没有运行，则重新启动计时器
-        if not self._running:
-            self._running = True
-            self._task = asyncio.create_task(self._run(time_badge))
-
-    # 继承倒计时
-    def inherit_time(self, time):
-        # 如果计时器正在运行，首先停止它
-        if self._running:
-            self._running = False
-            if self._task:
-                self._task.cancel()
-
-        # 更新起始时间和剩余时间
-        self._start_time = time
-        self._remaining_time = time
-
-        # 更新 UI 上的显示
-        hour, minute = divmod(self._remaining_time, 3600)
-        minute, second = divmod(minute, 60)
-        time_badge.set_text("%02d:%02d:%02d" % (hour, minute, second))
+        self._remaining = timedelta(seconds=time)
 
 
 # ================================
@@ -992,42 +961,28 @@ def gift_count_setting_dialog():
 
 # dialog.open()
 
-def init_task():
-    global countdown_timer
-    global reset_inherit_status
-    countdown_timer = CountdownTimer(int(time_badge_inherit.text))
-    if app.storage.general["countdown_time"] != 0: # 如果存在可继承的倒计时
-        cancel_button.set_text("重置")
-        cancel_button.enable()
-        reset_inherit_status = True # 设置重置继承倒计时状态为True
-
-# 运行倒计时
-def start_task():
-    if countdown_timer._start_time == 0:
-        countdown_timer._start_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
-        countdown_timer._remaining_time = countdown_timer._start_time
-    countdown_timer.start(time_badge)
+countdown_timer = CountdownTimer()
 
 
 # 手动加时
 def add_time():
-    try:
+    if cd_status:
         if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
             tmp_time = countdown_timer.get_tmp_time()
             changed_time = tmp_time + ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1 # 在视觉效果上倒计时被正确反馈，实际上多加了1s
             countdown_timer.set_time(changed_time)
-    except NameError:
+    else:
         ui.notify("请先开始计时", type="negative")
 
 
 # 手动减时
 def sub_time():
-    try:
+    if cd_status:
         if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
             tmp_time = countdown_timer.get_tmp_time()
             changed_time = tmp_time - ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1  # 在视觉效果上倒计时被正确反馈，实际上少减了1s
             countdown_timer.set_time(changed_time)
-    except NameError:
+    else:
         ui.notify("请先开始计时", type="negative")
 
 
@@ -1036,6 +991,13 @@ def save_config():
     with open("config.json", "w+", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
+# 获取当前设备ip
+def get_public_ip():
+    try:
+        response = requests.get("https://api64.ipify.org?format=text", timeout=5)
+        return response.text
+    except requests.RequestException as e:
+        return f"Error: {e}"
 
 # 检查弹幕服务器连接状态
 async def check_b_connect_status():
@@ -1064,7 +1026,7 @@ async def check_b_connect_status():
             b_connect_switch.set_value(False)
             b_connect_switch.set_text("连接至弹幕服务器")
 
-    # 
+    # 如果正在连接弹幕服务器
     if b_connect_switch.value == "null":
         if room_id.value == "":
             b_connect_switch.set_value(False)
@@ -1340,115 +1302,175 @@ async def capture():
     ui.timer(5, callback=lambda: check_gift_refresh())
 
 # ================================
-# 主界面GUI
+# GUI
 # ================================
 
+def format_timer(remaining_time):
+    minute, second = divmod(remaining_time, 60)
+    hour, minute = divmod(minute, 60)
+    return "%02d:%02d:%02d" % (hour, minute, second)
 
-with open("config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
 
-# 创建主界面
-ui.query('body').style(f'background: url("static/bg_server.png") 0px 0px/cover')
+@ui.page('/')
+def page():
+    if not app.storage.user.get('authenticated'):
+        ui.navigate.to('/login')
+    else:
+        ui.navigate.to('/admin')
 
-with ui.card(align_items="center").classes("absolute-center"):
-    time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl") # 创建时钟
-    time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
-    time_badge_inherit.set_visibility(False)
-    gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 将结果写入storage) # 投喂挑战总数
-    gift_play_unit_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_unit") # 投喂挑战单位
-    gift_play_text_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_text") # 投喂挑战项目
-    gift_challenge_count.set_visibility(False)
-    gift_play_unit_main.set_visibility(False)
-    gift_play_text_main.set_visibility(False)
 
-    # 时间输入框
-    with ui.row():
-        input_hour = ui.number("时", value=0, min=0).style("width: 100px")
-        input_minute = ui.number("分", value=0, min=0).style("width: 100px")
-        input_second = ui.number("秒", value=0, min=0).style("width: 100px")
-        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
-        gift_challenge_switch.disable()
+@ui.page('/login', title="登录 | bili_travail")
+def page():
+    def try_login() -> None:
+        if not os.path.exists('users.json'):
+            with open('users.json', 'w', encoding='utf-8') as f:
+                json.dump({}, f, indent=4, ensure_ascii=False)
+        with open('users.json', 'r', encoding='utf-8') as f:
+            users = json.load(f)
+        try:
+            if users[username.value] == hashlib.sha256(str(password.value).encode('utf-8')).hexdigest():
+                app.storage.user.indent = True
+                app.storage.user.update({'user': username.value, 'authenticated': True})
+                ui.navigate.to(app.storage.user.get('referrer_path', '/admin'))
+            else:
+                ui.notify('密码错误', color='negative')
+        except KeyError:
+            ui.notify('账号错误或不存在', color='negative')
 
-    # 倒计时按钮
-    with ui.row():
-        # Start button
-        start_button = ui.button('开始', on_click=lambda: start_task())
-        start_button.disable()
+    ui.query('body').style('background: url("static/bg.jpg") 0px 0px/cover')
+    with ui.card(align_items="center").classes('absolute-center'):
+        ui.badge('B站加班姬', outline=True).classes('text-3xl')
+        username = ui.input('账号').style("width: 150px")
+        password = ui.input('密码', password=True, password_toggle_button=True).on('keydown.enter', try_login).style("width: 150px")
+        ui.button('登录', on_click=try_login)
 
-        # Pause button
-        pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause())
-        pause_button.disable()
+    with ui.page_sticky(position='bottom-left', x_offset=10, y_offset=10):
+        ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
 
-        # Resume button
-        resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
-        resume_button.disable()
+# 创建管理面板
+@ui.page('/admin', title="管理面板 | bili_travail")
+def page():
+    global time_badge, time_badge_inherit, gift_challenge_count, gift_play_unit_main, gift_play_text_main, input_hour, input_minute, input_second, gift_challenge_switch, start_button, pause_button, resume_button, cancel_button, add_button, sub_button, room_id, b_connect_switch, inherit_status, gift_list_show
 
-        # Stop button
-        cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop(time_badge))
-        cancel_button.disable()
+    # def check_cd_status():
+        
 
-        # Add time Button
-        add_button = ui.button("手动增加", on_click=lambda: add_time())
-        add_button.disable()
+    ui.query('body').style(f'background: url("static/bg_server.png") 0px 0px/cover')
 
-        # Sub Time Button
-        sub_button = ui.button("手动减少", on_click=lambda: sub_time())
-        sub_button.disable()
+    if not app.storage.user.get('authenticated'):
+        ui.navigate.to('/login')
 
-    ui.separator()
+    with ui.card(align_items="center").classes("absolute-center"):
+        # time_badge = ui.badge(outline=True).bind_text_from(countdown_timer, 'remaining', lambda remaining: f'{format_timer(remaining.seconds)}').classes("text-9xl") # 创建时钟
+        time_badge = ui.badge(text=format_timer(app.storage.general["countdown_time"]), outline=True).classes("text-9xl") # 创建时钟
+        time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
+        time_badge_inherit.set_visibility(False)
+        gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 将结果写入storage) # 投喂挑战总数
+        gift_play_unit_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_unit") # 投喂挑战单位
+        gift_play_text_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_text") # 投喂挑战项目
+        gift_challenge_count.set_visibility(False)
+        gift_play_unit_main.set_visibility(False)
+        gift_play_text_main.set_visibility(False)
 
-    # 房间号和颜色输入框，颜色只在about和capture页面生效
-    with ui.row():
-        room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id") # 实时写入房间号到配置文件
-        b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+        # 时间输入框
+        with ui.row():
+            input_hour = ui.number("时", value=0, min=0).style("width: 100px")
+            input_minute = ui.number("分", value=0, min=0).style("width: 100px")
+            input_second = ui.number("秒", value=0, min=0).style("width: 100px")
+            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
+            gift_challenge_switch.disable()
 
-    ui.separator()
+        # 倒计时按钮
+        with ui.row():
+            # Start button
+            start_button = ui.button('开始', on_click=lambda: countdown_timer.start(input_hour.value, input_minute.value, input_second.value))
+            start_button.disable()
 
-    with ui.row():
-        ui.color_input(label="强调色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
-        ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
-        # Show gift list button
-        ui.button("界面预览", on_click=lambda: open_capture())
+            # Pause button
+            pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause())
+            pause_button.disable()
 
-    # 按钮组
-    with ui.row():
-        # Gift Setting button
-        # ui.button("礼物设置", on_click=lambda: gift())
-        ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
-        ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
+            # Resume button
+            resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
+            resume_button.disable()
 
-    def gift_list_show(name, gift, num, time):
-        with open("data/gift_img.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
+            # Stop button
+            cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop())
+            cancel_button.disable()
 
-        with gift_scroll:
-            with ui.row().classes("w-full"):
-                ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
-                with ui.avatar(color="").classes("w-6 h-6"):
-                    ui.image(gifts[gift])
-                ui.label(f"{gift}x{num}").classes("text-l")
-                ui.label(time).classes("text-l")
-        gift_scroll.scroll_to(percent=1, duration=0.5)
+            # Add time Button
+            add_button = ui.button("手动增加", on_click=lambda: add_time())
+            add_button.disable()
 
-    with ui.card(align_items="stretch").classes("w-full"):
-        with ui.scroll_area().classes('h-32') as gift_scroll:
-            tmp_label = ui.label()
-            tmp_label.set_visibility(False)
+            # Sub Time Button
+            sub_button = ui.button("手动减少", on_click=lambda: sub_time())
+            sub_button.disable()
 
-    with ui.row():
-        # Update gift data button
-        ui.button("更新礼物数据", on_click=lambda: refresh_gift())
+        ui.separator()
 
-    # obs源
-    ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
-    ui.label(f"OBS投喂挑战浏览器源URL：http://127.0.0.1:{port}/capture_gift")
+        # 房间号和颜色输入框，颜色只在about和capture页面生效
+        with ui.row():
+            room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id") # 实时写入房间号到配置文件
+            b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
 
-    init_task()
-    countdown_timer.inherit_time(int(time_badge_inherit.text))
+        ui.separator()
 
-# about按钮
-with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
-    ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
+        with ui.row():
+            ui.color_input(label="强调色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+            ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
+            # Show gift list button
+            ui.button("界面预览", on_click=lambda: open_capture())
+
+        # 按钮组
+        with ui.row():
+            # Gift Setting button
+            # ui.button("礼物设置", on_click=lambda: gift())
+            ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
+            ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
+
+        def gift_list_show(name, gift, num, time):
+            with open("data/gift_img.json", "r", encoding="utf-8") as f:
+                gifts = json.load(f)
+
+            with gift_scroll:
+                with ui.row().classes("w-full"):
+                    ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
+                    with ui.avatar(color="").classes("w-6 h-6"):
+                        ui.image(gifts[gift])
+                    ui.label(f"{gift}x{num}").classes("text-l")
+                    ui.label(time).classes("text-l")
+            gift_scroll.scroll_to(percent=1, duration=0.5)
+
+        with ui.card(align_items="stretch").classes("w-full"):
+            with ui.scroll_area().classes('h-32') as gift_scroll:
+                tmp_label = ui.label()
+                tmp_label.set_visibility(False)
+
+        with ui.row():
+            # Update gift data button
+            ui.button("更新礼物数据", on_click=lambda: refresh_gift())
+
+        # obs源
+        if config["domain"] == "":
+            if platform.system() == "Windows" or platform.system() == "Darwin": # 如果是Windows或MacOS
+                server = "127.0.0.1"
+            else:
+                server = get_public_ip()
+        else:
+            server = config["domain"]
+
+        ui.label(f"OBS倒计时浏览器源URL：http://{server}:{port}/capture_cd")
+        ui.label(f"OBS投喂挑战浏览器源URL：http://{server}:{port}/capture_gift")
+
+    if app.storage.general["countdown_time"] != 0: # 如果存在可继承的倒计时
+        countdown_timer.set_time(float(app.storage.general["countdown_time"]))
+        inherit_status = True # 设置重置继承倒计时状态为True
+        cancel_button.set_text("重置")
+        cancel_button.enable()
+
+    # about按钮
+    with ui.page_sticky(position='bottom-left', x_offset=10, y_offset=10):
+        ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
 
 
 # about页面
@@ -1532,4 +1554,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(host="0.0.0.0", port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", show=False, reconnect_timeout=15)
+ui.run(host="0.0.0.0", port=port, title="bili_travail", favicon="static/logo.ico", show=False, reconnect_timeout=15, storage_secret="vita")
