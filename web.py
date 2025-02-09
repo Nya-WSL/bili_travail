@@ -1305,6 +1305,7 @@ async def capture():
 # GUI
 # ================================
 
+
 def format_timer(remaining_time):
     minute, second = divmod(remaining_time, 60)
     hour, minute = divmod(minute, 60)
@@ -1314,18 +1315,38 @@ def format_timer(remaining_time):
 @ui.page('/')
 def page():
     if not app.storage.user.get('authenticated'):
-        ui.navigate.to('/login')
+        if not os.path.exists('data/users.json'):
+            ui.navigate.to('/register')
+        else:
+            ui.navigate.to('/login')
     else:
         ui.navigate.to('/admin')
+
+
+@ui.page("/register", title="注册 | bili_travail")
+def page():
+    def try_register() -> None:
+        with open("data/users.json", "w+", encoding="utf-8") as f:
+            passwd = {username.value: hashlib.sha256(str(password.value).encode('utf-8')).hexdigest()}
+            json.dump(passwd, f, indent=4, ensure_ascii=False)
+        ui.navigate.to('/login')
+
+    ui.query('body').style('background: url("static/bg.jpg") 0px 0px/cover')
+    with ui.card(align_items="center").classes('absolute-center'):
+        ui.badge('B站加班姬', outline=True).classes('text-3xl')
+        username = ui.input('账号').style("width: 150px")
+        password = ui.input('密码', password=True, password_toggle_button=True).on('keydown.enter', try_register).style("width: 150px")
+        with ui.row():
+            ui.button('注册', on_click=lambda: try_register())
 
 
 @ui.page('/login', title="登录 | bili_travail")
 def page():
     def try_login() -> None:
-        if not os.path.exists('users.json'):
-            with open('users.json', 'w', encoding='utf-8') as f:
-                json.dump({}, f, indent=4, ensure_ascii=False)
-        with open('users.json', 'r', encoding='utf-8') as f:
+        if not os.path.exists('data/users.json'):
+            ui.navigate.to('/register')
+
+        with open('data/users.json', 'r', encoding='utf-8') as f:
             users = json.load(f)
         try:
             if users[username.value] == hashlib.sha256(str(password.value).encode('utf-8')).hexdigest():
@@ -1342,7 +1363,9 @@ def page():
         ui.badge('B站加班姬', outline=True).classes('text-3xl')
         username = ui.input('账号').style("width: 150px")
         password = ui.input('密码', password=True, password_toggle_button=True).on('keydown.enter', try_login).style("width: 150px")
-        ui.button('登录', on_click=try_login)
+        with ui.row():
+            ui.button('登录', on_click=try_login)
+            ui.button('注册', on_click=lambda: ui.navigate.to('/register'))
 
     with ui.page_sticky(position='bottom-left', x_offset=10, y_offset=10):
         ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
