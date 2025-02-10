@@ -20,7 +20,7 @@ from typing import *
 from nicegui import ui, app
 from datetime import timedelta
 
-version = "0.19.0-web_dev"
+version = "v0.19.0-web_alpha"
 
 # ================================
 # 检查环境状态
@@ -34,6 +34,8 @@ refresh_capture_gift = False  # 初始化投喂挑战刷新状态
 b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
 inherit_status = False # 初始化重置继承倒计时状态
+admin_is_refresh = False # 初始化admin页面刷新状态
+pause_status = False # 初始化暂停状态
 
 def format_seconds(seconds):
     """
@@ -357,11 +359,12 @@ class CountdownTimer:
 
     # 运行倒计时
     def start(self, hour, minute, second):
-        global cd_status, inherit_status
+        global cd_status, inherit_status, pause_status
         if cd_status:
             ui.notify("倒计时已在运行中", type="negative")
 
-        elif inherit_status:
+        elif inherit_status and not admin_is_refresh:
+            print(1)
             cd_status = True
             self.timer = app.timer(1, self.update)
             # 设置按钮状态
@@ -370,14 +373,15 @@ class CountdownTimer:
             pause_button.enable()
             add_button.enable()
             sub_button.enable()
-            cancel_button.set_text("停止")
             inherit_status = False
+            pause_status = False
 
         elif hour == 0 and minute == 0 and second == 0:
             ui.notify("请输入时间", type="negative")
 
         else:
             cd_status = True # 设置倒计时运行状态
+            inherit_status = False # 设置倒计时继承状态
             self._remaining = timedelta(hours=hour, minutes=minute, seconds=second)
             self.timer = app.timer(1, self.update)
             # 重置时间输入框
@@ -390,7 +394,6 @@ class CountdownTimer:
             pause_button.enable()
             add_button.enable()
             sub_button.enable()
-            cancel_button.set_text("停止")
 
     def update(self):
         global cd_status
@@ -398,19 +401,20 @@ class CountdownTimer:
             self._remaining -= timedelta(seconds=1)
             time_badge.set_text(format_timer(self._remaining.seconds))
         else:
-            cd_status = False
+            # cd_status = False
             self._remaining = timedelta(seconds=0)
             self.timer.cancel()
-            time_badge.set_text("00:00:00")
-            input_hour.set_value(0)
-            input_minute.set_value(0)
-            input_second.set_value(0)
+            self.stop()
+            # time_badge.set_text("00:00:00")
+            # input_hour.set_value(0)
+            # input_minute.set_value(0)
+            # input_second.set_value(0)
 
         app.storage.general["countdown_time"] = self._remaining.seconds
 
     # 暂停倒计时
     def pause(self):
-        global cd_status
+        global cd_status, inherit_status, pause_status
         self.timer.active = False
 
         # 设置按钮状态
@@ -421,10 +425,13 @@ class CountdownTimer:
 
         # 设置倒计时状态
         cd_status = False
+        inherit_status = True
+        pause_status = True
+        reset_button.enable()
 
     # 继续倒计时
     def resume(self):
-        global cd_status
+        global cd_status, pause_status
         self.timer.active = True
 
         # 设置按钮状态
@@ -435,35 +442,48 @@ class CountdownTimer:
 
         # 设置倒计时状态
         cd_status = True
+        pause_status = False
+
+    def reset(self):
+        global inherit_status
+
+        app.storage.general["countdown_time"] = 0
+        if cd_status or pause_status:
+            self._remaining = timedelta(seconds=1)
+            time_badge.set_text("00:00:01")
+            self.resume()
+        else:
+            self._remaining = timedelta(seconds=0)
+            time_badge.set_text("00:00:00")
+        inherit_status = False
+        # if not cd_status and b_connect_status:
+        #     start_button.enable()
 
     # 停止倒计时
     def stop(self):
-        global cd_status
+        global cd_status, inherit_status, pause_status
 
-        # 如果重置继承
+        app.storage.general["countdown_time"] = 0
+        self._remaining = timedelta(seconds=0)
+        time_badge.set_text("00:00:00")
+
         if inherit_status:
-            app.storage.general["countdown_time"] = 0
-            self._remaining = timedelta(seconds=0)
-            time_badge.set_text("00:00:00")
-            cancel_button.set_text("停止")
-            cancel_button.disable()
-        else:
-            app.storage.general["countdown_time"] = 0
-            self._remaining = timedelta(seconds=0)
+            inherit_status = False
 
-            # 设置按钮状态
-            start_button.enable()
-            cancel_button.disable()
-            pause_button.disable()
-            resume_button.disable()
-            add_button.disable()
-            sub_button.disable()
-            input_hour.set_value(0)
-            input_minute.set_value(0)
-            input_second.set_value(0)
+        # 设置按钮状态
+        start_button.enable()
+        cancel_button.disable()
+        pause_button.disable()
+        resume_button.disable()
+        add_button.disable()
+        sub_button.disable()
+        input_hour.set_value(0)
+        input_minute.set_value(0)
+        input_second.set_value(0)
 
-            # 设置倒计时状态
-            cd_status = False
+        # 设置倒计时状态
+        cd_status = False
+        pause_status = False
 
     # 设置倒计时
     def set_time(self, time):
@@ -1001,7 +1021,7 @@ def get_public_ip():
 
 # 检查弹幕服务器连接状态
 async def check_b_connect_status():
-    global b_connect_status
+    global b_connect_status, admin_is_refresh
 
     # 如果连接弹幕服务器开关为关且房间号不为空
     if b_connect_switch.value == False:
@@ -1018,6 +1038,7 @@ async def check_b_connect_status():
                 b_connect_switch.set_value(False)
                 b_connect_switch.set_text("连接至弹幕服务器")
         else:
+            admin_is_refresh = False
             start_button.disable()
             gift_challenge_switch.disable()
             b_connect_status = False
@@ -1050,7 +1071,8 @@ async def check_b_connect_status():
             return
 
         if b_connect_status:
-            start_button.enable()
+            if not admin_is_refresh and not cd_status:
+                start_button.enable()
             gift_challenge_switch.enable()
         else:
             b_connect_switch.set_value("null")
@@ -1326,18 +1348,32 @@ def page():
 @ui.page("/register", title="注册 | bili_travail")
 def page():
     def try_register() -> None:
-        with open("data/users.json", "w+", encoding="utf-8") as f:
-            passwd = {username.value: hashlib.sha256(str(password.value).encode('utf-8')).hexdigest()}
-            json.dump(passwd, f, indent=4, ensure_ascii=False)
-        ui.navigate.to('/login')
+        if not os.path.exists('data/users.json'):
+            with open("data/users.json", "w+", encoding="utf-8") as f:
+                passwd = {username.value: hashlib.sha256(str(password.value).encode('utf-8')).hexdigest()}
+                json.dump(passwd, f, indent=4, ensure_ascii=False)
+            ui.navigate.to('/login')
+        else:
+            ui.notify('已存在用户，请直接登录，忘记密码可删除账号密码后重新注册', color='warning')
 
-    ui.query('body').style('background: url("static/bg.jpg") 0px 0px/cover')
+        with open('data/users.json', 'r', encoding='utf-8') as f:
+            users = json.load(f)
+        if users != {}:
+            ui.notify('已存在用户，请直接登录，忘记密码可删除账号密码后重新注册', color='warning')
+        else:
+            with open("data/users.json", "w+", encoding="utf-8") as f:
+                passwd = {username.value: hashlib.sha256(str(password.value).encode('utf-8')).hexdigest()}
+                json.dump(passwd, f, indent=4, ensure_ascii=False)
+            ui.navigate.to('/login')
+
+    ui.query('body').style('background: url("static/bg_server.png") 0px 0px/cover')
     with ui.card(align_items="center").classes('absolute-center'):
         ui.badge('B站加班姬', outline=True).classes('text-3xl')
         username = ui.input('账号').style("width: 150px")
         password = ui.input('密码', password=True, password_toggle_button=True).on('keydown.enter', try_register).style("width: 150px")
         with ui.row():
             ui.button('注册', on_click=lambda: try_register())
+        ui.label("请勿使用浏览器的自动填入功能").classes("text-xs text-red")
 
 
 @ui.page('/login', title="登录 | bili_travail")
@@ -1358,7 +1394,7 @@ def page():
         except KeyError:
             ui.notify('账号错误或不存在', color='negative')
 
-    ui.query('body').style('background: url("static/bg.jpg") 0px 0px/cover')
+    ui.query('body').style('background: url("static/bg_server.png") 0px 0px/cover')
     with ui.card(align_items="center").classes('absolute-center'):
         ui.badge('B站加班姬', outline=True).classes('text-3xl')
         username = ui.input('账号').style("width: 150px")
@@ -1366,6 +1402,7 @@ def page():
         with ui.row():
             ui.button('登录', on_click=try_login)
             ui.button('注册', on_click=lambda: ui.navigate.to('/register'))
+        ui.label("请勿使用浏览器的自动填入功能").classes("text-xs text-red")
 
     with ui.page_sticky(position='bottom-left', x_offset=10, y_offset=10):
         ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
@@ -1373,10 +1410,33 @@ def page():
 # 创建管理面板
 @ui.page('/admin', title="管理面板 | bili_travail")
 def page():
-    global time_badge, time_badge_inherit, gift_challenge_count, gift_play_unit_main, gift_play_text_main, input_hour, input_minute, input_second, gift_challenge_switch, start_button, pause_button, resume_button, cancel_button, add_button, sub_button, room_id, b_connect_switch, inherit_status, gift_list_show
+    global time_badge, time_badge_inherit, gift_challenge_count, gift_play_unit_main, gift_play_text_main, input_hour, input_minute, input_second, gift_challenge_switch, start_button, pause_button, resume_button, reset_button, cancel_button, add_button, sub_button, room_id, b_connect_switch, inherit_status, gift_list_show
 
-    # def check_cd_status():
-        
+    def check_cd_status():
+        global admin_is_refresh, inherit_status
+        if cd_status:
+            pause_button.enable()
+            add_button.enable()
+            sub_button.enable()
+            start_button.disable()
+            cancel_button.enable()
+        else:
+            if app.storage.general["countdown_time"] == 0:
+                inherit_status = False
+
+        if b_connect_status:
+            b_connect_switch.value = True
+            if not cd_status:
+                admin_is_refresh = True
+                start_button.enable()
+            else:
+                start_button.disable()
+
+        if pause_status:
+            pause_button.disable()
+            resume_button.enable()
+            start_button.disable()
+            cancel_button.enable()
 
     ui.query('body').style(f'background: url("static/bg_server.png") 0px 0px/cover')
 
@@ -1400,7 +1460,7 @@ def page():
             input_hour = ui.number("时", value=0, min=0).style("width: 100px")
             input_minute = ui.number("分", value=0, min=0).style("width: 100px")
             input_second = ui.number("秒", value=0, min=0).style("width: 100px")
-            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
+            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).bind_value(config, "gift_challenge_status")
             gift_challenge_switch.disable()
 
         # 倒计时按钮
@@ -1416,6 +1476,13 @@ def page():
             # Resume button
             resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
             resume_button.disable()
+
+            # Reset button
+            reset_button = ui.button('重置', on_click=lambda: countdown_timer.reset())
+            if inherit_status or app.storage.general["countdown_time"] != 0:
+                reset_button.enable()
+            else:
+                reset_button.disable()
 
             # Stop button
             cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop())
@@ -1476,20 +1543,20 @@ def page():
         # obs源
         if config["domain"] == "":
             if platform.system() == "Windows" or platform.system() == "Darwin": # 如果是Windows或MacOS
-                server = "127.0.0.1"
+                url = f"http://127.0.0.1:{port}"
             else:
-                server = get_public_ip()
+                url = "http://" + get_public_ip() + ":" + str(port)
         else:
-            server = config["domain"]
+            url = config["domain"]
 
-        ui.label(f"OBS倒计时浏览器源URL：http://{server}:{port}/capture_cd")
-        ui.label(f"OBS投喂挑战浏览器源URL：http://{server}:{port}/capture_gift")
+        ui.label(f"OBS倒计时浏览器源URL：{url}/capture_cd")
+        ui.label(f"OBS投喂挑战浏览器源URL：{url}/capture_gift")
 
     if app.storage.general["countdown_time"] != 0: # 如果存在可继承的倒计时
         countdown_timer.set_time(float(app.storage.general["countdown_time"]))
         inherit_status = True # 设置重置继承倒计时状态为True
-        cancel_button.set_text("重置")
-        cancel_button.enable()
+
+    check_cd_status()
 
     # about按钮
     with ui.page_sticky(position='bottom-left', x_offset=10, y_offset=10):
@@ -1577,4 +1644,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(host="0.0.0.0", port=port, title="bili_travail", favicon="static/logo.ico", show=False, reconnect_timeout=15, storage_secret="vita")
+ui.run(host="0.0.0.0", port=port, title="bili_travail", favicon="static/logo.ico", show=False, reconnect_timeout=15, storage_secret="Nya-WSL")
