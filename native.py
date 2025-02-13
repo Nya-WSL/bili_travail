@@ -1365,7 +1365,7 @@ def check_update(init = False):
         try:
             latest_version = requests.get(url[0]) # 优先从Nya-WSL中国服务器获取版本信息
             if latest_version.status_code == 200:
-                latest_version.text.replace("\n", "") # 服务器返回内容
+                latest_version = latest_version.text.replace("\n", "") # 服务器返回内容
             else:
                 raise ValueError("From Nya-WSL CN to get version info was error") # 抛出错误
         except:
