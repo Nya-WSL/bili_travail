@@ -128,12 +128,10 @@ class BiliGiftManager:
                 else:
                     gift_mapping[k] = f"data/{v}"
 
-        # if show:
-        #     # 打印映射结果
-        #     for url, name in gift_mapping.items():
-        #         print(f"URL: {url} -> 标签: {name}")
-
         if write_img:
+            blind_box = gift_map.blind_box
+            for v in blind_box.values():
+                gift_mapping.update(v)
             with open(img_path, "w", encoding="utf-8") as file:
                 json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
 
@@ -141,6 +139,11 @@ class BiliGiftManager:
             tmp_dict = {}
             for k,v in gift_mapping.items():
                 tmp_dict[k] = time
+            # 更新预定义的盲盒数据
+            blind_box = gift_map.blind_box
+            for v in blind_box.values():
+                for gift in v.keys():
+                    gift_mapping[gift] = time
             with open(time_path, "w", encoding="utf-8") as file:
                 json.dump(tmp_dict, file, ensure_ascii=False, indent=4)
 

@@ -4,7 +4,7 @@
 # 数据源直播间:1815222606
 #
 # 盲盒数据
-# 2025/01/27
+# 2025/02/14
 # 数据源直播间:1815222606
 # ===============================
 
@@ -138,4 +138,13 @@ blind_box = {
         "绮彩权杖": "https://s1.hdslb.com/bfs/live/5cecbf274a4205ef76ed3f11c6540f0c6743363c.png",
         "璀璨钻石": "https://s1.hdslb.com/bfs/live/a0031d70323d085203c57272758520fe95bfeec0.png"
     },
+    "浪漫盲盒": {
+        "盛世花嫁": "data/gifts/sshj.webp",
+        "燕归": "data/gifts/yg.webp",
+        "爱情来信": "data/gifts/aqlx.webp",
+        "蛋糕恋语": "data/gifts/dgly.webp",
+        "缘起灵签": "data/gifts/yqlq.webp",
+        "初悸等待": "data/gifts/cjdd.webp",
+        "永恒之约": "data/gifts/yhzy.webp",
+    }
 }

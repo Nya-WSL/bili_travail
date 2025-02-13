@@ -1120,7 +1120,7 @@ async def refresh_gift():
             if html_content:
                 # print("[INFO] 正在格式化数据...")
                 await GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
-                await GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html", write_img=False, time_path="data/gifts_count.json")
+                shutil.copy("data/gifts.json", "data/gifts_count.json")
                 # print("[INFO] 礼物数据更新完成!")
                 ui.notify("礼物数据更新完成", type="positive")
             else:
