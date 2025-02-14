@@ -20,7 +20,7 @@ from typing import *
 from nicegui import ui, app
 from datetime import timedelta
 
-version = "v0.19.1-web_alpha"
+version = "v0.19.2-web_alpha"
 
 # ================================
 # 检查环境状态
@@ -1178,7 +1178,8 @@ async def capture():
 
     # 创建预览界面
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"): # 居中、背景透明、取消卡片阴影、置顶居中
-        ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(time_badge).classes("text-8xl") # 创建时钟
+        # ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(time_badge).classes("text-8xl") # 创建时钟
+        ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(countdown_timer, '_remaining', lambda remaining: f'{format_timer(remaining.seconds)}').classes("text-8xl")
         ui.separator() # 分割线
 
         # 创建礼物列表
