@@ -90,6 +90,8 @@ class BiliGiftManager:
 
         gift_mapping = {} # 创建一个空字典来存储礼物标签和URL
 
+        blind_box = gift_map.blind_box
+
         gift_items = soup.find_all('div', class_='gift-item') # 找到所有的礼物项
 
         for item in gift_items: # 遍历每个礼物项，提取标签和URL
@@ -129,7 +131,6 @@ class BiliGiftManager:
                     gift_mapping[k] = f"data/{v}"
 
         if write_img:
-            blind_box = gift_map.blind_box
             for v in blind_box.values():
                 gift_mapping.update(v)
             with open(img_path, "w", encoding="utf-8") as file:
@@ -140,7 +141,6 @@ class BiliGiftManager:
             for k,v in gift_mapping.items():
                 tmp_dict[k] = time
             # 更新预定义的盲盒数据
-            blind_box = gift_map.blind_box
             for v in blind_box.values():
                 for gift in v.keys():
                     gift_mapping[gift] = time

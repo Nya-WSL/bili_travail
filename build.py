@@ -82,6 +82,7 @@ def main() -> None:
         if not os.path.exists(save_path):
             os.mkdir(save_path)
         shutil.copy(os.path.join("data", i), save_file)
+    shutil.copytree("data/gifts", os.path.join("dist", "bili_travail", "data", "gifts"))
 
 if __name__ == '__main__':
     main()

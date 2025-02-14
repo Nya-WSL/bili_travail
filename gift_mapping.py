@@ -109,7 +109,7 @@ blind_box = {
         "少女祈祷": "https://s1.hdslb.com/bfs/live/3f59e679d630dbc2fc54216f23a3bea50bc636c0.png",
         "冲鸭": "https://s1.hdslb.com/bfs/live/6e35fb88d5f038890a7ac8849158628a2bcce22d.png",
         "星河入梦": "https://s1.hdslb.com/bfs/live/311930350df3b8e467d13b992e62344ca1e3664f.png",
-        "落樱缤纷": "https://s1.hdslb.com/bfs/live/30718e4c1cb21d14798c7739d7808994f411170c.png",
+        "落樱缤纷": "https://s1.hdslb.com/bfs/live/30718e4c1cb21d14798c7739d7808994f411170c.png"
     },
     "心动盲盒": {
         "电影票": "https://s1.hdslb.com/bfs/live/20864a10beaea541c7dce264d5bbc56676d63e4f.png",
@@ -139,12 +139,21 @@ blind_box = {
         "璀璨钻石": "https://s1.hdslb.com/bfs/live/a0031d70323d085203c57272758520fe95bfeec0.png"
     },
     "浪漫盲盒": {
-        "盛世花嫁": "data/gifts/sshj.webp",
-        "燕归": "data/gifts/yg.webp",
-        "爱情来信": "data/gifts/aqlx.webp",
-        "蛋糕恋语": "data/gifts/dgly.webp",
-        "缘起灵签": "data/gifts/yqlq.webp",
-        "初悸等待": "data/gifts/cjdd.webp",
-        "永恒之约": "data/gifts/yhzy.webp",
+        "盛世花嫁": "data/gifts/lmmh/sshj.webp",
+        "燕归": "data/gifts/lmmh/yg.webp",
+        "爱情来信": "data/gifts/lmmh/aqlx.webp",
+        "蛋糕恋语": "data/gifts/lmmh/dgly.webp",
+        "缘起灵签": "data/gifts/lmmh/yqlq.webp",
+        "初悸等待": "data/gifts/lmmh/cjdd.webp",
+        "永恒之约": "data/gifts/lmmh/yhzy.webp",
+    },
+    "奇遇盲盒": {
+        "奇幻古堡": "data/gifts/qymh/qhgb.webp",
+        "星愿飞船": "data/gifts/qymh/xyfc.webp",
+        "奇遇巴士": "data/gifts/qymh/qybs.webp",
+        "梦幻花车": "data/gifts/qymh/mhhc.webp",
+        "许愿神灯": "data/gifts/qymh/xysd.webp",
+        "精灵兔": "data/gifts/qymh/jlt.webp",
+        "魔力球": "data/gifts/qymh/mlq.webp"
     }
 }

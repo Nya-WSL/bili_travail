@@ -2,6 +2,7 @@
 import blive_crower
 import gift as get_gift
 from blivedm import blivedm
+import gift_mapping as gift_map
 import blivedm.blivedm.models.web as web_models
 
 # Third Party Packages
@@ -17,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.19.1-alpha"
+version = "0.20.0-alpha"
 
 # ================================
 # 检查环境状态
@@ -246,6 +247,7 @@ class BiliHandler(blivedm.BaseHandler):
 
     # 收到礼物后执行函数
     def _on_gift_play(self, gift, num, uname):
+        is_blind_box = False
         if b_connect_status:  # True则已连接至弹幕服务器
             if gift_challenge_switch.value:  # True则为投喂挑战开关为开状态
                 # 检查投喂挑战数据文件是否存在
@@ -262,14 +264,35 @@ class BiliHandler(blivedm.BaseHandler):
                             with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
                                 json.dump(gifts, f, indent=4, ensure_ascii=False)
 
+                    # 初始化盲盒数据
+                    blind_box = gift_map.blind_box
+                    blind_box_gifts = []
+                    for v in blind_box.values():
+                        for k in v.keys():
+                            blind_box_gifts.append(k)
+
+                    # 如果礼物在盲盒中，将礼物设定为盲盒id
+                    if gift in blind_box_gifts:
+                        if gift not in special and gifts[gift] == 0:
+                            blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
+                            for box_name, gifts_name in blind_box_map.items():
+                                if gift in gifts_name:
+                                    origin_gift = gift
+                                    is_blind_box = True
+                                    gift = box_name
+
                     # 如果收到的礼物在special.json中
                     if gift in special:
                         if special[gift] == "double": # 加倍挑战
                             changed_num = int(gift_challenge_count.text) * (2 * int(num))
+                            if is_blind_box:
+                                gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
                             gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
+                            if is_blind_box:
+                                gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
                             gift_list_show(uname, gift, num, "清空")
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
@@ -281,15 +304,21 @@ class BiliHandler(blivedm.BaseHandler):
                                 total_changed_num += random_num
                                 i += 1
                             changed_num = int(gift_challenge_count.text) + total_changed_num
+                            gift_list_show_num = str(int(gifts[gift] * int(num)))
+                            if is_blind_box:
+                                gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
-                            gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
+                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
 
                     # 如果收到的礼物不在special.json中
-                    else:  
+                    else:
                         changed_num = (gifts[gift] * int(num)) + int(gift_challenge_count.text) # （设定的值 * 礼物数量） + 目前总数
+                        gift_list_show_num = str(int(gifts[gift] * int(num)))
+                        if is_blind_box:
+                            gift = origin_gift
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
-                        if gifts[gift] != 0:
-                            gift_list_show(uname, gift, num, str(int(gifts[gift] * int(num))) + gift_play_unit_main.text)
+                        if gifts[gift] != 0 or is_blind_box:
+                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
 
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
@@ -310,14 +339,35 @@ class BiliHandler(blivedm.BaseHandler):
                             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                                 json.dump(gifts, f, indent=4, ensure_ascii=False)
 
+                    # 初始化盲盒数据
+                    blind_box = gift_map.blind_box
+                    blind_box_gifts = []
+                    for v in blind_box.values():
+                        for k in v.keys():
+                            blind_box_gifts.append(k)
+
+                    # 如果礼物在盲盒中，将礼物设定为盲盒id
+                    if gift in blind_box_gifts:
+                        if gift not in special and gifts[gift] == 0:
+                            blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
+                            for box_name, gifts_name in blind_box_map.items():
+                                if gift in gifts_name:
+                                    origin_gift = gift
+                                    is_blind_box = True
+                                    gift = box_name
+
                     if gift in special:
                         if special[gift] == "double":
                             changed_time = tmp_time * (2 * int(num))
+                            if is_blind_box:
+                                gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
                             gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
 
                         if special[gift] == "clear":
                             changed_time = 3
+                            if is_blind_box:
+                                gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
                             gift_list_show(uname, gift, num, "清空")
 
@@ -328,14 +378,19 @@ class BiliHandler(blivedm.BaseHandler):
                                 total_changed_time += random_time
                                 i += 1
                             changed_time = tmp_time + total_changed_time
+                            if is_blind_box:
+                                gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
                             gift_list_show(uname, gift, num, format_seconds(total_changed_time))
 
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
+                        gift_list_show_time = gifts[gift] * int(num)
+                        if is_blind_box:
+                            gift = origin_gift
                         result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
-                        if gifts[gift] != 0:
-                            gift_list_show(uname, gift, num, format_seconds(gifts[gift] * int(num)))
+                        if gifts[gift] != 0 or is_blind_box:
+                            gift_list_show(uname, gift, num, format_seconds(gift_list_show_time))
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
 
