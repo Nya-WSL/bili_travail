@@ -126,27 +126,28 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
             await file.write(driver.page_source)
 
         # 模拟click进入PK
-        button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[2]/div[1]"
-        try:
-            button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, button_xpath))
-            )
-            actions = ActionChains(driver)
-            actions.move_to_element(button).perform()
-            button.click()
-            # print("[INFO] 成功获取PK礼物数据...")
-            if not init:
-                ui.notify("成功获取PK礼物数据", type="positive")
-            async with aiofiles.open(h5_path, "a", encoding="utf-8") as file:
-                await file.write(driver.page_source)
-        except Exception:
-            # print(f"[ERROR] 未能获取PK礼物数据...")
-            if not init:
-                ui.notify("未能获取PK礼物数据", type="warning")
+        # button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[2]/div[1]"
+        # try:
+        #     button = WebDriverWait(driver, 10).until(
+        #         EC.element_to_be_clickable((By.XPATH, button_xpath))
+        #     )
+        #     actions = ActionChains(driver)
+        #     actions.move_to_element(button).perform()
+        #     button.click()
+        #     # print("[INFO] 成功获取PK礼物数据...")
+        #     if not init:
+        #         ui.notify("成功获取PK礼物数据", type="positive")
+        #     async with aiofiles.open(h5_path, "a", encoding="utf-8") as file:
+        #         await file.write(driver.page_source)
+        # except Exception:
+        #     # print(f"[ERROR] 未能获取PK礼物数据...")
+        #     if not init:
+        #         ui.notify("未能获取PK礼物数据", type="warning")
 
 
         # 模拟click进入粉丝团
-        button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[3]/div[1]"
+        # button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[3]/div[1]"
+        button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[2]/div[1]"
         try:
             button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, button_xpath))
@@ -166,7 +167,8 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
 
 
         # 模拟click进入航海
-        button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[4]/div[1]"
+        # button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[4]/div[1]"
+        button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[3]/div[1]"
         try:
             button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, button_xpath))
@@ -186,7 +188,8 @@ async def get_bili_h5(room_id, h5_path = "data/saved_page.html", headless = True
 
 
         # 模拟click进入专属礼物
-        button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[5]/div[1]"
+        # button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[5]/div[1]"
+        button_xpath = "/html/body/div[1]/main/div[1]/section[1]/div[2]/div[3]/div/div[2]/div[1]/div/div/div[2]/div/div/div[2]/div/div[4]/div[1]"
         try:
             button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, button_xpath))
