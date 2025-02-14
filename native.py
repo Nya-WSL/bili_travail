@@ -18,7 +18,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.20.0-alpha"
+version = "0.20.1-alpha"
 
 # ================================
 # 检查环境状态
@@ -1574,7 +1574,11 @@ def _():
                     f.write(default_content)
                 return default_content
 
-        text = requests.get("https://nya-wsl.com/bili_travail/chat_msg.json")
+        try:
+            text = requests.get("https://nya-wsl.com/bili_travail/chat_msg.json")
+        except:
+            text = requests.get("https://version.nya-wsl.cn/bili_travail/chat_msg.json")
+
         text.encoding = "utf-8"
         if text.status_code == 200 or not config["local_text"]: # 如果请求状态为200且配置文件未启用本地文本
             if random.random() < 0.3:
