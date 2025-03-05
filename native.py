@@ -26,7 +26,7 @@ version = "0.21.0-alpha"
 # ================================
 
 # 初始化NiceGUI
-asyncio.run(app.storage.general.initialize())
+# asyncio.run(app.storage.general.initialize())
 app.storage.general.indent = True  # 格式化storage
 app.add_static_files('/static', 'static')   # 创建虚拟路径
 refresh_capture_cd = False  # 初始倒计时化刷新状态
@@ -112,6 +112,8 @@ port = config["port"]
 GiftManager = get_gift.BiliGiftManager()
 
 async def init_config():
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
     # 初始化gifts.json数据
     # 确保礼物数据文件存在，如果不存在，则先进行初始化礼物数据
     if not os.path.exists("data/gifts.json"):
@@ -120,14 +122,23 @@ async def init_config():
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
-            html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html", init=True)
+            if not config["crower"]:
+                html_content = GiftManager.get_gift_config(img_path="data/gift_img.json", time_path="data/gifts.json") # 使用B站api
+            else:
+                html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html", init=True, crower=True) # 使用爬虫
             if not html_content:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
-                GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+                if not config["crower"]:
+                    html_content = await GiftManager.get_live_h5(room_id, h5_path=f"data/{room_id}.html", init=True)
+                    if not html_content:
+                        GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+                else:
+                    GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
             else:  # 格式化B站礼物数据为json
-                await GiftManager.convert_h5_to_json(h5_path=f"data/{room_id}.html")
+                if config["crower"]:
+                    await GiftManager.convert_h5_to_json(h5_path=f"data/{room_id}.html")
         else:
             # 如果没有room_id，则从Nya-WSL服务器或本地注入方式写入
-            GiftManager.init_gift("data/gift_img.json", "data/gifts.json", time=0)
+            GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
 
     # 初始化数据
     if not os.path.exists("data/special.json"):
@@ -1163,18 +1174,24 @@ def open_capture():
 # 更新礼物数据
 async def refresh_gift():
     ROOM_ID = room_id.value
-    if ROOM_ID == "":
+    if ROOM_ID == "" and config["crower"]:
         ui.notify("请先填入房间号！", type="negative")
     else:
         async def check_refresh():
             check_dialog.close()
             ui.notify("正在更新礼物数据，请稍后...", type="info")
             await asyncio.sleep(1)
-            int(ROOM_ID) # 判断ROOM_ID是否是数字
-            GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
-            html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
+            if config["crower"]:
+                int(ROOM_ID) # 判断ROOM_ID是否是数字
+                GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
+                html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
+            else:
+                html_content = GiftManager.get_gift_config(img_path="data/gift_img.json", time_path="data/gifts.json")
+                shutil.copy("data/gifts.json", "data/gifts_count.json")
+                # print("[INFO] 礼物数据更新完成!")
+                ui.notify("礼物数据更新完成", type="positive")
             # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
-            if html_content:
+            if html_content and config["crower"]:
                 # print("[INFO] 正在格式化数据...")
                 await GiftManager.convert_h5_to_json(f"data/{ROOM_ID}.html")
                 shutil.copy("data/gifts.json", "data/gifts_count.json")
@@ -1527,7 +1544,7 @@ with ui.card(align_items="center").classes("absolute-center"):
             with ui.row().classes("w-full"):
                 ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
                 with ui.avatar(color="").classes("w-6 h-6"):
-                    ui.image(gifts[gift])
+                    ui.image(blive_crower.get_bili_img(gifts[gift]))
                 ui.label(f"{gift}x{num}").classes("text-l")
                 ui.label(time).classes("text-l")
         gift_scroll.scroll_to(percent=1, duration=0.5)

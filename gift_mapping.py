@@ -4,7 +4,7 @@
 # 数据源直播间:1815222606
 #
 # 盲盒数据
-# 2025/02/14
+# 2025/03/05
 # 数据源直播间:1815222606
 # ===============================
 
@@ -138,22 +138,31 @@ blind_box = {
         "绮彩权杖": "https://s1.hdslb.com/bfs/live/5cecbf274a4205ef76ed3f11c6540f0c6743363c.png",
         "璀璨钻石": "https://s1.hdslb.com/bfs/live/a0031d70323d085203c57272758520fe95bfeec0.png"
     },
-    "浪漫盲盒": {
-        "盛世花嫁": "data/gifts/lmmh/sshj.webp",
-        "燕归": "data/gifts/lmmh/yg.webp",
-        "爱情来信": "data/gifts/lmmh/aqlx.webp",
-        "蛋糕恋语": "data/gifts/lmmh/dgly.webp",
-        "缘起灵签": "data/gifts/lmmh/yqlq.webp",
-        "初悸等待": "data/gifts/lmmh/cjdd.webp",
-        "永恒之约": "data/gifts/lmmh/yhzy.webp",
-    },
+    # "浪漫盲盒": {
+    #     "盛世花嫁": "data/gifts/lmmh/sshj.webp",
+    #     "燕归": "data/gifts/lmmh/yg.webp",
+    #     "爱情来信": "data/gifts/lmmh/aqlx.webp",
+    #     "蛋糕恋语": "data/gifts/lmmh/dgly.webp",
+    #     "缘起灵签": "data/gifts/lmmh/yqlq.webp",
+    #     "初悸等待": "data/gifts/lmmh/cjdd.webp",
+    #     "永恒之约": "data/gifts/lmmh/yhzy.webp",
+    # },
     "奇遇盲盒": {
-        "奇幻古堡": "data/gifts/qymh/qhgb.webp",
-        "星愿飞船": "data/gifts/qymh/xyfc.webp",
-        "奇遇巴士": "data/gifts/qymh/qybs.webp",
-        "梦幻花车": "data/gifts/qymh/mhhc.webp",
-        "许愿神灯": "data/gifts/qymh/xysd.webp",
-        "精灵兔": "data/gifts/qymh/jlt.webp",
-        "魔力球": "data/gifts/qymh/mlq.webp"
+        "奇幻古堡": "",
+        "星愿飞船": "",
+        "奇遇巴士": "",
+        "梦幻花车": "",
+        "许愿神灯": "",
+        "精灵兔": "",
+        "魔力球": ""
+    },
+    "百花盲盒": {
+        "百花齐放": "",
+        "花舞人间": "",
+        "甜蜜满满": "",
+        "玫瑰花冠": "",
+        "郁金香": "",
+        "初樱": "",
+        "雏菊": ""
     }
 }

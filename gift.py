@@ -72,6 +72,56 @@ class BiliGiftManager:
         self.html_content = await blive_crower.get_bili_h5(room_id, h5_path, headless, init)
         return self.html_content
 
+    def get_gift_config(self, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0):
+        try:
+            url = "https://api.live.bilibili.com/gift/v3/live/gift_config"
+            User_Agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
+            response = requests.get(url, headers={"User-Agent": User_Agent})
+            response.encoding = "utf-8"
+            response = response.json()
+            gifts_data = response['data']
+            gift_mapping = {}
+            for data in gifts_data:
+                name = data['name']
+                img = data['img_basic']
+                gift_mapping[name] = img
+
+            # 更新舰队数据
+            guard = {
+                "舰长": "guard-level-3.png",
+                "提督": "guard-level-2.png",
+                "总督": "guard-level-1.png"
+            } # 舰队列表
+
+            url = "https://nya-wsl.com/images/bili_travail/"
+
+            for k,v in guard.items():
+                if not os.path.exists(f"data/{v}"):
+                    gift_mapping[k] = url + v
+                else:
+                    gift_mapping[k] = f"data/{v}"
+
+            with open(img_path, "w", encoding="utf-8") as file:
+                json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
+
+            for i in gift_mapping.keys():
+                gift_mapping[i] = time
+
+            # 更新预定义的盲盒数据
+            blind_box = gift_map.blind_box
+            for k, v in blind_box.items():
+                for gift in v.keys():
+                    gift_mapping[gift] = time
+
+            with open(time_path, "w", encoding="utf-8") as file:
+                json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
+
+            return True
+
+        except:
+            return False
+
+
     async def convert_h5_to_json(self, h5_path: str, write_img = True, write_time = True, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0):
         """
         爬取并解析B站直播间礼物标签和URL，保存为JSON文件
