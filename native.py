@@ -2,6 +2,7 @@
 import blive_crower
 import gift as get_gift
 from blivedm import blivedm
+import update as travail_update
 import gift_mapping as gift_map
 import blivedm.blivedm.models.web as web_models
 
@@ -18,13 +19,14 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.20.1-alpha"
+version = "0.21.0-alpha"
 
 # ================================
 # 检查环境状态
 # ================================
 
 # 初始化NiceGUI
+asyncio.run(app.storage.general.initialize())
 app.storage.general.indent = True  # 格式化storage
 app.add_static_files('/static', 'static')   # 创建虚拟路径
 refresh_capture_cd = False  # 初始倒计时化刷新状态
@@ -1408,9 +1410,9 @@ def check_update(init = False):
             ui.label(f"当前版本：{version} | 最新版本：{status}")
 
             with ui.row():
-                ui.button("gtihub", on_click=lambda: ui.navigate.to(f"https://github.com/Nya-WSL/bili_travail/releases/tag/v{status}", new_tab=True))
-                ui.button("Nya-WSL", on_click=lambda: ui.navigate.to(f"https://nya-wsl.com/bili_travail/releases/{status}.zip", new_tab=True))
-                ui.button("Nya-WSL Cloud", on_click=lambda: ui.navigate.to(f"https://cloud.nya-wsl.cn/ms-drive/bili_travail/releases/", new_tab=True))
+                ui.button("国内源", on_click=lambda: travail_update.update("CN-HK"))
+                ui.button("海外源", on_click=lambda: travail_update.update("Overseas"))
+                ui.button("GitHub", on_click=lambda: travail_update.update("GitHub"))
                 ui.button("取消", on_click=lambda: dialog.close())
 
         dialog.open()
@@ -1438,8 +1440,9 @@ def check_update(init = False):
     status = version_check()
     if status != version:
         if status != "Error":
-            ui.notify("检查到可用更新", type="info")
-            if not init:
+            if init:
+                ui.notify("检查到可用更新", type="info")
+            else:
                 version_dialog()
         else:
             ui.notify("检查更新失败", type="negative")
