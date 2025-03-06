@@ -49,10 +49,13 @@ async def update(server):
 cd /d {os.getcwd()}
 taskkill /f /im bili_travail.exe
 timeout /t 3 /nobreak
-move /y update\\* ./
+rmdir /s /q _internal
+timeout /t 1 /nobreak
+robocopy update ./ /E
 rmdir /s /q update
 rmdir /s /q cache
-bili_travail.exe
+start bili_travail.exe
+timeout /t 1 /nobreak
 """)
         os.system("update.bat")
         app.shutdown()
