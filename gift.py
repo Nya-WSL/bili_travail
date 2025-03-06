@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import aiofiles
 import requests
@@ -84,7 +85,8 @@ class BiliGiftManager:
             for data in gifts_data:
                 name = data['name']
                 img = data['img_basic']
-                gift_mapping[name] = img
+                if not re.search("测试", name):
+                    gift_mapping[name] = img
 
             # 更新舰队数据
             guard = {

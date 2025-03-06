@@ -19,7 +19,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.21.0-alpha"
+version = "0.21.1-alpha"
 
 # ================================
 # 检查环境状态
@@ -29,7 +29,7 @@ version = "0.21.0-alpha"
 # asyncio.run(app.storage.general.initialize())
 app.storage.general.indent = True  # 格式化storage
 app.add_static_files('/static', 'static')   # 创建虚拟路径
-refresh_capture_cd = False  # 初始倒计时化刷新状态
+refresh_capture_cd = False  # 初始化倒计时刷新状态
 refresh_capture_gift = False  # 初始化投喂挑战刷新状态
 b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
@@ -1428,7 +1428,7 @@ def check_update(init = False):
 
             with ui.row():
                 ui.button("国内源", on_click=lambda: travail_update.update("CN-HK"))
-                ui.button("海外源", on_click=lambda: travail_update.update("Overseas"))
+                ui.button("海外源", on_click=lambda: travail_update.update("Overseas")).disable()
                 ui.button("GitHub", on_click=lambda: travail_update.update("GitHub"))
                 ui.button("取消", on_click=lambda: dialog.close())
 
