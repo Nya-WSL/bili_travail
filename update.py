@@ -1,7 +1,10 @@
 import os
 import aiohttp
 import zipfile
+import asyncio
 from nicegui import ui, app
+
+file_name = "cache\\bili_travail_update.zip"
 
 async def update(server):
     if os.path.exists("update.bat"):
@@ -10,7 +13,9 @@ async def update(server):
     async def download(url, save_path):
         async def close_session():
             await session.close()
+            dialog.close()
 
+        dialog.open()
         percent_dialog.set_text("正在下载更新包")
 
         if not os.path.exists("cache"):
@@ -25,14 +30,20 @@ async def update(server):
                         chunk = await response.content.read(1024)
                         f.write(chunk)
                         percent_dialog.set_text("下载进度：" + "%.2f%%" % (f.tell() / response.content_length * 100))
+
                         if not chunk:
+                            percent_dialog.set_text("下载完成！")
+                            await asyncio.sleep(1)
                             break
 
-        percent_dialog.set_text("下载完成！")
-        Unzip = zipfile.ZipFile("cache\\bili_travail_update.zip", mode='r')
+        Unzip = zipfile.ZipFile(file_name, mode='r')
+        percent_dialog.set_text("正在解压更新包...")
+        await asyncio.sleep(1)
         for names in Unzip.namelist():
             Unzip.extract(names, os.getcwd())
         Unzip.close()
+        percent_dialog.set_text("正在更新...")
+        await asyncio.sleep(1)
         with open("update.bat", "w") as f:
             f.write(f"""
 cd /d {os.getcwd()}
@@ -48,6 +59,7 @@ bili_travail.exe
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
         percent_dialog = ui.label("")
+        cancelButton = ui.button("取消")
         if server == "GitHub":
             zipUrl = "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
         elif server == "Overseas":
@@ -57,13 +69,8 @@ bili_travail.exe
         else:
             ui.notify("更新源不存在", type="negative")
             return
-
         try:
-            await download(zipUrl, "cache\\bili_travail_update.zip")
-        except:
-            ui.notify("更新失败", type="negative")
+            await download(zipUrl, file_name)
+        except Exception as e:
+            ui.notify(f"更新失败：{e}", type="negative")
             return
-
-        cancelButton = ui.button("取消")
-
-    dialog.open()

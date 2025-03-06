@@ -35,6 +35,11 @@ b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
 reset_inherit_status = False # 初始化重置继承倒计时状态
 
+if os.path.exists("update.bat"):
+    os.remove("update.bat")
+if os.path.exists("cache"):
+    shutil.rmtree("cache")
+
 def format_seconds(seconds):
     """
     格式化时间
