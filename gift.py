@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import shutil
 import aiofiles
 import requests
 import blive_crower
@@ -73,7 +74,7 @@ class BiliGiftManager:
         self.html_content = await blive_crower.get_bili_h5(room_id, h5_path, headless, init)
         return self.html_content
 
-    def get_gift_config(self, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0):
+    def get_gift_config(self, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, init = True):
         try:
             url = "https://api.live.bilibili.com/gift/v3/live/gift_config"
             User_Agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
@@ -115,8 +116,41 @@ class BiliGiftManager:
                 for gift in v.keys():
                     gift_mapping[gift] = time
 
-            with open(time_path, "w", encoding="utf-8") as file:
-                json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
+            # 如果不是初始化状态，则使用已设定的礼物时长替换默认时长
+            if not init:
+                with open(time_path, "r", encoding="utf-8") as file:
+                    gifts = json.load(file)
+                with open("data/gifts_count.json", "r", encoding="utf-8") as file:
+                    gifts_count = json.load(file)
+
+                for k, v in gifts.items():
+                    if v != 0:
+                        gift_mapping[k] = v
+
+                    # 如果旧礼物不存在于新礼物中，这可能是因为B站删除了该礼物，则从新礼物数据中删除该礼物
+                    if k not in gift_mapping.keys():
+                        gift_mapping.pop(k)
+
+                with open(time_path, "w", encoding="utf-8") as file:
+                    json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
+
+                for k, v in gifts_count.items():
+                    if v != 0:
+                        gift_mapping[k] = v
+
+                    if gifts_count[k] == 0:
+                        gift_mapping[k] = time
+
+                    if k not in gift_mapping.keys():
+                        gift_mapping.pop(k)
+
+                with open("data/gifts_count.json", "w", encoding="utf-8") as file:
+                    json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
+
+            else:
+                with open(time_path, "w", encoding="utf-8") as file:
+                    json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
+                shutil.copy(time_path, "data/gifts_count.json")
 
             return True
 

@@ -19,7 +19,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.21.1-alpha"
+version = "0.22.0-alpha"
 
 # ================================
 # 检查环境状态
@@ -1191,8 +1191,7 @@ async def refresh_gift():
                 GiftManager.remove_h5_file(f"data/{ROOM_ID}.html") # 删除旧的h5文件
                 html_content = await GiftManager.get_live_h5(ROOM_ID, f"data/{ROOM_ID}.html") # 爬取B站直播间数据
             else:
-                html_content = GiftManager.get_gift_config(img_path="data/gift_img.json", time_path="data/gifts.json")
-                shutil.copy("data/gifts.json", "data/gifts_count.json")
+                html_content = GiftManager.get_gift_config(img_path="data/gift_img.json", time_path="data/gifts.json", init=False)
                 # print("[INFO] 礼物数据更新完成!")
                 ui.notify("礼物数据更新完成", type="positive")
             # 如果成功爬取到数据则格式化礼物数据，否则让用户选择是否使用预设数据重置
@@ -1463,7 +1462,7 @@ def check_update(init = False):
     if status != version:
         if status != "Error":
             if init:
-                ui.notify("检查到可用更新", type="info")
+                ui.notify(f"检查到可用更新：v{status}", progress=True, timeout=10000, color="orange-10")
             else:
                 version_dialog()
         else:
