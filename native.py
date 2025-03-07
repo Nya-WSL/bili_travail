@@ -19,7 +19,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.22.0-alpha"
+version = "0.22.1-alpha"
 
 # ================================
 # 检查环境状态
@@ -99,6 +99,18 @@ if not os.path.exists(".nicegui/storage-general.json"):
     app.storage.general["gift_challenge_unit"] = ""
     app.storage.general["gift_challenge_text"] = ""
     app.storage.general["countdown_time"] = 0
+else:
+    try:
+        with open(".nicegui/storage-general.json", "r", encoding="utf-8") as f:
+            storage = json.load(f)
+            if storage == "" or storage == {}:
+                raise json.JSONDecodeError("No JSON object could be decoded", "", 0)
+    except:
+        app.storage.general["gift_challenge_count"] = 0
+        app.storage.general["gift_challenge_unit"] = ""
+        app.storage.general["gift_challenge_text"] = ""
+        app.storage.general["countdown_time"] = 0
+
 
 # 检查data文件夹状态
 if not os.path.exists("data"):
@@ -224,7 +236,7 @@ class BiliHandler(blivedm.BaseHandler):
         uname = message.uname
         result = ""
         if len(uname.split()) > 8:
-            uname = gift.split()[0-5] + "..."
+            uname = uname.split()[0-5] + "..."
 
         self._on_gift_play(gift, num, uname)
 
@@ -246,7 +258,7 @@ class BiliHandler(blivedm.BaseHandler):
             gift = "神秘物种"
 
         if len(uname.split()) > 8:
-            uname = gift.split()[0-5] + "..."
+            uname = uname.split()[0-5] + "..."
 
         self._on_gift_play(gift, num, uname)
 
@@ -295,9 +307,10 @@ class BiliHandler(blivedm.BaseHandler):
                             blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
                             for box_name, gifts_name in blind_box_map.items():
                                 if gift in gifts_name:
-                                    origin_gift = gift
-                                    is_blind_box = True
-                                    gift = box_name
+                                    if gifts[box_name] != 0 or special.get(box_name, None) != None:
+                                        origin_gift = gift
+                                        is_blind_box = True
+                                        gift = box_name
 
                     # 如果收到的礼物在special.json中
                     if gift in special:
@@ -370,9 +383,10 @@ class BiliHandler(blivedm.BaseHandler):
                             blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
                             for box_name, gifts_name in blind_box_map.items():
                                 if gift in gifts_name:
-                                    origin_gift = gift
-                                    is_blind_box = True
-                                    gift = box_name
+                                    if gifts[box_name] != 0 or special.get(box_name, None) != None:
+                                        origin_gift = gift
+                                        is_blind_box = True
+                                        gift = box_name
 
                     if gift in special:
                         if special[gift] == "double":
@@ -1548,13 +1562,16 @@ with ui.card(align_items="center").classes("absolute-center"):
             with ui.row().classes("w-full"):
                 ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
                 with ui.avatar(color="").classes("w-6 h-6"):
-                    ui.image(blive_crower.get_bili_img(gifts[gift]))
+                    if gift not in ["舰长", "提督", "总督"]:
+                        ui.image(blive_crower.get_bili_img(gifts[gift]))
+                    else:
+                        ui.image(gifts[gift])
                 ui.label(f"{gift}x{num}").classes("text-l")
                 ui.label(time).classes("text-l")
         gift_scroll.scroll_to(percent=1, duration=0.5)
 
     with ui.card(align_items="stretch").classes("w-full"):
-        with ui.scroll_area().classes('h-32') as gift_scroll:
+        with ui.scroll_area().classes('h-16') as gift_scroll:
             tmp_label = ui.label()
             tmp_label.set_visibility(False)
 
@@ -1572,7 +1589,7 @@ with ui.card(align_items="center").classes("absolute-center"):
     countdown_timer.inherit_time(int(time_badge_inherit.text))
 
 # about按钮
-with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
+with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
 
 
@@ -1661,4 +1678,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[800, 900], reconnect_timeout=15)
+ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[575, 815], reconnect_timeout=15)
