@@ -240,11 +240,12 @@ class BiliHandler(blivedm.BaseHandler):
         gift = message.gift_name
         num = message.num
         uname = message.uname
+        price = message.price / 100
         result = ""
         if len(uname.split()) > 8:
             uname = uname.split()[0-5] + "..."
 
-        self._on_gift_play(gift, num, uname)
+        self._on_gift_play(gift, num, uname, price)
 
 
     # 舰队数据
@@ -282,8 +283,26 @@ class BiliHandler(blivedm.BaseHandler):
 
 
     # 收到礼物后执行函数
-    def _on_gift_play(self, gift, num, uname):
+    def _on_gift_play(self, gift, num, uname, price = 0):
         is_blind_box = False
+        
+        def blind_box_value(gift, num : int, price : int, box_name):
+            if not os.path.exists("data/blind_box_value.json"):
+                with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
+                    json.dump({}, f, ensure_ascii=False, indent=4)
+            with open("data/blind_box_value.json", "r", encoding="utf-8") as f:
+                box_value = json.load(f)
+
+            if box_value.get(box_name, None) == None:
+                box_value[box_name] = {"gift": gift, "num": 0, "price": 0}
+
+            box_value[box_name]["gift"] = gift
+            box_value[box_name]["num"] += num
+            box_value[box_name]["price"] = price
+
+            with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
+                json.dump(box_value, f, ensure_ascii=False, indent=4)
+
         if b_connect_status:  # True则已连接至弹幕服务器
             if gift_challenge_switch.value:  # True则为投喂挑战开关为开状态
                 # 检查投喂挑战数据文件是否存在
@@ -308,15 +327,18 @@ class BiliHandler(blivedm.BaseHandler):
                             blind_box_gifts.append(k)
 
                     # 如果礼物在盲盒中，将礼物设定为盲盒id
+                    origin_gift = None
                     if gift in blind_box_gifts:
-                        if gift not in special and gifts[gift] == 0:
-                            blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
-                            for box_name, gifts_name in blind_box_map.items():
-                                if gift in gifts_name:
-                                    if gifts[box_name] != 0 or special.get(box_name, None) != None:
-                                        origin_gift = gift
+                        blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
+                        for box_name, gifts_name in blind_box_map.items():
+                            if gift in gifts_name:
+                                if gifts[box_name] != 0 or special.get(box_name, None) != None:
+                                    origin_gift = gift
+                                    if gift not in special and gifts[gift] == 0:
                                         is_blind_box = True
                                         gift = box_name
+
+                                    blind_box_value(origin_gift, num, price, box_name) # 盲盒价值
 
                     # 如果收到的礼物在special.json中
                     if gift in special:
@@ -384,15 +406,18 @@ class BiliHandler(blivedm.BaseHandler):
                             blind_box_gifts.append(k)
 
                     # 如果礼物在盲盒中，将礼物设定为盲盒id
+                    origin_gift = None
                     if gift in blind_box_gifts:
-                        if gift not in special and gifts[gift] == 0:
-                            blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
-                            for box_name, gifts_name in blind_box_map.items():
-                                if gift in gifts_name:
-                                    if gifts[box_name] != 0 or special.get(box_name, None) != None:
-                                        origin_gift = gift
+                        blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
+                        for box_name, gifts_name in blind_box_map.items():
+                            if gift in gifts_name:
+                                if gifts[box_name] != 0 or special.get(box_name, None) != None:
+                                    origin_gift = gift
+                                    if gift not in special and gifts[gift] == 0:
                                         is_blind_box = True
                                         gift = box_name
+
+                                    blind_box_value(origin_gift, num, price, box_name) # 盲盒价值
 
                     if gift in special:
                         if special[gift] == "double":
@@ -815,6 +840,42 @@ def cd_setting_dialog():
             ui.button('关闭', on_click=lambda: cd_dialog.close())
 
     cd_dialog.open() # 打开弹窗
+
+# 盲盒价值弹窗
+def blind_box_value_dialog():
+    def get_box_value():
+        with open("data/blind_box_value.json", "r", encoding="utf-8") as f:
+            box_value = json.load(f)
+        box_price_list = {"星月盲盒": 50, "心动盲盒": 150, "奇遇盲盒": 330, "闪耀盲盒": 500, "至尊盲盒": 1000, "百花盲盒": 250} # 盲盒基础价值
+        box_name = None
+        value_list = {}
+        for k,v in box_value.items():
+            if not k in box_price_list:
+                box_price_list[k] = 0
+
+            box_name = box_value[k]
+            gift_name = box_value[k]["gift"]
+            num = box_value[k]["num"]
+            price = box_value[k]["price"]
+            box_price = box_price_list[k]
+            if value_list.get(k, None) == None:
+                value_list[k] = []
+            value_list[k].append(f"盲盒价格：{box_price} | 礼物：{gift_name} | 数量：{num} | 总价格：{num * price}电池")
+
+        with value_card:
+            ui.label(k)
+            for k,v in value_list.items():
+                ui.label(v)
+
+    if not os.path.exists("data/blind_box_value.json"):
+        with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
+
+    with ui.dialog() as value_dialog, ui.card(align_items="center") as value_card:
+        ui.label().set_visibility(False)
+        get_box_value()
+
+    value_dialog.open()
 
 # 投喂挑战弹窗
 def gift_count_setting_dialog():
@@ -1559,6 +1620,7 @@ with ui.card(align_items="center").classes("absolute-center"):
         # ui.button("礼物设置", on_click=lambda: gift())
         ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
         ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
+        ui.button("查看盲盒盈亏", on_click=lambda: blind_box_value_dialog())
 
     def gift_list_show(name, gift, num, time):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
@@ -1587,7 +1649,7 @@ with ui.card(align_items="center").classes("absolute-center"):
         # Update version button
         ui.button("检查版本更新", on_click=lambda: check_update())
         # Changelog button
-        ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
+        ui.button("查看更新日志", on_click=lambda: ui.navigate.to("/changelog"))
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")

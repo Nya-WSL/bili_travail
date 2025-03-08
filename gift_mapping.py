@@ -109,7 +109,8 @@ blind_box = {
         "少女祈祷": "https://s1.hdslb.com/bfs/live/3f59e679d630dbc2fc54216f23a3bea50bc636c0.png",
         "冲鸭": "https://s1.hdslb.com/bfs/live/6e35fb88d5f038890a7ac8849158628a2bcce22d.png",
         "星河入梦": "https://s1.hdslb.com/bfs/live/311930350df3b8e467d13b992e62344ca1e3664f.png",
-        "落樱缤纷": "https://s1.hdslb.com/bfs/live/30718e4c1cb21d14798c7739d7808994f411170c.png"
+        "落樱缤纷": "https://s1.hdslb.com/bfs/live/30718e4c1cb21d14798c7739d7808994f411170c.png",
+        "辣条": ""
     },
     "心动盲盒": {
         "电影票": "https://s1.hdslb.com/bfs/live/20864a10beaea541c7dce264d5bbc56676d63e4f.png",
