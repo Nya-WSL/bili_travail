@@ -2,6 +2,7 @@
 import blive_crower
 import gift as get_gift
 from blivedm import blivedm
+from changelog import changelog
 import update as travail_update
 import gift_mapping as gift_map
 import blivedm.blivedm.models.web as web_models
@@ -19,7 +20,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.22.1-alpha"
+version = "0.22.2-alpha"
 
 # ================================
 # 检查环境状态
@@ -99,6 +100,7 @@ if not os.path.exists(".nicegui/storage-general.json"):
     app.storage.general["gift_challenge_unit"] = ""
     app.storage.general["gift_challenge_text"] = ""
     app.storage.general["countdown_time"] = 0
+    app.storage.general["version"] = version
 else:
     try:
         with open(".nicegui/storage-general.json", "r", encoding="utf-8") as f:
@@ -110,6 +112,10 @@ else:
         app.storage.general["gift_challenge_unit"] = ""
         app.storage.general["gift_challenge_text"] = ""
         app.storage.general["countdown_time"] = 0
+        app.storage.general["version"] = version
+
+if app.storage.general.get("version", None) == None:
+    app.storage.general["version"] = version
 
 
 # 检查data文件夹状态
@@ -1580,6 +1586,8 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("更新礼物数据", on_click=lambda: refresh_gift())
         # Update version button
         ui.button("检查版本更新", on_click=lambda: check_update())
+        # Changelog button
+        ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
@@ -1591,6 +1599,14 @@ with ui.card(align_items="center").classes("absolute-center"):
 # about按钮
 with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
+
+@ui.page('/changelog')
+def _():
+    changelog()
+
+if app.storage.general["version"] != version: # 如果版本号不一致
+    app.storage.general["version"] = version # 更新版本号
+    ui.navigate.to("/changelog") # 跳转到更新日志页面
 
 
 # about页面
