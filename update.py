@@ -46,6 +46,7 @@ async def update(server):
         await asyncio.sleep(1)
         with open("update.bat", "w") as f:
             f.write(f"""
+@zhcp 65001
 cd /d {os.getcwd()}
 taskkill /f /im bili_travail.exe
 timeout /t 3 /nobreak
