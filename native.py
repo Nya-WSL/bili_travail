@@ -20,7 +20,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.22.2-alpha"
+version = "0.23.0-alpha"
 
 # ================================
 # 检查环境状态
@@ -296,9 +296,10 @@ class BiliHandler(blivedm.BaseHandler):
             if box_value.get(box_name, None) == None:
                 box_value[box_name] = {"gift": gift, "num": 0, "price": 0}
 
-            box_value[box_name]["gift"] = gift
-            box_value[box_name]["num"] += num
-            box_value[box_name]["price"] = price
+            if box_value[box_name].get(gift, None) == None:
+                box_value[box_name][gift] = {"num": 0, "price": 0}
+
+            box_value[box_name][gift] = {"num": box_value[box_name][gift]["num"] + num, "price": price}
 
             with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
                 json.dump(box_value, f, ensure_ascii=False, indent=4)
@@ -847,25 +848,39 @@ def blind_box_value_dialog():
         with open("data/blind_box_value.json", "r", encoding="utf-8") as f:
             box_value = json.load(f)
         box_price_list = {"星月盲盒": 50, "心动盲盒": 150, "奇遇盲盒": 330, "闪耀盲盒": 500, "至尊盲盒": 1000, "百花盲盒": 250} # 盲盒基础价值
-        box_name = None
         value_list = {}
+        price_list = {}
         for k,v in box_value.items():
             if not k in box_price_list:
                 box_price_list[k] = 0
 
-            box_name = box_value[k]
-            gift_name = box_value[k]["gift"]
-            num = box_value[k]["num"]
-            price = box_value[k]["price"]
-            box_price = box_price_list[k]
-            if value_list.get(k, None) == None:
-                value_list[k] = []
-            value_list[k].append(f"盲盒价格：{box_price} | 礼物：{gift_name} | 数量：{num} | 总价格：{num * price}电池")
+            for gift, value in box_value[k].items():
+                gift_name = gift
+                num = value["num"]
+                price = value["price"]
+                if value_list.get(k, None) == None:
+                    value_list[k] = []
+                value_list[k].append(f"礼物：{gift_name} | 数量：{num} | 总价格：{int(num * price)}电池")
+
+            blind_all_price = 0
+            for gift_name, gift_value in v.items():
+                blind_all_price += (gift_value["num"] * gift_value["price"]) - (box_price_list[k] * gift_value["num"])
+            price_list[k] = blind_all_price
 
         with value_card:
-            ui.label(k)
-            for k,v in value_list.items():
-                ui.label(v)
+            for box_name in box_value.keys():
+                ui.label(f"{box_name} | 价格：{box_price_list[box_name]}电池")
+                for k,v in value_list.items():
+                    if k == box_name:
+                        for i in v:
+                            ui.label(i)
+                        ui.label(f"盈亏：{price_list[k]}电池")
+
+                ui.separator() # 分割线
+            all_price = 0
+            for i in price_list.values():
+                all_price += i
+            ui.label(f"总盈亏：{all_price}电池")
 
     if not os.path.exists("data/blind_box_value.json"):
         with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:

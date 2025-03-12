@@ -7,6 +7,11 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
+            ui.timeline_entry(title='Release of 0.23.0-alpha', subtitle='2025-03-12', avatar='static/logo.ico')
+            ui.timeline_entry('新增赌⭕统计功能')
+            ui.timeline_entry('修复系统语言非utf-8编码可能会导致更新脚本报错的问题')
+            ui.timeline_entry('更新预设礼物数据和盲盒数据')
+            ui.timeline_entry('心动盲盒礼物数据适配B站新改动')
             ui.timeline_entry(title='Release of 0.22.2-alpha', subtitle='2025-03-08', avatar='static/logo.ico')
             ui.timeline_entry('新增更新日志，仅在更新后第一次启动时自动显示')
             ui.timeline_entry(title='Release of 0.22.1-alpha', subtitle='2025-03-08', avatar='static/logo.ico')
