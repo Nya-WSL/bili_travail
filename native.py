@@ -20,7 +20,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.0-alpha"
+version = "0.23.1-alpha"
 
 # ================================
 # 检查环境状态
@@ -845,6 +845,9 @@ def cd_setting_dialog():
 # 盲盒价值弹窗
 def blind_box_value_dialog():
     def get_box_value():
+        if not os.path.exists("data/blind_box_value.json"):
+            with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=4)
         with open("data/blind_box_value.json", "r", encoding="utf-8") as f:
             box_value = json.load(f)
         box_price_list = {"星月盲盒": 50, "心动盲盒": 150, "奇遇盲盒": 330, "闪耀盲盒": 500, "至尊盲盒": 1000, "百花盲盒": 250} # 盲盒基础价值
@@ -882,6 +885,12 @@ def blind_box_value_dialog():
                 all_price += i
             ui.label(f"总盈亏：{all_price}电池")
 
+    def clear_box_value():
+        os.remove("data/blind_box_value.json")
+        value_card.clear()
+        get_box_value()
+        ui.button("关闭", on_click=lambda: value_dialog.close())
+
     if not os.path.exists("data/blind_box_value.json"):
         with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
@@ -889,6 +898,7 @@ def blind_box_value_dialog():
     with ui.dialog() as value_dialog, ui.card(align_items="center") as value_card:
         ui.label().set_visibility(False)
         get_box_value()
+        ui.button("清零", on_click=lambda: clear_box_value())
 
     value_dialog.open()
 
