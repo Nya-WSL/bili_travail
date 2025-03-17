@@ -20,7 +20,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.1-alpha"
+version = "0.23.2-alpha"
 
 # ================================
 # 检查环境状态
@@ -324,14 +324,13 @@ class BiliHandler(blivedm.BaseHandler):
                     blind_box = gift_map.blind_box
                     blind_box_gifts = []
                     for v in blind_box.values():
-                        for k in v.keys():
-                            blind_box_gifts.append(k)
+                        for gift in v:
+                            blind_box_gifts.append(gift)
 
                     # 如果礼物在盲盒中，将礼物设定为盲盒id
                     origin_gift = None
                     if gift in blind_box_gifts:
-                        blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
-                        for box_name, gifts_name in blind_box_map.items():
+                        for box_name, gifts_name in blind_box.items():
                             if gift in gifts_name:
                                 if gifts[box_name] != 0 or special.get(box_name, None) != None:
                                     origin_gift = gift
@@ -403,14 +402,13 @@ class BiliHandler(blivedm.BaseHandler):
                     blind_box = gift_map.blind_box
                     blind_box_gifts = []
                     for v in blind_box.values():
-                        for k in v.keys():
-                            blind_box_gifts.append(k)
+                        for gift in v:
+                            blind_box_gifts.append(gift)
 
                     # 如果礼物在盲盒中，将礼物设定为盲盒id
                     origin_gift = None
                     if gift in blind_box_gifts:
-                        blind_box_map = {category: list(items.keys()) for category, items in blind_box.items()}
-                        for box_name, gifts_name in blind_box_map.items():
+                        for box_name, gifts_name in blind_box.items():
                             if gift in gifts_name:
                                 if gifts[box_name] != 0 or special.get(box_name, None) != None:
                                     origin_gift = gift

@@ -7,8 +7,10 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
-            ui.timeline_entry(title='Release of 0.23.1-alpha', subtitle='2025-03-13', avatar='static/logo.ico')
-            ui.timeline_entry('赌⭕统计功能新增清零按钮')
+            ui.timeline_entry(title='Release of 0.23.2-alpha', subtitle='2025-03-18', avatar='static/logo.ico')
+            ui.timeline_entry(r"盲盒数据结构从 '盲盒: {礼物: img}' 改为 '盲盒: [礼物列表]'")
+            ui.timeline_entry('当无法联网获取礼物数据时内置图片数据不再自动解析盲盒，礼物规则数据不受影响')
+            ui.timeline_entry('赌⭕统计功能新增清零按钮', title='Release of 0.23.1-alpha', subtitle='2025-03-13', avatar='static/logo.ico')
             ui.timeline_entry(title='Release of 0.23.0-alpha', subtitle='2025-03-12', avatar='static/logo.ico')
             ui.timeline_entry('新增赌⭕统计功能')
             ui.timeline_entry('修复系统语言非utf-8编码可能会导致更新脚本报错的问题')

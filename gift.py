@@ -47,8 +47,7 @@ class BiliGiftManager:
             for gift in gift_mapping.keys():
                 time_dict[gift] = time
             for v in blind_box.values():
-                gift_mapping.update(v)
-                for gift in v.keys():
+                for gift in v:
                     time_dict[gift] = time
 
             with open(time_path, "w+", encoding="utf-8") as f:
@@ -112,8 +111,8 @@ class BiliGiftManager:
 
             # 更新预定义的盲盒数据
             blind_box = gift_map.blind_box
-            for k, v in blind_box.items():
-                for gift in v.keys():
+            for v in blind_box.values():
+                for gift in v:
                     gift_mapping[gift] = time
 
             # 如果不是初始化状态，则使用已设定的礼物时长替换默认时长
@@ -228,7 +227,7 @@ class BiliGiftManager:
                 tmp_dict[k] = time
             # 更新预定义的盲盒数据
             for v in blind_box.values():
-                for gift in v.keys():
+                for gift in v:
                     gift_mapping[gift] = time
             with open(time_path, "w", encoding="utf-8") as file:
                 json.dump(tmp_dict, file, ensure_ascii=False, indent=4)
