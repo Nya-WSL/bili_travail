@@ -20,7 +20,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.2-alpha"
+version = "0.23.3-alpha"
 
 # ================================
 # 检查环境状态
@@ -89,7 +89,10 @@ if not os.path.exists("config.json"):
     ],
     "color": "#5898d4",
     "text_color": "#000000",
-    "local_text": False
+    "local_text": False,
+    "domain": "",
+    "crower": False,
+    "show_capture_gift_list": False
 }
             json.dump(config, f, indent=4, ensure_ascii=False)
     else:
@@ -285,7 +288,7 @@ class BiliHandler(blivedm.BaseHandler):
     # 收到礼物后执行函数
     def _on_gift_play(self, gift, num, uname, price = 0):
         is_blind_box = False
-        
+
         def blind_box_value(gift, num : int, price : int, box_name):
             if not os.path.exists("data/blind_box_value.json"):
                 with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
@@ -324,8 +327,8 @@ class BiliHandler(blivedm.BaseHandler):
                     blind_box = gift_map.blind_box
                     blind_box_gifts = []
                     for v in blind_box.values():
-                        for gift in v:
-                            blind_box_gifts.append(gift)
+                        for blind_gift in v:
+                            blind_box_gifts.append(blind_gift)
 
                     # 如果礼物在盲盒中，将礼物设定为盲盒id
                     origin_gift = None
@@ -348,12 +351,16 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
                             gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                            if show_capture_gift_list_switch.value:
+                                capture_challenge_gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
                             if is_blind_box:
                                 gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
                             gift_list_show(uname, gift, num, "清空")
+                            if show_capture_gift_list_switch.value:
+                                capture_challenge_gift_list_show(uname, gift, num, "清空")
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
                                 # random_num = random.randint(special[gift][0], special[gift][1]) # 从列表第一位和第二位的范围内随机抽一个int值
                                 # changed_num = int(gift_challenge_count.text) + (random_num * num) # 目前总数 + random_num生成的随机数
@@ -368,6 +375,8 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
                             gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
+                            if show_capture_gift_list_switch.value:
+                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
 
                     # 如果收到的礼物不在special.json中
                     else:
@@ -378,6 +387,8 @@ class BiliHandler(blivedm.BaseHandler):
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
                         if gifts[gift] != 0 or is_blind_box:
                             gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
+                            if show_capture_gift_list_switch.value:
+                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
 
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
@@ -402,8 +413,8 @@ class BiliHandler(blivedm.BaseHandler):
                     blind_box = gift_map.blind_box
                     blind_box_gifts = []
                     for v in blind_box.values():
-                        for gift in v:
-                            blind_box_gifts.append(gift)
+                        for blind_gift in v:
+                            blind_box_gifts.append(blind_gift)
 
                     # 如果礼物在盲盒中，将礼物设定为盲盒id
                     origin_gift = None
@@ -425,6 +436,8 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
                             gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                            if show_capture_gift_list_switch.value:
+                                capture_cd_gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
 
                         if special[gift] == "clear":
                             changed_time = 3
@@ -432,6 +445,8 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
                             gift_list_show(uname, gift, num, "清空")
+                            if show_capture_gift_list_switch.value:
+                                capture_cd_gift_list_show(uname, gift, num, "清空")
 
                         if type(special[gift]) == list:
                             total_changed_time = 0
@@ -444,6 +459,8 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
                             gift_list_show(uname, gift, num, format_seconds(total_changed_time))
+                            if show_capture_gift_list_switch.value:
+                                capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time))
 
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
@@ -453,6 +470,8 @@ class BiliHandler(blivedm.BaseHandler):
                         result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
                         if gifts[gift] != 0 or is_blind_box:
                             gift_list_show(uname, gift, num, format_seconds(gift_list_show_time))
+                            if show_capture_gift_list_switch.value:
+                                capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time))
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
 
@@ -1336,9 +1355,16 @@ async def refresh_gift():
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail")
 async def capture():
+    global capture_cd_gift_list_show
     # 检查是否需要刷新页面
     def check_cd_refresh():
         global refresh_capture_cd
+        if not show_capture_gift_list_switch.value:
+            if scroll_card.visible:
+                scroll_card.set_visibility(False)
+        else:
+            scroll_card.set_visibility(True)
+
         if refresh_capture_cd:
             refresh_capture_cd = False
             # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
@@ -1420,13 +1446,46 @@ async def capture():
                         if v == "double":
                             v = "加倍"
                         ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+
+        def capture_cd_gift_list_show(name, gift, num, time):
+            if not show_capture_gift_list_switch.value:
+                scroll_card.set_visibility(False)
+            else:
+                scroll_card.set_visibility(True)
+                with open("data/gift_img.json", "r", encoding="utf-8") as f:
+                    gifts = json.load(f)
+
+                with capture_gift_scroll:
+                    with ui.row().classes("w-full"):
+                        ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
+                        with ui.avatar(color="").classes("w-6 h-6"):
+                            if gift not in ["舰长", "提督", "总督"]:
+                                ui.image(blive_crower.get_bili_img(gifts[gift]))
+                            else:
+                                ui.image(gifts[gift])
+                        ui.label(f"{gift}x{num}").classes("text-l")
+                        ui.label(time).classes("text-l")
+                capture_gift_scroll.scroll_to(percent=1, duration=0.5)
+
+        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
+            with ui.scroll_area().classes('h-24') as capture_gift_scroll:
+                tmp_label = ui.label()
+                tmp_label.set_visibility(False)
+
     ui.timer(5, callback=lambda: check_cd_refresh())
 
 # 投喂挑战预览
 @ui.page("/capture_gift", title="投喂挑战 | bili_travail")
 async def capture():
+    global capture_challenge_gift_list_show
     def check_gift_refresh():
         global refresh_capture_gift
+        if not show_capture_gift_list_switch.value:
+            if scroll_card.visible:
+                scroll_card.set_visibility(False)
+        else:
+            scroll_card.set_visibility(True)
+
         if refresh_capture_gift:
             refresh_capture_gift = False
             # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
@@ -1518,6 +1577,32 @@ async def capture():
                         if v == "double":
                             v = "加倍"
                         ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+
+        def capture_challenge_gift_list_show(name, gift, num, time):
+            if not show_capture_gift_list_switch.value:
+                scroll_card.set_visibility(False)
+            else:
+                scroll_card.set_visibility(True)
+                with open("data/gift_img.json", "r", encoding="utf-8") as f:
+                    gifts = json.load(f)
+
+                with capture_gift_scroll:
+                    with ui.row().classes("w-full"):
+                        ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
+                        with ui.avatar(color="").classes("w-6 h-6"):
+                            if gift not in ["舰长", "提督", "总督"]:
+                                ui.image(blive_crower.get_bili_img(gifts[gift]))
+                            else:
+                                ui.image(gifts[gift])
+                        ui.label(f"{gift}x{num}").classes("text-l")
+                        ui.label(time).classes("text-l")
+                capture_gift_scroll.scroll_to(percent=1, duration=0.5)
+
+        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
+            with ui.scroll_area().classes('h-24') as capture_gift_scroll:
+                tmp_label = ui.label()
+                tmp_label.set_visibility(False)
+
     ui.timer(5, callback=lambda: check_gift_refresh())
 
 # ================================
@@ -1628,6 +1713,7 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id") # 实时写入房间号到配置文件
         b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+        show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list")
 
     ui.separator()
 

@@ -16,5 +16,6 @@
     "text_color": "#000000",
     "local_text": false,
     "domain": "",
-    "crower": false
+    "crower": false,
+    "show_capture_gift_list": false
 }
