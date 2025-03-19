@@ -7,7 +7,14 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.23.4-alpha', subtitle='2025-03-19', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.23.5-alpha', subtitle='2025-03-20', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● OBS投喂记录框增加高度和宽度')
+                    ui.label('● OBS投喂记录增加字体大小并加粗，现在不再显示礼物名字和时间')
+                    ui.label('● 修复OBS投喂记录不会换行的问题')
+                    ui.label('● OBS投喂记录备份将会保存至data/history，不再是data')
+                    ui.label('● 修复当程序启动后，如果capture页面从未被访问过时，收到礼物会导致更新OBS投喂记录报错的问题')
+            with ui.timeline_entry(title='Release of 0.23.4-alpha', subtitle='2025-03-19'):
                 ui.label('● OBS投喂记录现在刷新页面后不再清空（刷新后不会显示，需收到一次存在规则的礼物），每次启动程序时会在备份后删除记录')
             with ui.timeline_entry(title='Release of 0.23.3-alpha', subtitle='2025-03-19'):
                 with ui.column().classes('gap-3'):

@@ -174,3 +174,4 @@ packages/*
 passwd.json
 users.json
 update.zip
+/data/history
