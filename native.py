@@ -20,7 +20,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.3-alpha"
+version = "0.23.4-alpha"
 
 # ================================
 # 检查环境状态
@@ -38,6 +38,8 @@ reset_inherit_status = False # 初始化重置继承倒计时状态
 
 if os.path.exists("update.bat"):
     os.remove("update.bat")
+if os.path.exists("data/gift_history.json"):
+    shutil.move("data/gift_history.json", f"data/gift_history_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.json")
 if os.path.exists("cache"):
     shutil.rmtree("cache")
 
@@ -1452,25 +1454,55 @@ async def capture():
                 scroll_card.set_visibility(False)
             else:
                 scroll_card.set_visibility(True)
+                capture_gift_scroll.clear()
+
+                if not os.path.exists("data/gift_history.json"):
+                    gift_history = {
+                        "cd": [],
+                        "challenge": []
+                    }
+                    with open("data/gift_history.json", "w+", encoding="utf-8") as f:
+                        json.dump(gift_history, f, ensure_ascii=False, indent=4)
+
+                with open("data/gift_history.json", "r", encoding="utf-8") as f:
+                    gift_history = json.load(f)
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
 
+                gift_history["cd"].append({
+                    "name": name,
+                    "gift": gift,
+                    "num": num,
+                    "time": f"{datetime.datetime.now().strftime('%H:%M:%S')}",
+                    "rule": f"{time}"
+                })
+
+                with open("data/gift_history.json", "w+", encoding="utf-8") as f:
+                    json.dump(gift_history, f, ensure_ascii=False, indent=4)
+
                 with capture_gift_scroll:
                     with ui.row().classes("w-full"):
-                        ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
-                        with ui.avatar(color="").classes("w-6 h-6"):
-                            if gift not in ["舰长", "提督", "总督"]:
-                                ui.image(blive_crower.get_bili_img(gifts[gift]))
-                            else:
-                                ui.image(gifts[gift])
-                        ui.label(f"{gift}x{num}").classes("text-l")
-                        ui.label(time).classes("text-l")
+                        for data in gift_history["cd"]:
+                            gift_time = data["time"]
+                            gift_user = data["name"]
+                            gift_num = data["num"]
+                            gift_rule = data["rule"]
+                            gift_name = data["gift"]
+
+                            ui.label(f"[{gift_time}] {gift_user} 赠送").classes("text-l")
+                            with ui.avatar(color="").classes("w-6 h-6"):
+                                if gift_name not in ["舰长", "提督", "总督"]:
+                                    ui.image(blive_crower.get_bili_img(gifts[gift_name]))
+                                else:
+                                    ui.image(gifts[gift_name])
+                            ui.label(f"{gift_name}x{gift_num}").classes("text-l")
+                            ui.label(gift_rule).classes("text-l")
+
                 capture_gift_scroll.scroll_to(percent=1, duration=0.5)
 
         with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
             with ui.scroll_area().classes('h-24') as capture_gift_scroll:
-                tmp_label = ui.label()
-                tmp_label.set_visibility(False)
+                ui.label().set_visibility(False)
 
     ui.timer(5, callback=lambda: check_cd_refresh())
 
@@ -1583,25 +1615,55 @@ async def capture():
                 scroll_card.set_visibility(False)
             else:
                 scroll_card.set_visibility(True)
+                capture_gift_scroll.clear()
+
+                if not os.path.exists("data/gift_history.json"):
+                    gift_history = {
+                        "cd": [],
+                        "challenge": []
+                    }
+                    with open("data/gift_history.json", "w+", encoding="utf-8") as f:
+                        json.dump(gift_history, f, ensure_ascii=False, indent=4)
+
+                with open("data/gift_history.json", "r", encoding="utf-8") as f:
+                    gift_history = json.load(f)
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
 
+                gift_history["challenge"].append({
+                    "name": name,
+                    "gift": gift,
+                    "num": num,
+                    "time": f"{datetime.datetime.now().strftime('%H:%M:%S')}",
+                    "rule": f"{time}"
+                })
+
+                with open("data/gift_history.json", "w+", encoding="utf-8") as f:
+                    json.dump(gift_history, f, ensure_ascii=False, indent=4)
+
                 with capture_gift_scroll:
                     with ui.row().classes("w-full"):
-                        ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
-                        with ui.avatar(color="").classes("w-6 h-6"):
-                            if gift not in ["舰长", "提督", "总督"]:
-                                ui.image(blive_crower.get_bili_img(gifts[gift]))
-                            else:
-                                ui.image(gifts[gift])
-                        ui.label(f"{gift}x{num}").classes("text-l")
-                        ui.label(time).classes("text-l")
+                        for data in gift_history["challenge"]:
+                            gift_time = data["time"]
+                            gift_user = data["name"]
+                            gift_num = data["num"]
+                            gift_rule = data["rule"]
+                            gift_name = data["gift"]
+
+                            ui.label(f"[{gift_time}] {gift_user} 赠送").classes("text-l")
+                            with ui.avatar(color="").classes("w-6 h-6"):
+                                if gift_name not in ["舰长", "提督", "总督"]:
+                                    ui.image(blive_crower.get_bili_img(gifts[gift_name]))
+                                else:
+                                    ui.image(gifts[gift_name])
+                            ui.label(f"{gift_name}x{gift_num}").classes("text-l")
+                            ui.label(gift_rule).classes("text-l")
+
                 capture_gift_scroll.scroll_to(percent=1, duration=0.5)
 
         with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
             with ui.scroll_area().classes('h-24') as capture_gift_scroll:
-                tmp_label = ui.label()
-                tmp_label.set_visibility(False)
+                ui.label().set_visibility(False)
 
     ui.timer(5, callback=lambda: check_gift_refresh())
 
@@ -1745,7 +1807,7 @@ with ui.card(align_items="center").classes("absolute-center"):
                         ui.image(gifts[gift])
                 ui.label(f"{gift}x{num}").classes("text-l")
                 ui.label(time).classes("text-l")
-        gift_scroll.scroll_to(percent=1, duration=0.5)
+        gift_scroll.scroll_to(percent=0.9, duration=0.5)
 
     with ui.card(align_items="stretch").classes("w-full"):
         with ui.scroll_area().classes('h-16') as gift_scroll:
