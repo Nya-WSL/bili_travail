@@ -7,7 +7,12 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.23.5-alpha', subtitle='2025-03-20', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.23.6-alpha', subtitle='2025-03-22', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 新增错误日志')
+                    ui.label('● 进入房间、醒目留言、触发心跳、成功连接房间将会写入日志')
+                    ui.label('● 调整界面预览按钮位置')
+            with ui.timeline_entry(title='Release of 0.23.5-alpha', subtitle='2025-03-20'):
                 with ui.column().classes('gap-3'):
                     ui.label('● OBS投喂记录框增加高度和宽度')
                     ui.label('● OBS投喂记录增加字体大小并加粗，现在不再显示礼物名字和时间')

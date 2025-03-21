@@ -9,18 +9,37 @@ import blivedm.blivedm.models.web as web_models
 
 # Third Party Packages
 import os
+import sys
 import json
 import shutil
 import random
 import asyncio
 import aiohttp
+import logging
 import requests
 import datetime
 import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.5-alpha"
+version = "0.23.6-alpha"
+
+# LEVEL: DEBUG INFO WARNING ERROR CRITICAL
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s [%(levelname)s]: %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S',
+                    filename="bili_travail.log",
+                    encoding="utf-8"
+                    )
+
+# 全局异常处理钩子
+def handle_exception(exc_type, exc_value, exc_traceback):
+    logging.error(
+        "未知错误！",
+        exc_info=(exc_type, exc_value, exc_traceback)
+    )
+
+sys.excepthook = handle_exception
 
 # ================================
 # 检查环境状态
@@ -237,11 +256,11 @@ class BiliHandler(blivedm.BaseHandler):
     # 心跳数据
     def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
         self.heart_count += 1
-        # print(f'[INFO] [{client.room_id}]-[{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]: 触发心跳')
+        logging.info("触发心跳")
         if self.heart_count < 2:
             b_connect_switch.set_value(True)
             b_connect_switch.set_text("已连接弹幕服务器")
-            # print(f"[INFO] 已成功连接至 {room_id.value}")
+            logging.info(f"已连接至{room_id.value}")
 
 
     # 礼物数据
@@ -255,6 +274,7 @@ class BiliHandler(blivedm.BaseHandler):
             uname = uname.split()[0-5] + "..."
 
         self._on_gift_play(gift, num, uname, price)
+        logging.info(message)
 
 
     # 舰队数据
@@ -277,18 +297,18 @@ class BiliHandler(blivedm.BaseHandler):
             uname = uname.split()[0-5] + "..."
 
         self._on_gift_play(gift, num, uname)
+        logging.info(message)
 
     # ================================
     # 醒目留言
     # 待开发
     # ================================
     def _on_super_chat(self, client: blivedm.BLiveClient, message: web_models.SuperChatMessage):
-    #     print(f'[{client.room_id}] 醒目留言 ¥{message.price} {message.uname}：{message.message}')
-        return {"price": message.price}
+        logging.info(f'[{client.room_id}] 醒目留言 ¥{message.price} {message.uname}：{message.message}')
 
-    # def _on_interact_word(self, client: blivedm.BLiveClient, message: web_models.InteractWordMessage):
-    #     if message.msg_type == 1:
-    #         print(f'[{client.room_id}] {message.username} 进入房间')
+    def _on_interact_word(self, client: blivedm.BLiveClient, message: web_models.InteractWordMessage):
+        if message.msg_type == 1:
+            logging.info(f'{message.username} 进入房间')
 
 
     # 收到礼物后执行函数
@@ -1785,8 +1805,6 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         ui.color_input(label="强调色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
-        # Show gift list button
-        ui.button("界面预览", on_click=lambda: open_capture())
 
     # 按钮组
     with ui.row():
@@ -1795,6 +1813,8 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
         ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
         ui.button("查看盲盒盈亏", on_click=lambda: blind_box_value_dialog())
+        # Show gift list button
+        ui.button("界面预览", on_click=lambda: open_capture())
 
     def gift_list_show(name, gift, num, time):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
@@ -1870,7 +1890,9 @@ def _():
         try:
             text = requests.get("https://nya-wsl.com/bili_travail/chat_msg.json")
         except:
-            text = requests.get("https://version.nya-wsl.cn/bili_travail/chat_msg.json")
+            text = requests.get("http://version.nya-wsl.cn/bili_travail/chat_msg.json")
+        else:
+            logging.error(Exception)
 
         text.encoding = "utf-8"
         if text.status_code == 200 or not config["local_text"]: # 如果请求状态为200且配置文件未启用本地文本
