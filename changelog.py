@@ -7,7 +7,9 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.23.7-alpha', subtitle='2025-03-22', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.23.8-alpha', subtitle='2025-03-23', avatar='static/logo.ico'):
+                ui.label('● OBS投喂记录上限可自定义（自定义需修改配置文件，假设为x)，超过x条时只会显示最后x条，不再删除记录')
+            with ui.timeline_entry(title='Release of 0.23.7-alpha', subtitle='2025-03-22'):
                 ui.label('● OBS投喂记录新增3条的上限，超过时会覆盖第一条记录并写入日志，防止过长的记录会导致收到礼物时卡顿')
             with ui.timeline_entry(title='Release of 0.23.6-alpha', subtitle='2025-03-22'):
                 with ui.column().classes('gap-3'):

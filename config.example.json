@@ -17,5 +17,6 @@
     "local_text": false,
     "domain": "",
     "crower": false,
-    "show_capture_gift_list": false
+    "show_capture_gift_list": false,
+    "capture_gift_list_number": 3
 }

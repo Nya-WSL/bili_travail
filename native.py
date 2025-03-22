@@ -22,7 +22,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.7-alpha"
+version = "0.23.8-alpha"
 
 # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
 logging.basicConfig(level=logging.DEBUG,
@@ -117,7 +117,8 @@ if not os.path.exists("config.json"):
     "local_text": False,
     "domain": "",
     "crower": False,
-    "show_capture_gift_list": False
+    "show_capture_gift_list": False,
+    "capture_gift_list_number": 3
 }
             json.dump(config, f, indent=4, ensure_ascii=False)
     else:
@@ -1494,10 +1495,8 @@ async def capture():
                     gift_history = json.load(f)
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
-
-                if len(gift_history["cd"]) >= 3:
-                    del_value = gift_history["cd"].pop(0)
-                    logging.debug(f"删除倒计时投喂记录: {del_value}")
+                with open("config.json", "r", encoding="utf-8") as f:
+                    config = json.load(f)
 
                 gift_history["cd"].append({
                     "name": name,
@@ -1510,7 +1509,7 @@ async def capture():
                     json.dump(gift_history, f, ensure_ascii=False, indent=4)
 
                 with capture_gift_scroll:
-                    for data in gift_history["cd"]:
+                    for data in gift_history["cd"][-int(config["capture_gift_list_number"]):]:
                         with ui.row().classes("w-full"):
                             gift_user = data["name"]
                             gift_num = data["num"]
@@ -1658,10 +1657,8 @@ async def capture():
                     gift_history = json.load(f)
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
-
-                if len(gift_history["challenge"]) >= 3:
-                    del_value = gift_history["challenge"].pop(0)
-                    logging.debug(f"删除投喂挑战投喂记录: {del_value}")
+                with open("config.json", "r", encoding="utf-8") as f:
+                    config = json.load(f)
 
                 gift_history["challenge"].append({
                     "name": name,
@@ -1674,7 +1671,7 @@ async def capture():
                     json.dump(gift_history, f, ensure_ascii=False, indent=4)
 
                 with capture_gift_scroll:
-                    for data in gift_history["challenge"]:
+                    for data in gift_history["challenge"][-int(config["capture_gift_list_number"]):]:
                         with ui.row().classes("w-full"):
                             gift_user = data["name"]
                             gift_num = data["num"]
