@@ -22,7 +22,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.6-alpha"
+version = "0.23.7-alpha"
 
 # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
 logging.basicConfig(level=logging.DEBUG,
@@ -1495,6 +1495,10 @@ async def capture():
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
 
+                if len(gift_history["cd"]) >= 3:
+                    del_value = gift_history["cd"].pop(0)
+                    logging.debug(f"删除倒计时投喂记录: {del_value}")
+
                 gift_history["cd"].append({
                     "name": name,
                     "gift": gift,
@@ -1654,6 +1658,10 @@ async def capture():
                     gift_history = json.load(f)
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
+
+                if len(gift_history["challenge"]) >= 3:
+                    del_value = gift_history["challenge"].pop(0)
+                    logging.debug(f"删除投喂挑战投喂记录: {del_value}")
 
                 gift_history["challenge"].append({
                     "name": name,
