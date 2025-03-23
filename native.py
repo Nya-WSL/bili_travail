@@ -1,4 +1,5 @@
 # Local Packages
+import bili_auth
 import blive_crower
 import gift as get_gift
 from blivedm import blivedm
@@ -11,6 +12,7 @@ import blivedm.blivedm.models.web as web_models
 import os
 import sys
 import json
+import time
 import shutil
 import random
 import asyncio
@@ -22,7 +24,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.23.8-alpha"
+version = "0.24.0-alpha"
 
 # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
 logging.basicConfig(level=logging.DEBUG,
@@ -130,6 +132,7 @@ if not os.path.exists(".nicegui/storage-general.json"):
     app.storage.general["gift_challenge_text"] = ""
     app.storage.general["countdown_time"] = 0
     app.storage.general["version"] = version
+    app.storage.general["startup_check_bili_auth"] = False
 else:
     try:
         with open(".nicegui/storage-general.json", "r", encoding="utf-8") as f:
@@ -142,6 +145,7 @@ else:
         app.storage.general["gift_challenge_text"] = ""
         app.storage.general["countdown_time"] = 0
         app.storage.general["version"] = version
+        app.storage.general["startup_check_bili_auth"] = False
 
 if app.storage.general.get("version", None) == None:
     app.storage.general["version"] = version
@@ -1257,6 +1261,31 @@ def save_config():
     with open("config.json", "w+", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
+async def check_auth(loginInfo):
+    status = await bili_auth.login(loginInfo)
+    if status[0]:
+        ui.notify(f"登录成功, 有效期至{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + int(status[1]['expires_in'])))}", type="positive")
+        try:
+            os.remove("bili_qrcode.png")
+        except:
+            pass
+    else:
+        ui.notify(f"登录失败: {status[1]}", type="negative")
+
+async def bili_login(status = 0):
+    if config["room_id"] == "":
+        ui.notify("请先填入房间号", type="negative")
+        return
+
+    with ui.dialog() as auth_dialog, ui.card(align_items="center"):
+        loginInfo = bili_auth.get_qrcode()
+        ui.image("bili_qrcode.png")
+        ui.label("请使用B站APP扫描二维码登录")
+        qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo)).on(type="click", handler=lambda: auth_dialog.close())
+        if status == 1:
+            qr_button.on_click(lambda: dialog.close())
+
+    auth_dialog.open()
 
 # 检查弹幕服务器连接状态
 async def check_b_connect_status():
@@ -1292,8 +1321,10 @@ async def check_b_connect_status():
             return
 
         if not b_connect_status:
+            with open("config.json", "r", encoding="utf-8") as f:
+                config = json.load(f)
             if config["SESSDATA"] == "":
-                ui.notify("SESSDATA为空，历史礼物功能可能无法显示用户名", type="warning")
+                ui.notify("未登录B站账号，历史礼物功能可能无法显示用户名", type="warning")
             asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
@@ -1849,6 +1880,8 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("检查版本更新", on_click=lambda: check_update())
         # Changelog button
         ui.button("查看更新日志", on_click=lambda: ui.navigate.to("/changelog"))
+        # Login bilibili button
+        ui.button("登录B站账号", on_click=lambda: bili_login())
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
@@ -1856,6 +1889,18 @@ with ui.card(align_items="center").classes("absolute-center"):
 
     init_task()
     countdown_timer.inherit_time(int(time_badge_inherit.text))
+
+    if config["SESSDATA"] == "" and not app.storage.general["startup_check_bili_auth"]:
+        app.storage.general["startup_check_bili_auth"] = True
+
+        with ui.dialog() as dialog, ui.card(align_items="center"):
+            ui.label("您似乎未登录B站账号，是否需要登录？")
+            ui.label("未登录历史礼物功能可能无法显示用户名")
+            with ui.row():
+                ui.button("登录", on_click=lambda: bili_login(1))
+                ui.button("取消", on_click=lambda: dialog.close())
+
+        dialog.open()
 
 # about按钮
 with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
