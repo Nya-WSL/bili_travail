@@ -24,7 +24,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.24.0-alpha"
+version = "0.25.0-alpha"
 
 # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
 logging.basicConfig(level=logging.DEBUG,
@@ -65,6 +65,10 @@ if os.path.exists("data/gift_history.json"):
     if not os.path.exists("data/history"):
         os.mkdir("data/history")
     shutil.move("data/gift_history.json", f"data/history/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+if os.path.exists("data/gift_statistics.json"):
+    if not os.path.exists("data/statistics"):
+        os.mkdir("data/statistics")
+    shutil.move("data/gift_statistics.json", f"data/statistics/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
 if os.path.exists("cache"):
     shutil.rmtree("cache")
 
@@ -279,6 +283,7 @@ class BiliHandler(blivedm.BaseHandler):
             uname = uname.split()[0-5] + "..."
 
         self._on_gift_play(gift, num, uname, price)
+        self._on_gift_statistics(gift, num, uname, price)
         logging.info(message)
 
 
@@ -287,6 +292,7 @@ class BiliHandler(blivedm.BaseHandler):
         gift = message.guard_level
         num = message.num
         uname = message.username
+        price = message.price / 100
         result = ""
 
         if gift == 1:
@@ -302,6 +308,7 @@ class BiliHandler(blivedm.BaseHandler):
             uname = uname.split()[0-5] + "..."
 
         self._on_gift_play(gift, num, uname)
+        self._on_gift_statistics(gift, num, uname, price)
         logging.info(message)
 
     # ================================
@@ -315,6 +322,28 @@ class BiliHandler(blivedm.BaseHandler):
         if message.msg_type == 1:
             logging.info(f'{message.username} 进入房间')
 
+    def _on_gift_statistics(self, gift, num, uname, price = 0):
+        if not os.path.exists("data/gift_statistics.json"):
+
+            with open("data/gift_statistics.json", "w+", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=4)
+
+        with open("data/gift_statistics.json", "r", encoding="utf-8") as f:
+            count = json.load(f)
+
+        count.setdefault(gift, {"num": 0, "price": 0, "user": []})
+        users = count[gift]["user"]
+
+        if uname not in users:
+            users.append(uname)
+        num += count[gift]["num"]
+        if gift == "辣条":
+            count[gift] = {"num": num, "price": 0, "user": users}
+        else:
+            count[gift] = {"num": num, "price": price, "user": users}
+
+        with open("data/gift_statistics.json", "w+", encoding="utf-8") as f:
+            json.dump(count, f, ensure_ascii=False, indent=4)
 
     # 收到礼物后执行函数
     def _on_gift_play(self, gift, num, uname, price = 0):
@@ -1841,6 +1870,7 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         ui.color_input(label="强调色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
+        ui.link("查看礼物统计", "/count", new_tab=True).style("text-decoration: none;")
 
     # 按钮组
     with ui.row():
@@ -1914,6 +1944,34 @@ if app.storage.general["version"] != version: # 如果版本号不一致
     app.storage.general["version"] = version # 更新版本号
     ui.navigate.to("/changelog") # 跳转到更新日志页面
 
+@ui.page('/count')
+def _():
+    ui.query('body').style(f'background: url("static/bg_vita.png") fixed')
+    try:
+        with open("data/gift_statistics.json", "r", encoding="utf-8") as f:
+            count = json.load(f)
+        if count == {}:
+            raise Exception("No data")
+    except:
+        count = {
+            "占位礼物": {
+                "num": 0,
+                "price": 0,
+                "user": ["user1", "user2"]
+            }
+        }
+
+    with ui.card(align_items="center").classes("w-80").style("top: 50%; left: 50%; transform: translate(-50%);"):
+    # with ui.scroll_area().classes('absolute-center w-80 h-96'):
+        for gift, value in count.items():
+            with ui.row():
+                ui.label(gift + ": ")
+                ui.label(str(value["num"]) + "个 / " + str(value["price"] * value["num"]) + "电池")
+            ui.label("送礼用户")
+            for i in value["user"]:
+                ui.label(i)
+            ui.separator()
+        ui.label(f"总计：{sum([value['num'] for value in count.values()])}个礼物 / {int(sum([value['price'] * value['num'] for value in count.values()]))}电池")
 
 # about页面
 @ui.page('/about')
