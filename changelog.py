@@ -7,7 +7,9 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.24.0-alpha', subtitle='2025-03-23', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.25.0-alpha', subtitle='2025-03-26', avatar='static/logo.ico'):
+                ui.label('● 新增礼物统计功能，会自动统计程序运行时收到的所有礼物（盲盒只统计具体礼物；需连接弹幕服务器；在程序启动时将会备份后清空数据）')
+            with ui.timeline_entry(title='Release of 0.24.0-alpha', subtitle='2025-03-23'):
                 ui.label('● 新增登录至B站功能，无需手动获取SESSDATA')
             with ui.timeline_entry(title='Release of 0.23.8-alpha', subtitle='2025-03-23'):
                 ui.label('● OBS投喂记录上限可自定义（自定义需修改配置文件，假设为x)，超过x条时只会显示最后x条，不再删除记录')
