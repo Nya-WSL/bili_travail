@@ -1,11 +1,11 @@
 # Local Packages
-import bili_auth
 import blive_crower
 import gift as get_gift
 from blivedm import blivedm
 from changelog import changelog
 import update as travail_update
 import gift_mapping as gift_map
+import bili_auth_web as bili_auth
 import blivedm.blivedm.models.web as web_models
 
 # Third Party Packages
@@ -21,10 +21,11 @@ import logging
 import requests
 import datetime
 import http.cookies
+import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.25.0-alpha"
+version = "0.25.1-alpha"
 
 # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
 logging.basicConfig(level=logging.DEBUG,
@@ -1290,29 +1291,75 @@ def save_config():
     with open("config.json", "w+", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
-async def check_auth(loginInfo):
-    status = await bili_auth.login(loginInfo)
-    if status[0]:
-        ui.notify(f"登录成功, 有效期至{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + int(status[1]['expires_in'])))}", type="positive")
-        try:
-            os.remove("bili_qrcode.png")
-        except:
-            pass
-    else:
-        ui.notify(f"登录失败: {status[1]}", type="negative")
+def check_auth(loginInfo):
+    status = bili_auth.login(loginInfo[0])
 
-async def bili_login(status = 0):
+    if status == True:
+        ui.notify("登录成功", type="positive")
+        try:
+            os.remove(loginInfo[1])
+        except:
+            logging.warning(f"删除{loginInfo[1]}失败")
+
+    else:
+        ui.notify(status, type="negative")
+
+def get_browser_cookies(url: str):
+    """
+    :param url: 需获取cookies的网址，不带http(s)://
+    """
+
+    try:
+        # chrome, firefox, edge, opera, brave...
+        cookies = browser_cookie3.firefox(domain_name=url)
+
+        cookie_dict = {cookie.name: cookie.value for cookie in cookies}
+        return cookie_dict
+
+    except Exception as e:
+        logging.error(e)
+        return {}
+
+def bili_auto_login(init = False):
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+
     if config["room_id"] == "":
         ui.notify("请先填入房间号", type="negative")
         return
 
+    cookies = get_browser_cookies('bilibili.com')
+
+    if "SESSDATA" not in cookies.keys():
+        ui.notify("未获取到SESSDATA，请使用扫码登录", type="negative")
+        return
+
+    for cookie_name, cookie_value in cookies.items():
+        if cookie_name == 'SESSDATA':
+            config["SESSDATA"] = cookie_value
+
+            with open("config.json", "w+", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=4)
+
+            if init:
+                init_login_dialog.close()
+
+            ui.notify("自动登录成功", type="positive")
+
+def bili_login(init = False):
+    global qrcode_ui
+    if config["room_id"] == "":
+        ui.notify("请先填入房间号", type="negative")
+        return
+
+    loginInfo = bili_auth.get_qrcode("bili_qrcode")
+
     with ui.dialog() as auth_dialog, ui.card(align_items="center"):
-        loginInfo = bili_auth.get_qrcode()
-        ui.image("bili_qrcode.png")
+        qrcode_ui = ui.image(loginInfo[1])
         ui.label("请使用B站APP扫描二维码登录")
         qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo)).on(type="click", handler=lambda: auth_dialog.close())
-        if status == 1:
-            qr_button.on_click(lambda: dialog.close())
+        if init:
+            qr_button.on_click(lambda: init_login_dialog.close())
 
     auth_dialog.open()
 
@@ -1903,6 +1950,17 @@ with ui.card(align_items="center").classes("absolute-center"):
             tmp_label = ui.label()
             tmp_label.set_visibility(False)
 
+    def choice_login_dialog():
+        with ui.dialog() as select_login_dialog, ui.card(align_items="center"):
+            ui.label("请选择登录方式")
+            ui.label("获取浏览器Cookie仅支持firefox，请先确保浏览器已登录B站账号")
+            ui.label("无论使用哪种方式，皆建议使用小号登录，以免账号被风控")
+            with ui.row():
+                ui.button("扫码登录", on_click=lambda: bili_login())
+                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login())
+
+        select_login_dialog.open()
+
     with ui.row():
         # Update gift data button
         ui.button("更新礼物数据", on_click=lambda: refresh_gift())
@@ -1923,14 +1981,16 @@ with ui.card(align_items="center").classes("absolute-center"):
     if config["SESSDATA"] == "" and not app.storage.general["startup_check_bili_auth"]:
         app.storage.general["startup_check_bili_auth"] = True
 
-        with ui.dialog() as dialog, ui.card(align_items="center"):
+        with ui.dialog() as init_login_dialog, ui.card(align_items="center"):
             ui.label("您似乎未登录B站账号，是否需要登录？")
             ui.label("未登录历史礼物功能可能无法显示用户名")
+            ui.label("建议使用小号登录，以免账号被风控")
             with ui.row():
-                ui.button("登录", on_click=lambda: bili_login(1))
-                ui.button("取消", on_click=lambda: dialog.close())
+                ui.button("扫码登录", on_click=lambda: bili_login(True))
+                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login(True))
+                ui.button("取消", on_click=lambda: init_login_dialog.close())
 
-        dialog.open()
+        init_login_dialog.open()
 
 # about按钮
 with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
