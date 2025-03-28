@@ -7,7 +7,12 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.25.0-alpha', subtitle='2025-03-26', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.25.1-alpha', subtitle='2025-03-29', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 扫码登录移除tv端接口，新增web端接口，减少被风控的概率')
+                    ui.label('● 新增获取浏览器登录状态功能，仅支持firefox，可以使用浏览器已登录的B站账号登录')
+                    ui.label('● 优化登录逻辑，可以自行选择扫码登录或获取浏览器登录状态')
+            with ui.timeline_entry(title='Release of 0.25.0-alpha', subtitle='2025-03-26'):
                 ui.label('● 新增礼物统计功能，会自动统计程序运行时收到的所有礼物（盲盒只统计具体礼物；需连接弹幕服务器；在程序启动时将会备份后清空数据）')
             with ui.timeline_entry(title='Release of 0.24.0-alpha', subtitle='2025-03-23'):
                 ui.label('● 新增登录至B站功能，无需手动获取SESSDATA')
