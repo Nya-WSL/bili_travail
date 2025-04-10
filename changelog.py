@@ -7,7 +7,11 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True)).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable'):
             ui.timeline_entry('B站加班姬更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.25.1-alpha', subtitle='2025-03-29', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.25.2-alpha', subtitle='2025-04-10', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 初始化直播间接口现在要求更严格的鉴权，更换新接口修复该问题')
+                    ui.label('● 新增实验性的日志轮转功能，日志仅保存一周，轮转时间为周五')
+            with ui.timeline_entry(title='Release of 0.25.1-alpha', subtitle='2025-03-29'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 扫码登录移除tv端接口，新增web端接口，减少被风控的概率')
                     ui.label('● 新增获取浏览器登录状态功能，仅支持firefox，可以使用浏览器已登录的B站账号登录')

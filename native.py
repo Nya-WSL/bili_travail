@@ -12,7 +12,6 @@ import blivedm.blivedm.models.web as web_models
 import os
 import sys
 import json
-import time
 import shutil
 import random
 import asyncio
@@ -24,15 +23,26 @@ import http.cookies
 import browser_cookie3
 from typing import *
 from nicegui import ui, app
+from logging.handlers import TimedRotatingFileHandler
 
-version = "0.25.1-alpha"
+version = "0.25.2-alpha"
+
+if not os.path.exists("logs"):
+    os.mkdir("logs")
+
+log_weekly_handler = TimedRotatingFileHandler(
+    'logs/bili_travail.log',       # 日志文件名
+    when='W4', # 每周五轮转一次
+    interval=1,
+    backupCount=1,   # 保留1周日志
+    encoding='utf-8'
+)
 
 # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s [%(levelname)s]: %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S',
-                    filename="bili_travail.log",
-                    encoding="utf-8"
+                    handlers=[log_weekly_handler]
                     )
 
 # 全局异常处理钩子
