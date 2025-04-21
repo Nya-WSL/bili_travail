@@ -25,7 +25,7 @@ from typing import *
 from nicegui import ui, app
 from logging.handlers import TimedRotatingFileHandler
 
-version = "0.25.2-alpha"
+version = "0.25.3-alpha"
 
 if not os.path.exists("logs"):
     os.mkdir("logs")
@@ -130,6 +130,7 @@ if not os.path.exists("config.json"):
         "static/sample2.png"
     ],
     "color": "#5898d4",
+    "btn_color": "#eddad2",
     "text_color": "#000000",
     "local_text": False,
     "domain": "",
@@ -179,6 +180,17 @@ with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
 port = config["port"]
+btn_color = config["btn_color"]
+
+ui.add_css(f"""
+.text-btn {{
+color: {btn_color} !important;
+}}
+
+.bg-btn {{
+background: {btn_color} !important;
+}}""",
+shared=True)
 
 GiftManager = get_gift.BiliGiftManager()
 
@@ -811,8 +823,8 @@ def cd_setting_dialog():
             ui.label("是否确认重置所有礼物？")
 
             with ui.row():
-                ui.button("确认重置", on_click=lambda: double_check())
-                ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+                ui.button("确认重置", on_click=lambda: double_check(), color=btn_color)
+                ui.button("取消重置", on_click=lambda: double_check_dialog.close(), color=btn_color)
 
         double_check_dialog.open()
 
@@ -875,7 +887,7 @@ def cd_setting_dialog():
                         ui.label(k)
                         ui.space()
                         ui.label(format_seconds(v))
-                        ui.button("删除", on_click=lambda k = k: del_gift(False, k))
+                        ui.button("删除", on_click=lambda k = k: del_gift(False, k), color=btn_color)
 
         if special != {}: # 如果特殊礼物的数据不是空的
             for k,v in special.items():
@@ -884,7 +896,7 @@ def cd_setting_dialog():
                         ui.label(k)
                         ui.space()
                         ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k), color=btn_color)
                 else:
                     with ui.row().classes('w-full'):
                         ui.label(k)
@@ -896,7 +908,7 @@ def cd_setting_dialog():
                         if v == "double":
                             v = "加倍"
                         ui.label(v)
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k), color=btn_color)
         ui.separator() # 分割线
 
     # 弹窗
@@ -923,10 +935,10 @@ def cd_setting_dialog():
 
         # 按钮
         with ui.row():
-            ui.button('提交', on_click=lambda: run())
-            ui.button("删除", on_click=lambda: delete())
-            ui.button("重置全部", on_click=lambda: reset())
-            ui.button('关闭', on_click=lambda: cd_dialog.close())
+            ui.button('提交', on_click=lambda: run(), color=btn_color)
+            ui.button("删除", on_click=lambda: delete(), color=btn_color)
+            ui.button("重置全部", on_click=lambda: reset(), color=btn_color)
+            ui.button('关闭', on_click=lambda: cd_dialog.close(), color=btn_color)
 
     cd_dialog.open() # 打开弹窗
 
@@ -977,7 +989,7 @@ def blind_box_value_dialog():
         os.remove("data/blind_box_value.json")
         value_card.clear()
         get_box_value()
-        ui.button("关闭", on_click=lambda: value_dialog.close())
+        ui.button("关闭", on_click=lambda: value_dialog.close(), color=btn_color)
 
     if not os.path.exists("data/blind_box_value.json"):
         with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
@@ -986,7 +998,7 @@ def blind_box_value_dialog():
     with ui.dialog() as value_dialog, ui.card(align_items="center") as value_card:
         ui.label().set_visibility(False)
         get_box_value()
-        ui.button("清零", on_click=lambda: clear_box_value())
+        ui.button("清零", on_click=lambda: clear_box_value(), color=btn_color)
 
     value_dialog.open()
 
@@ -1086,8 +1098,8 @@ def gift_count_setting_dialog():
             ui.label("是否确认重置所有礼物？")
 
             with ui.row():
-                ui.button("确认重置", on_click=lambda: double_check())
-                ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+                ui.button("确认重置", on_click=lambda: double_check(), color=btn_color)
+                ui.button("取消重置", on_click=lambda: double_check_dialog.close(), color=btn_color)
 
         double_check_dialog.open()
 
@@ -1152,7 +1164,7 @@ def gift_count_setting_dialog():
                             ui.label(f"{int(v)}{gift_play_unit_main.text}")
                         elif v > 0:
                             ui.label(f"+{int(v)}{gift_play_unit_main.text}")
-                        ui.button("删除", on_click=lambda k = k: del_gift(False, k))
+                        ui.button("删除", on_click=lambda k = k: del_gift(False, k), color=btn_color)
 
         if special != {}:
             for k,v in special.items():
@@ -1172,7 +1184,7 @@ def gift_count_setting_dialog():
                             ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
                         else:
                             ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k), color=btn_color)
                 else:
                     with ui.row().classes('w-full'):
                         ui.label(k)
@@ -1182,7 +1194,7 @@ def gift_count_setting_dialog():
                         if v == "double":
                             v = "加倍"
                         ui.label(v)
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
+                        ui.button("删除", on_click=lambda k = k: del_gift(True, k), color=btn_color)
         ui.separator()
 
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
@@ -1232,19 +1244,19 @@ def gift_count_setting_dialog():
                 ui.label("是否确认重置计数？")
 
                 with ui.row():
-                    ui.button("确认重置", on_click=lambda: double_check())
-                    ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+                    ui.button("确认重置", on_click=lambda: double_check(), color=btn_color)
+                    ui.button("取消重置", on_click=lambda: double_check_dialog.close(), color=btn_color)
 
             double_check_dialog.open()
 
         with ui.row():
-            ui.button('提交', on_click=lambda: run())
-            ui.button("删除", on_click=lambda: delete())
-            ui.button("重置全部", on_click=lambda: reset())
-            ui.button("重置计数", on_click=lambda: change_challenge_count("reset"))
+            ui.button('提交', on_click=lambda: run(), color=btn_color)
+            ui.button("删除", on_click=lambda: delete(), color=btn_color)
+            ui.button("重置全部", on_click=lambda: reset(), color=btn_color)
+            ui.button("重置计数", on_click=lambda: change_challenge_count("reset"), color=btn_color)
             # ui.button("加1", on_click=lambda: change_challenge_count("add"))
             # ui.button("减1", on_click=lambda: change_challenge_count("sub"))
-            ui.button('关闭', on_click=lambda: gift_count_dialog.close())
+            ui.button('关闭', on_click=lambda: gift_count_dialog.close(), color=btn_color)
 
     gift_count_dialog.open()
 
@@ -1367,7 +1379,7 @@ def bili_login(init = False):
     with ui.dialog() as auth_dialog, ui.card(align_items="center"):
         qrcode_ui = ui.image(loginInfo[1])
         ui.label("请使用B站APP扫描二维码登录")
-        qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo)).on(type="click", handler=lambda: auth_dialog.close())
+        qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo), color=btn_color).on(type="click", handler=lambda: auth_dialog.close())
         if init:
             qr_button.on_click(lambda: init_login_dialog.close())
 
@@ -1437,9 +1449,9 @@ def open_capture():
         ui.label("使用OBS捕捉浏览器源时请关闭预览窗口")
         ui.label("如OBS未刷新，请点击：浏览器源 → 刷新当前页面缓存")
         with ui.row():
-            ui.button("加班预览", on_click=lambda: ui.navigate.to("/capture_cd", new_tab=True)).on(type="click", handler=lambda: dialog.close())
-            ui.button("挑战预览", on_click=lambda: ui.navigate.to("/capture_gift", new_tab=True)).on(type="click", handler=lambda: dialog.close())
-            ui.button("关闭", on_click=lambda: dialog.close())
+            ui.button("加班预览", on_click=lambda: ui.navigate.to("/capture_cd", new_tab=True), color=btn_color).on(type="click", handler=lambda: dialog.close())
+            ui.button("挑战预览", on_click=lambda: ui.navigate.to("/capture_gift", new_tab=True), color=btn_color).on(type="click", handler=lambda: dialog.close())
+            ui.button("关闭", on_click=lambda: dialog.close(), color=btn_color)
 
     dialog.open()
 
@@ -1481,8 +1493,8 @@ async def refresh_gift():
                 with ui.dialog() as reset_dialog, ui.card(align_items="center"):
                     with ui.row():
                         ui.label("更新礼物数据失败。是否重置本地数据？")
-                    ui.button("确定", on_click=lambda: reset_gift_data())
-                    ui.button("取消", on_click=lambda: reset_dialog.close())
+                    ui.button("确定", on_click=lambda: reset_gift_data(), color=btn_color)
+                    ui.button("取消", on_click=lambda: reset_dialog.close(), color=btn_color)
 
                 reset_dialog.open()
 
@@ -1491,8 +1503,8 @@ async def refresh_gift():
             ui.label("更新礼物数据前，请先暂停倒计时与投喂挑战。")
             ui.label("是否进行更新？")
             with ui.row():
-                ui.button("确定", on_click=lambda: check_refresh())
-                ui.button("取消", on_click=lambda: check_dialog.close())
+                ui.button("确定", on_click=lambda: check_refresh(), color=btn_color)
+                ui.button("取消", on_click=lambda: check_dialog.close(), color=btn_color)
 
         check_dialog.open()
 
@@ -1827,10 +1839,10 @@ def check_update(init = False):
             ui.label(f"当前版本：{version} | 最新版本：{status}")
 
             with ui.row():
-                ui.button("国内源", on_click=lambda: travail_update.update("CN-HK"))
-                ui.button("海外源", on_click=lambda: travail_update.update("Overseas")).disable()
-                ui.button("GitHub", on_click=lambda: travail_update.update("GitHub"))
-                ui.button("取消", on_click=lambda: dialog.close())
+                ui.button("国内源", on_click=lambda: travail_update.update("CN-HK"), color=btn_color)
+                ui.button("海外源", on_click=lambda: travail_update.update("Overseas"), color=btn_color).disable()
+                ui.button("GitHub", on_click=lambda: travail_update.update("GitHub"), color=btn_color)
+                ui.button("取消", on_click=lambda: dialog.close(), color=btn_color)
 
         dialog.open()
 
@@ -1870,7 +1882,7 @@ def check_update(init = False):
 
 with ui.card(align_items="center").classes("absolute-center"):
     check_update(True)
-    time_badge = ui.badge("00:00:00", outline=True).classes("text-9xl") # 创建时钟
+    time_badge = ui.badge("00:00:00", outline=True, color="").classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
     time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
     time_badge_inherit.set_visibility(False)
     gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 将结果写入storage) # 投喂挑战总数
@@ -1885,33 +1897,33 @@ with ui.card(align_items="center").classes("absolute-center"):
         input_hour = ui.number("时", value=0, min=0).style("width: 100px")
         input_minute = ui.number("分", value=0, min=0).style("width: 100px")
         input_second = ui.number("秒", value=0, min=0).style("width: 100px")
-        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config())
+        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
         gift_challenge_switch.disable()
 
     # 倒计时按钮
     with ui.row():
         # Start button
-        start_button = ui.button('开始', on_click=lambda: start_task())
+        start_button = ui.button('开始', on_click=lambda: start_task(), color=btn_color)
         start_button.disable()
 
         # Pause button
-        pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause())
+        pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause(), color=btn_color)
         pause_button.disable()
 
         # Resume button
-        resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
+        resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume(), color=btn_color)
         resume_button.disable()
 
         # Stop button
-        cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop(time_badge))
+        cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop(time_badge), color=btn_color)
         cancel_button.disable()
 
         # Add time Button
-        add_button = ui.button("手动增加", on_click=lambda: add_time())
+        add_button = ui.button("手动增加", on_click=lambda: add_time(), color=btn_color)
         add_button.disable()
 
         # Sub Time Button
-        sub_button = ui.button("手动减少", on_click=lambda: sub_time())
+        sub_button = ui.button("手动减少", on_click=lambda: sub_time(), color=btn_color)
         sub_button.disable()
 
     ui.separator()
@@ -1920,12 +1932,13 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id") # 实时写入房间号到配置文件
         b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
-        show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list")
+        show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list").props('color="btn"')
 
     ui.separator()
 
     with ui.row():
-        ui.color_input(label="强调色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+        ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+        ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
         ui.link("查看礼物统计", "/count", new_tab=True).style("text-decoration: none;")
 
@@ -1933,11 +1946,11 @@ with ui.card(align_items="center").classes("absolute-center"):
     with ui.row():
         # Gift Setting button
         # ui.button("礼物设置", on_click=lambda: gift())
-        ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog())
-        ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog())
-        ui.button("查看盲盒盈亏", on_click=lambda: blind_box_value_dialog())
+        ui.button("加班礼物设置", on_click=lambda: cd_setting_dialog(), color=btn_color)
+        ui.button("投喂挑战设置", on_click=lambda: gift_count_setting_dialog(), color=btn_color)
+        ui.button("查看盲盒盈亏", on_click=lambda: blind_box_value_dialog(), color=btn_color)
         # Show gift list button
-        ui.button("界面预览", on_click=lambda: open_capture())
+        ui.button("界面预览", on_click=lambda: open_capture(), color=btn_color)
 
     def gift_list_show(name, gift, num, time):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
@@ -1966,20 +1979,20 @@ with ui.card(align_items="center").classes("absolute-center"):
             ui.label("获取浏览器Cookie仅支持firefox，请先确保浏览器已登录B站账号")
             ui.label("无论使用哪种方式，皆建议使用小号登录，以免账号被风控")
             with ui.row():
-                ui.button("扫码登录", on_click=lambda: bili_login())
-                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login())
+                ui.button("扫码登录", on_click=lambda: bili_login(), color=btn_color)
+                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login(), color=btn_color)
 
         select_login_dialog.open()
 
     with ui.row():
         # Update gift data button
-        ui.button("更新礼物数据", on_click=lambda: refresh_gift())
+        ui.button("更新礼物数据", on_click=lambda: refresh_gift(), color=btn_color)
         # Update version button
-        ui.button("检查版本更新", on_click=lambda: check_update())
+        ui.button("检查版本更新", on_click=lambda: check_update(), color=btn_color)
         # Changelog button
-        ui.button("查看更新日志", on_click=lambda: ui.navigate.to("/changelog"))
+        ui.button("查看更新日志", on_click=lambda: ui.navigate.to("/changelog"), color=btn_color)
         # Login bilibili button
-        ui.button("登录B站账号", on_click=lambda: bili_login())
+        ui.button("登录B站账号", on_click=lambda: bili_login(), color=btn_color)
 
     # obs源
     ui.label(f"OBS倒计时浏览器源URL：http://127.0.0.1:{port}/capture_cd")
@@ -1996,15 +2009,15 @@ with ui.card(align_items="center").classes("absolute-center"):
             ui.label("未登录历史礼物功能可能无法显示用户名")
             ui.label("建议使用小号登录，以免账号被风控")
             with ui.row():
-                ui.button("扫码登录", on_click=lambda: bili_login(True))
-                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login(True))
-                ui.button("取消", on_click=lambda: init_login_dialog.close())
+                ui.button("扫码登录", on_click=lambda: bili_login(True), color=btn_color)
+                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login(True), color=btn_color)
+                ui.button("取消", on_click=lambda: init_login_dialog.close(), color=btn_color)
 
         init_login_dialog.open()
 
 # about按钮
 with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
-    ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
+    ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support', color=btn_color).props('fab')
 
 @ui.page('/changelog')
 def _():
@@ -2127,7 +2140,7 @@ def _():
         ui.link("Nya-WSL服务与反馈群", "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
         ui.separator()
         # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵').classes("text-2xl text-white")
-        ui.button("返回", on_click=lambda: ui.navigate.to("/"))
+        ui.button("返回", on_click=lambda: ui.navigate.to("/"), color=btn_color)
 
 # 运行NiceGUI
 ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[575, 815], reconnect_timeout=15)
