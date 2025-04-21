@@ -13,6 +13,7 @@
         "static/sample2.png"
     ],
     "color": "#5898d4",
+    "btn_color": "#eddad2",
     "text_color": "#000000",
     "local_text": false,
     "domain": "",
