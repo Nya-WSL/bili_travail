@@ -11,7 +11,9 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.25.2-alpha', subtitle='2025-04-10', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.25.4-alpha', subtitle='2025-05-09', avatar='static/logo.ico'):
+                ui.label('● OBS投喂记录支持自定义字体颜色')
+            with ui.timeline_entry(title='Release of 0.25.3-alpha', subtitle='2025-04-22'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 更新NiceGUI至v2.15.0')
                     ui.label('● 支持自定义按钮、开关和更新日志的时间线颜色（需重启生效）')

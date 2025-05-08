@@ -25,7 +25,7 @@ from typing import *
 from nicegui import ui, app
 from logging.handlers import TimedRotatingFileHandler
 
-version = "0.25.3-alpha"
+version = "0.25.4-alpha"
 
 if not os.path.exists("logs"):
     os.mkdir("logs")
@@ -1645,14 +1645,14 @@ async def capture():
                             gift_rule = data["rule"]
                             gift_name = data["gift"]
 
-                            ui.label(f"{gift_user}").classes("text-xl font-extrabold")
+                            ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     ui.image(blive_crower.get_bili_img(gifts[gift_name]))
                                 else:
                                     ui.image(gifts[gift_name])
-                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold")
-                            ui.label(gift_rule).classes("text-xl font-extrabold")
+                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
 
                 capture_gift_scroll.scroll_to(percent=1, duration=0.5)
 
