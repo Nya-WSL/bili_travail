@@ -25,7 +25,7 @@ from typing import *
 from nicegui import ui, app
 from logging.handlers import TimedRotatingFileHandler
 
-version = "0.25.4-alpha"
+version = "0.25.5-alpha"
 
 if not os.path.exists("logs"):
     os.mkdir("logs")
@@ -1940,7 +1940,10 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
         ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
-        ui.link("查看礼物统计", "/count", new_tab=True).style("text-decoration: none;")
+        # ui.link("查看礼物统计", "/count", new_tab=True).style("text-decoration: none;")
+
+    with ui.row():
+        ui.button("查看礼物统计", on_click=lambda: ui.navigate.to("/count", True), color=btn_color)
 
     # 按钮组
     with ui.row():
@@ -2143,4 +2146,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"), color=btn_color)
 
 # 运行NiceGUI
-ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[575, 815], reconnect_timeout=15)
+ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[575, 860], reconnect_timeout=15)
