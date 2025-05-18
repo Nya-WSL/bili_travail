@@ -1,8 +1,6 @@
 {
     "room_id": "",
     "port": 65000,
-    "native": true,
-    "clean_cache": false,
     "show_zero": false,
     "SESSDATA": "",
     "background_image": [
@@ -16,8 +14,6 @@
     "btn_color": "#eddad2",
     "text_color": "#000000",
     "local_text": false,
-    "domain": "",
-    "crower": false,
     "show_capture_gift_list": false,
     "capture_gift_list_number": 3
 }

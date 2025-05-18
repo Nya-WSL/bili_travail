@@ -177,3 +177,5 @@ update.zip
 /data/history
 bili_qrcode.png
 /data/statistics
+/logs
+*.png

@@ -11,7 +11,17 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.25.5-alpha', subtitle='2025-05-09', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.26.0-alpha', subtitle='2025-05-19', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 移除过时的配置和代码')
+                    ui.label('● 移除B站直播间爬虫')
+                    ui.label('● 移除tv端登录接口代码')
+                    ui.label('● 日志轮转功能似乎并未生效，暂时移除该功能')
+                    ui.label('●  更新预设礼物数据（注：盲盒未更新）')
+                    ui.label('● 将所有模块的日志合并为同一个handler')
+                    ui.label('● 尝试使用标准主守护程序防止日志被初始化两次')
+                    ui.label('● 现在会比对配置文件和默认配置并自动更新差异')
+            with ui.timeline_entry(title='Release of 0.25.5-alpha', subtitle='2025-05-09'):
                 ui.label('● 尝试修复查看礼物统计无法打开新标签页的问题，现在查看礼物统计是一个按钮而不是一个超链接')
             with ui.timeline_entry(title='Release of 0.25.4-alpha', subtitle='2025-05-09'):
                 ui.label('● OBS投喂记录支持自定义字体颜色')

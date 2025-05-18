@@ -1,23 +1,23 @@
 import qrcode
-import logging
+from log import logger
 import sys, requests, json, time
 
-# LEVEL: DEBUG INFO WARNING ERROR CRITICAL
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s [%(levelname)s]: %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    filename="bili_travail.log",
-                    encoding="utf-8"
-                    )
+# # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
+# logging.basicConfig(level=logger.DEBUG,
+#                     format='%(asctime)s [%(levelname)s]: %(message)s',
+#                     datefmt='%Y-%m-%d %H:%M:%S',
+#                     filename="bili_travail.log",
+#                     encoding="utf-8"
+#                     )
 
-# 全局异常处理钩子
-def handle_exception(exc_type, exc_value, exc_traceback):
-    logging.error(
-        "未知错误！",
-        exc_info=(exc_type, exc_value, exc_traceback)
-    )
+# # 全局异常处理钩子
+# def handle_exception(exc_type, exc_value, exc_traceback):
+#     logging.error(
+#         "未知错误！",
+#         exc_info=(exc_type, exc_value, exc_traceback)
+#     )
 
-sys.excepthook = handle_exception
+# sys.excepthook = handle_exception
 
 class BiliPollError(Exception):
     """
@@ -64,14 +64,14 @@ def login(loginInfo):
     pollInfo = response.json()
 
     if pollInfo["data"]['code'] == 0:
-        logging.info("登录成功")
+        logger.info("登录成功")
 
     else:
         error = BiliPollError(pollInfo)
         if error:
-            logging.error(error)
+            logger.error(error)
         else:
-            logging.error("B站扫码出现未知错误")
+            logger.error("B站扫码出现未知错误")
         return error
 
     cookies = response.cookies
