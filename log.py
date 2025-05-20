@@ -21,9 +21,7 @@ logging.remove()  # 移除默认的日志处理器
 logging.add(
     os.path.join("logs", f"bili_travail_{file_time}.log"),
     encoding="utf-8",
-    retention="1 week",
     enqueue=True,
-    compression="zip",
     backtrace=True,
     level="DEBUG",
     format='{time:%Y-%m-%d %H:%M:%S} [{level}]: {name} | {function}({line}): <level>{message}</level>'

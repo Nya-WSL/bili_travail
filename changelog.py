@@ -11,7 +11,9 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.26.0-alpha', subtitle='2025-05-20', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.26.1-dev', subtitle='2025-05-21', avatar='static/logo.ico'):
+                ui.label('● 修复当每次启动程序都会将之前日志归档的问题')
+            with ui.timeline_entry(title='Release of 0.26.0-alpha', subtitle='2025-05-20'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 移除过时的配置和代码')
                     ui.label('● 移除B站直播间爬虫')
