@@ -84,14 +84,9 @@ class BiliGiftManager:
             with open(img_path, "w", encoding="utf-8") as file:
                 json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
 
+            # 初始化礼物规则数据
             for i in gift_mapping.keys():
                 gift_mapping[i] = time
-
-            # 更新预定义的盲盒数据
-            blind_box = gift_map.blind_box
-            for v in blind_box.values():
-                for gift in v:
-                    gift_mapping[gift] = time
 
             # 如果不是初始化状态，则使用已设定的礼物时长替换默认时长
             if not init:
@@ -102,38 +97,40 @@ class BiliGiftManager:
                     with open("data/gifts_count.json", "r", encoding="utf-8") as file:
                         gifts_count = json.load(file)
 
+                    gift_mapping_keys = gift_mapping.keys()
+
                     for k, v in gifts.items():
                         if v != 0:
-                            gift_mapping[k] = v
-
-                        # 如果旧礼物不存在于新礼物中，这可能是因为B站删除了该礼物，则从新礼物数据中删除该礼物
-                        if k not in gift_mapping.keys():
-                            gift_mapping.pop(k)
+                            if k in gift_mapping_keys:
+                                gift_mapping[k] = v
 
                     with open(time_path, "w", encoding="utf-8") as file:
                         json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
 
+                    # 重新初始化礼物规则数据，防止倒计时数据污染投喂挑战
+                    for i in gift_mapping.keys():
+                        gift_mapping[i] = time
+
                     for k, v in gifts_count.items():
                         if v != 0:
-                            gift_mapping[k] = v
-
-                        if gifts_count[k] == 0:
-                            gift_mapping[k] = time
-
-                        if k not in gift_mapping.keys():
-                            gift_mapping.pop(k)
+                            if k in gift_mapping_keys:
+                                gift_mapping[k] = v
 
                     with open("data/gifts_count.json", "w", encoding="utf-8") as file:
                         json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
+
+                    logger.success("礼物数据更新成功...")
                 else:
+                    logger.warning("本地不存在礼物数据，初始化中...")
                     return None
             else:
                 with open(time_path, "w", encoding="utf-8") as file:
                     json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
                 shutil.copy(time_path, "data/gifts_count.json")
+                logger.success("礼物数据初始化成功...")
 
             return True
 
         except Exception as e:
-            logger.error(f"获取礼物数据失败: {e}")
+            logger.exception(f"获取礼物数据失败: {e}")
             return False

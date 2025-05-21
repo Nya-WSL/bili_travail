@@ -25,7 +25,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.26.1-dev"
+version = "0.26.2-dev"
 logger.debug("version: {}", version)
 
 # ================================
@@ -1312,7 +1312,7 @@ def get_browser_cookies(url: str):
         return cookie_dict
 
     except Exception as e:
-        logger.error(e)
+        logger.exception(e)
         return {}
 
 def bili_auto_login(init = False):
@@ -1430,41 +1430,43 @@ def open_capture():
 
 # 更新礼物数据
 async def refresh_gift():
-    ROOM_ID = room_id.value
-    if ROOM_ID == "" and config["crower"]:
-        ui.notify("请先填入房间号！", type="negative")
-    else:
-        async def check_refresh():
-            check_dialog.close()
-            ui.notify("正在更新礼物数据，请稍后...", type="info")
+    async def check_refresh():
+        check_dialog.close()
+        ui.notify("正在更新礼物数据，请稍后...", type="info")
 
-            await asyncio.sleep(1)
-            gift_config = GiftManager.get_config(img_path="data/gift_img.json", time_path="data/gifts.json", init=False)
-            if gift_config == True:
-                ui.notify("礼物数据更新完成", type="positive")
-            # 如果本地礼物配置数据不存在，则直接初始化
-            elif gift_config == None:
-                init_config()
-                ui.notify("礼物数据更新完成", type="positive")
-            # 如果礼物数据更新失败，则使用本地数据重置
-            else:
-                ui.notify("礼物数据更新失败，将使用本地数据重置", type="negative")
-                # 重置本地数据
-                try:
-                    GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
-                    ui.notify("重置成功", type="negative")
-                except:
-                    ui.notify("重置失败", type="positive")
+        await asyncio.sleep(1)
+        gift_config = GiftManager.get_config(img_path="data/gift_img.json", time_path="data/gifts.json", init=False)
+        if gift_config == True:
+            ui.notify("礼物数据更新完成", type="positive")
+        # 如果本地礼物配置数据不存在，则直接初始化
+        elif gift_config == None:
+            ui.notify("未检测到本地礼物数据，将初始化礼物数据...", type="info")
+            init_config()
+            ui.notify("礼物数据初始化完成", type="positive")
+        # 如果礼物数据更新失败，则使用本地数据重置
+        else:
+            ui.notify("礼物数据更新失败，请检查日志或稍后重试，或者使用本地数据重置", type="negative")
 
-        with ui.dialog() as check_dialog, ui.card(align_items="center"):
-            ui.label("请不要在倒计时和投喂挑战功能运行时更新。")
-            ui.label("更新礼物数据前，请先暂停倒计时与投喂挑战。")
-            ui.label("是否进行更新？")
-            with ui.row():
-                ui.button("确定", on_click=lambda: check_refresh(), color=btn_color)
-                ui.button("取消", on_click=lambda: check_dialog.close(), color=btn_color)
+    def reset_local_gift():
+        # 重置本地数据
+        try:
+            GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
+            ui.notify("重置成功", type="positive")
+        except Exception as e:
+            logger.exception(f"使用本地数据重置失败：{e}")
+            ui.notify("重置失败", type="negative")
 
-        check_dialog.open()
+    with ui.dialog() as check_dialog, ui.card(align_items="center"):
+        ui.label("请不要在倒计时和投喂挑战功能运行时更新。")
+        ui.label("更新礼物数据前，请先暂停倒计时与投喂挑战。")
+        ui.label("是否进行更新？")
+
+        with ui.row():
+            ui.button("确定", on_click=lambda: check_refresh(), color=btn_color)
+            ui.button("取消", on_click=lambda: check_dialog.close(), color=btn_color)
+            ui.button("使用本地数据重置", on_click=lambda: reset_local_gift(), color=btn_color)
+
+    check_dialog.open()
 
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail")
@@ -1958,8 +1960,7 @@ with ui.card(align_items="center").classes("absolute-center"):
     init_task()
     countdown_timer.inherit_time(int(time_badge_inherit.text))
 
-    if config["SESSDATA"] == "" and not app.storage.general["startup_check_bili_auth"]:
-        app.storage.general["startup_check_bili_auth"] = True
+    if not app.storage.general["startup_check_bili_auth"]:
 
         with ui.dialog() as init_login_dialog, ui.card(align_items="center"):
             ui.label("您似乎未登录B站账号，是否需要登录？")
@@ -1970,7 +1971,9 @@ with ui.card(align_items="center").classes("absolute-center"):
                 ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login(True), color=btn_color)
                 ui.button("取消", on_click=lambda: init_login_dialog.close(), color=btn_color)
 
-        init_login_dialog.open()
+        if config["room_id"] != "":
+            app.storage.general["startup_check_bili_auth"] = True
+            init_login_dialog.open()
 
 # about按钮
 with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
@@ -2038,11 +2041,11 @@ def _():
         try:
             text = requests.get("https://nya-wsl.com/bili_travail/chat_msg.json")
         except Exception as e:
-            logger.error(f"获取文本失败：{e}")
+            logger.exception(f"获取文本失败：{e}")
             try:
                 text = requests.get("http://version.nya-wsl.cn/bili_travail/chat_msg.json")
             except Exception as e:
-                logger.error(f"获取文本失败：{e}")
+                logger.exception(f"获取文本失败：{e}")
 
         text.encoding = "utf-8"
         if text.status_code == 200 or not config["local_text"]: # 如果请求状态为200且配置文件未启用本地文本

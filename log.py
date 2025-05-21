@@ -23,7 +23,6 @@ logging.add(
     encoding="utf-8",
     enqueue=True,
     backtrace=True,
-    level="DEBUG",
     format='{time:%Y-%m-%d %H:%M:%S} [{level}]: {name} | {function}({line}): <level>{message}</level>'
     )
 

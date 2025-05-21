@@ -1,23 +1,6 @@
 import qrcode
 from log import logger
-import sys, requests, json, time
-
-# # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
-# logging.basicConfig(level=logger.DEBUG,
-#                     format='%(asctime)s [%(levelname)s]: %(message)s',
-#                     datefmt='%Y-%m-%d %H:%M:%S',
-#                     filename="bili_travail.log",
-#                     encoding="utf-8"
-#                     )
-
-# # 全局异常处理钩子
-# def handle_exception(exc_type, exc_value, exc_traceback):
-#     logging.error(
-#         "未知错误！",
-#         exc_info=(exc_type, exc_value, exc_traceback)
-#     )
-
-# sys.excepthook = handle_exception
+import requests, json, time
 
 class BiliPollError(Exception):
     """
@@ -37,52 +20,60 @@ def get_qrcode(path):
     :param path: 二维码保存路径，格式为: "path_时间戳.png"，例: "bili_qrcode_1743233445.png"
     :return: 扫码登录秘钥
     """
+    try:
+        loginInfo = requests.get(
+            url = "https://passport.bilibili.com/x/passport-login/web/qrcode/generate",
+            headers = {
+                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+                }
+            ).json()
 
-    loginInfo = requests.get(
-        url = "https://passport.bilibili.com/x/passport-login/web/qrcode/generate",
-        headers = {
-            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-            }
-        ).json()
-
-    # 生成二维码
-    img = qrcode.make(loginInfo['data']['url'])
-    save_path = f"{path}_{int(time.time())}.png"
-    img.save(save_path)
-    return loginInfo["data"]["qrcode_key"], save_path
+        # 生成二维码
+        img = qrcode.make(loginInfo['data']['url'])
+        save_path = f"{path}_{int(time.time())}.png"
+        img.save(save_path)
+        return loginInfo["data"]["qrcode_key"], save_path
+    except Exception as e:
+        logger.exception(e)
 
 
 def login(loginInfo):
-    response = requests.get(
-        url = "https://passport.bilibili.com/x/passport-login/web/qrcode/poll",
-        headers = {
-            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-            },
-        params = {"qrcode_key": loginInfo}
-        )
+    try:
+        response = requests.get(
+            url = "https://passport.bilibili.com/x/passport-login/web/qrcode/poll",
+            headers = {
+                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+                },
+            params = {"qrcode_key": loginInfo}
+            )
 
-    pollInfo = response.json()
+        pollInfo = response.json()
 
-    if pollInfo["data"]['code'] == 0:
-        logger.info("登录成功")
+        if pollInfo["data"]['code'] == 0:
+            logger.info("登录成功")
 
-    else:
-        error = BiliPollError(pollInfo)
-        if error:
-            logger.error(error)
         else:
-            logger.error("B站扫码出现未知错误")
-        return error
+            error = BiliPollError(pollInfo)
+            if error:
+                logger.error(error)
+            else:
+                logger.exception("B站扫码出现未知错误")
+            return error
 
-    cookies = response.cookies
+        cookies = response.cookies
 
-    for cookie in cookies:
-        if cookie.name == "SESSDATA":
-            with open("config.json", "r", encoding="utf-8") as f:
-                config = json.load(f)
-            config["SESSDATA"] = cookie.value
-            with open("config.json", "w+", encoding="utf-8") as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
-            return True
-        else:
-            return "未获取到SESSDATA"
+        for cookie in cookies:
+            if cookie.name == "SESSDATA":
+                with open("config.json", "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                # 在写入SESSDATA前尝试清除原有的SESSDATA，防止覆盖失败
+                if config.get("SESSDATA", "") != "":
+                    config["SESSDATA"] = ""
+                config["SESSDATA"] = cookie.value
+                with open("config.json", "w+", encoding="utf-8") as f:
+                    json.dump(config, f, ensure_ascii=False, indent=4)
+                return True
+            else:
+                return "未获取到SESSDATA"
+    except Exception as e:
+        logger.exception(e)
