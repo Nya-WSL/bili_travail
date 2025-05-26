@@ -25,7 +25,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.26.2-dev"
+version = "0.26.3-dev"
 logger.debug("version: {}", version)
 
 # ================================
@@ -1790,15 +1790,26 @@ with open("config.json", "r", encoding="utf-8") as f:
 
 # 检查版本更新按钮
 def check_update(init = False):
+
+    async def check(server, status):
+        if server == None or server == "":
+            ui.notify("请选择更新源", type="negative")
+            return
+
+        await travail_update.update(server, status) # 调用更新函数
+
     def version_dialog():
         with ui.dialog() as dialog, ui.card(align_items="center"):
             ui.label(f"当前版本：{version} | 最新版本：{status}")
 
-            with ui.row():
-                ui.button("国内源", on_click=lambda: travail_update.update("CN-HK"), color=btn_color)
-                ui.button("海外源", on_click=lambda: travail_update.update("Overseas"), color=btn_color).disable()
-                ui.button("GitHub", on_click=lambda: travail_update.update("GitHub"), color=btn_color)
-                ui.button("取消", on_click=lambda: dialog.close(), color=btn_color)
+            # with ui.row():
+            #     ui.button("国内源", on_click=lambda: travail_update.update("CN-HK"), color=btn_color)
+            #     ui.button("海外源", on_click=lambda: travail_update.update("Overseas"), color=btn_color).disable()
+            #     ui.button("GitHub", on_click=lambda: travail_update.update("GitHub"), color=btn_color)
+            #     ui.button("取消", on_click=lambda: dialog.close(), color=btn_color)
+
+            server_select = ui.select(options={"CN-HK": "国内源", "CN-QN": "国内备用源", "GitHub": "GitHub"}, label="选择更新源").classes("w-1/2")
+            ui.button("更新", on_click=lambda: check(server_select.value, status), color=btn_color)
 
         dialog.open()
 

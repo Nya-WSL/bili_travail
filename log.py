@@ -28,10 +28,16 @@ logging.add(
 
 # 全局异常处理钩子
 def handle_exception(exc_type, exc_value, exc_traceback):
-    log.error(
-        "未知错误！",
-        exc_info=(exc_type, exc_value, exc_traceback)
-    )
+    if exc_value != KeyboardInterrupt:
+        log.error(
+            "未知错误！",
+            exc_info=(exc_type, exc_value, exc_traceback)
+        )
+    else:
+        log.warning(
+            "程序被用户中断",
+            exc_info=(exc_type, exc_value, exc_traceback)
+        )
 
 sys.excepthook = handle_exception
 

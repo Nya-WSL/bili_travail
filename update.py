@@ -2,11 +2,13 @@ import os
 import aiohttp
 import zipfile
 import asyncio
+
+from log import logger
 from nicegui import ui, app
 
 file_name = "cache\\bili_travail_update.zip"
 
-async def update(server):
+async def update(server, version):
     if os.path.exists("update.bat"):
         os.remove("update.bat")
 
@@ -17,6 +19,7 @@ async def update(server):
 
         dialog.open()
         percent_dialog.set_text("正在下载更新包")
+        logger.debug(f"更新包：{url}")
 
         if not os.path.exists("cache"):
             os.mkdir("cache")
@@ -24,6 +27,13 @@ async def update(server):
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 cancelButton.on_click(lambda: close_session())
+                if response.status != 200:
+
+                    ui.notify("更新失败", type="negative")
+                    logger.error(f'更新包下载失败：{response.status} {response.reason}')
+                    percent_dialog.set_text(f'更新失败：{response.status} {response.reason}')
+                    await session.close()
+                    return
 
                 with open(save_path, 'wb') as f:
                     while True:
@@ -45,14 +55,14 @@ async def update(server):
         percent_dialog.set_text("正在更新...")
         await asyncio.sleep(1)
         with open("update.bat", "w") as f:
-            f.write(f"""
-@zhcp 65001
+            f.write(rf"""
+@chcp 65001
 cd /d {os.getcwd()}
 taskkill /f /im bili_travail.exe
 timeout /t 3 /nobreak
 rmdir /s /q _internal
 timeout /t 1 /nobreak
-robocopy update ./ /E
+robocopy update ./ /E /UNILOG:logs\update.log /NP /NS /V /TEE
 rmdir /s /q update
 rmdir /s /q cache
 start bili_travail.exe
@@ -66,10 +76,10 @@ timeout /t 1 /nobreak
         cancelButton = ui.button("取消")
         if server == "GitHub":
             zipUrl = "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
-        elif server == "Overseas":
-            zipUrl = "https://cloud.nya-wsl.cn/ms-drive/bili_travail/update/update.zip"
         elif server == "CN-HK":
             zipUrl = "https://travail.nya-wsl.com/bili_travail/update/update.zip"
+        elif server == "CN-QN":
+            zipUrl = f"https://qn.nya-wsl.cn/bili_travail/update/{version}.zip"
         else:
             ui.notify("更新源不存在", type="negative")
             return
@@ -77,4 +87,5 @@ timeout /t 1 /nobreak
             await download(zipUrl, file_name)
         except Exception as e:
             ui.notify(f"更新失败：{e}", type="negative")
+            logger.error(f"更新失败：{e}")
             return
