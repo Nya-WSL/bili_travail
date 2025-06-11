@@ -70,7 +70,6 @@ def main() -> None:
     subprocess.call(command)
     shutil.copytree("static", os.path.join("dist", "bili_travail", "static"))
     shutil.copy("config.example.json", os.path.join("dist", "bili_travail"))
-    shutil.copy("selenium-manager.exe", os.path.join("dist", "bili_travail"))
     guard = {
             "舰长": "guard-level-3.png",
             "提督": "guard-level-2.png",

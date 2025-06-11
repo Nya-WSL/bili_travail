@@ -11,7 +11,41 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.25.5-alpha', subtitle='2025-05-09', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.27.0-alpha', subtitle='2025-05-27', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 调整按钮文本和位置')
+                    ui.label('● 调整OBS浏览器源URL布局，并可以直接点击复制链接')
+                    ui.label('● 窗口高度降低45px')
+                    ui.label('● 按钮颜色设置现在将直接修改按钮类的默认值，而不是每个按钮单独定义')
+                    ui.label('● 礼物设置弹窗在设置礼物后会自动刷新，并且不再自动关闭')
+            with ui.timeline_entry(title='Release of 0.26.3-dev', subtitle='2025-05-27'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 重写更新模块布局，新增国内备用源')
+                    ui.label('● 新增更新模块日志，单独保存在logs/update.log')
+                    ui.label('● 尝试屏蔽手动打断程序的日志')
+            with ui.timeline_entry(title='Release of 0.26.2-dev', subtitle='2025-05-22'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 调整更新礼物数据逻辑，现在使用本地数据重置需手动触发')
+                    ui.label('● 获取礼物数据和B站登录现在有更详细的日志')
+                    ui.label('● 移除获取礼物数据函数残留的爬虫代码')
+                    ui.label('● 修改初次启动时检查B站登录逻辑，现在如果房间号为空将不再弹窗提醒，延后到填入房间号后下一次启动程序')
+                    ui.label('● 调整日志捕获逻辑，现在报错会捕获完整的traceback')
+                    ui.label('● 现在登录B站时在写入新的SESSDATA前会尝试清除原有的SESSDATA，防止覆盖失败')
+                    ui.label('● 优化礼物数据更新逻辑，现在应该拥有更快的性能')
+                    ui.label('● 修复更新礼物数据时投喂挑战的规则会被倒计时规则污染的问题')
+            with ui.timeline_entry(title='Release of 0.26.1-dev', subtitle='2025-05-21'):
+                ui.label('● 修复当每次启动程序都会将之前日志归档的问题')
+            with ui.timeline_entry(title='Release of 0.26.0-alpha', subtitle='2025-05-20'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 移除过时的配置和代码')
+                    ui.label('● 移除B站直播间爬虫')
+                    ui.label('● 移除tv端登录接口代码')
+                    ui.label('● 更新预设礼物数据（注：盲盒未更新）')
+                    ui.label('● 将所有模块的日志合并为同一个handler')
+                    ui.label('● 同时使用logging和loguru记录更详细的日志，logging仅记录未知错误和DEBUG')
+                    ui.label('● 现在日志会按照日期保存')
+                    ui.label('● 现在会比对配置文件和默认配置并自动更新差异')
+            with ui.timeline_entry(title='Release of 0.25.5-alpha', subtitle='2025-05-09'):
                 ui.label('● 尝试修复查看礼物统计无法打开新标签页的问题，现在查看礼物统计是一个按钮而不是一个超链接')
             with ui.timeline_entry(title='Release of 0.25.4-alpha', subtitle='2025-05-09'):
                 ui.label('● OBS投喂记录支持自定义字体颜色')
