@@ -11,7 +11,14 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.26.3-dev', subtitle='2025-05-27', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.27.0-alpha', subtitle='2025-05-27', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 调整按钮文本和位置')
+                    ui.label('● 调整OBS浏览器源URL布局，并可以直接点击复制链接')
+                    ui.label('● 窗口高度降低45px')
+                    ui.label('● 按钮颜色设置现在将直接修改按钮类的默认值，而不是每个按钮单独定义')
+                    ui.label('● 礼物设置弹窗在设置礼物后会自动刷新，并且不再自动关闭')
+            with ui.timeline_entry(title='Release of 0.26.3-dev', subtitle='2025-05-27'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 重写更新模块布局，新增国内备用源')
                     ui.label('● 新增更新模块日志，单独保存在logs/update.log')
