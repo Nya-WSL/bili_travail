@@ -11,7 +11,13 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.27.0-alpha', subtitle='2025-05-27', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.27.1-alpha', subtitle='2025-06-19', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 修复盲盒盈亏的数据格式错误导致无法打开界面的问题')
+                    ui.label('● 现在每次启动程序时会将盲盒盈亏数据备份并重置')
+                    ui.label('● 读取盲盒盈亏的礼物数量和价格时转为int类型防止计算报错')
+                    ui.label('● 将Python更新至3.13.5')
+            with ui.timeline_entry(title='Release of 0.27.0-alpha', subtitle='2025-06-12'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 调整按钮文本和位置')
                     ui.label('● 调整OBS浏览器源URL布局，并可以直接点击复制链接')

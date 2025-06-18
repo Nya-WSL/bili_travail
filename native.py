@@ -25,7 +25,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.27.0-alpha"
+version = "0.27.1-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -55,6 +55,10 @@ if os.path.exists("data/gift_statistics.json"):
     if not os.path.exists("data/statistics"):
         os.mkdir("data/statistics")
     shutil.move("data/gift_statistics.json", f"data/statistics/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+if os.path.exists("data/blind_box_value.json"):
+    if not os.path.exists("data/blind_box"):
+        os.mkdir("data/blind_box")
+    shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
 if os.path.exists("cache"):
     shutil.rmtree("cache")
 
@@ -354,9 +358,6 @@ class BiliHandler(blivedm.BaseHandler):
                     json.dump({}, f, ensure_ascii=False, indent=4)
             with open("data/blind_box_value.json", "r", encoding="utf-8") as f:
                 box_value = json.load(f)
-
-            if box_value.get(box_name, None) == None:
-                box_value[box_name] = {"gift": gift, "num": 0, "price": 0}
 
             if box_value[box_name].get(gift, None) == None:
                 box_value[box_name][gift] = {"num": 0, "price": 0}
@@ -941,13 +942,13 @@ def blind_box_value_dialog():
             if not k in box_price_list:
                 box_price_list[k] = 0
 
-            for gift, value in box_value[k].items():
+            for gift, value in v.items():
                 gift_name = gift
-                num = value["num"]
-                price = value["price"]
+                num = int(value["num"])
+                price = int(value["price"])
                 if value_list.get(k, None) == None:
                     value_list[k] = []
-                value_list[k].append(f"礼物：{gift_name} | 数量：{num} | 总价格：{int(num * price)}电池")
+                value_list[k].append(f"礼物：{gift_name} | 数量：{num} | 总价格：{num * price}电池")
 
             blind_all_price = 0
             for gift_name, gift_value in v.items():
