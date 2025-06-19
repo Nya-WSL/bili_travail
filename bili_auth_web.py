@@ -18,7 +18,7 @@ def get_qrcode(path):
     获取B站Web端扫码登录二维码
 
     :param path: 二维码保存路径，格式为: "path_时间戳.png"，例: "bili_qrcode_1743233445.png"
-    :return: 扫码登录秘钥
+    :return: (扫码登录秘钥, 保存路径)
     """
     try:
         loginInfo = requests.get(

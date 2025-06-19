@@ -25,7 +25,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.27.1-alpha"
+version = "0.27.2-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -359,6 +359,9 @@ class BiliHandler(blivedm.BaseHandler):
             with open("data/blind_box_value.json", "r", encoding="utf-8") as f:
                 box_value = json.load(f)
 
+            if box_value.get(box_name, None) == None:
+                box_value[box_name] = {}
+
             if box_value[box_name].get(gift, None) == None:
                 box_value[box_name][gift] = {"num": 0, "price": 0}
 
@@ -428,7 +431,6 @@ class BiliHandler(blivedm.BaseHandler):
                             for i in range(num):
                                 random_num = random.randint(special[gift][0], special[gift][1] + 1)
                                 total_changed_num += random_num
-                                i += 1
                             changed_num = int(gift_challenge_count.text) + total_changed_num
                             gift_list_show_num = str(int(gifts[gift] * int(num)))
                             if is_blind_box:
@@ -512,7 +514,6 @@ class BiliHandler(blivedm.BaseHandler):
                             for i in range(num):
                                 random_time = random.randint(special[gift][0], special[gift][1] + 1)
                                 total_changed_time += random_time
-                                i += 1
                             changed_time = tmp_time + total_changed_time
                             if is_blind_box:
                                 gift = origin_gift
@@ -1378,6 +1379,7 @@ def bili_login(init = False):
             qr_button.on_click(lambda: init_login_dialog.close())
 
     auth_dialog.open()
+    auth_dialog.on("hide", lambda: os.remove(loginInfo[1]))
 
 # 检查弹幕服务器连接状态
 async def check_b_connect_status():

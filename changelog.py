@@ -11,7 +11,14 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.27.1-alpha', subtitle='2025-06-19', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.27.2-alpha', subtitle='2025-06-20', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 更新礼物和盲盒数据')
+                    ui.label('● 移除无效代码')
+                    ui.label('● 修复盲盒盈亏因为统计数据无法新建key导致报错的问题')
+                    ui.label('● 现在扫码登录关闭弹窗也会删除缓存的二维码')
+                    ui.label('● 将qrcode更新至v8.2')
+            with ui.timeline_entry(title='Release of 0.27.1-alpha', subtitle='2025-06-19'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 修复盲盒盈亏的数据格式错误导致无法打开界面的问题')
                     ui.label('● 现在每次启动程序时会将盲盒盈亏数据备份并重置')
