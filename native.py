@@ -25,7 +25,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.27.2-fix1"
+version = "0.27.2-fix2"
 logger.debug("version: {}", version)
 
 # ================================
