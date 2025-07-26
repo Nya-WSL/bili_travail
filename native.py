@@ -25,7 +25,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.27.2-fix2"
+version = "0.28.2-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -695,6 +695,21 @@ class CountdownTimer:
         time_badge.set_text("%02d:%02d:%02d" % (hour, minute, second))
 
 
+def sort_dict(d):
+    # 分离正数（包括零）和负数
+    positive = {k: v for k, v in d.items() if v >= 0}
+    negative = {k: v for k, v in d.items() if v < 0}
+
+    # 正数按值降序排序，负数按值升序排序
+    sorted_positive = sorted(positive.items(), key=lambda x: x[1], reverse=True)
+    sorted_negative = sorted(negative.items(), key=lambda x: x[1])
+
+    # 合并结果并创建有序字典
+    sorted_items = sorted_positive + sorted_negative
+    return OrderedDict(sorted_items)
+    # 或者直接返回字典（Python 3.7+）
+    # return dict(sorted_items)
+
 # ================================
 # GUI
 # ================================
@@ -768,6 +783,8 @@ def cd_setting_dialog():
                     gifts[gift_name.value] = 0
                 result = f'添加成功，{gift_name.value} | {format_seconds(min.value)} ~ {format_seconds(max.value)}随机'
 
+            gifts = sort_dict(gifts)  # 对礼物数据进行排序
+
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
             with open("data/special.json", "w+", encoding="utf-8") as f:
@@ -816,6 +833,9 @@ def cd_setting_dialog():
         if gift_name.value in special:
             special.pop(gift_name.value)
         result = f'删除成功 → {gift_name.value}'
+
+        gifts = sort_dict(gifts)  # 对礼物数据进行排序
+
         with open("data/gifts.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
         with open("data/special.json", "w+", encoding="utf-8") as f:
@@ -838,6 +858,7 @@ def cd_setting_dialog():
                 json.dump(special, f, ensure_ascii=False, indent=4)
         else:
             gifts[k] = 0
+            gifts = sort_dict(gifts)  # 对礼物数据进行排序
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
 

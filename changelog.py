@@ -11,7 +11,9 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.27.2-alpha', subtitle='2025-06-20', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.28.2-alpha', subtitle='2025-7-26', avatar='static/logo.ico'):
+                ui.label('● 倒计时礼物现在将按照正负数的绝对值进行排序，加倍清空随机除外')
+            with ui.timeline_entry(title='Release of 0.27.2-alpha', subtitle='2025-06-20'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 更新礼物和盲盒数据')
                     ui.label('● 移除无效代码')
