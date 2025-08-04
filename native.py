@@ -13,6 +13,7 @@ from changelog import changelog
 
 # Third Party Packages
 import os
+import re
 import json
 import shutil
 import random
@@ -25,7 +26,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.28.2-alpha"
+version = "0.29.0-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -185,6 +186,43 @@ ui.button.__init__.__kwdefaults__['color'] = btn_color # 设置所有按钮颜�
 
 GiftManager = get_gift.BiliGiftManager()
 
+def create_blind_box():
+    box_id = []
+    blind_box = {}
+    gifts = GiftManager.get_room_gift("android")
+    for gift in gifts:
+        if re.search("盲盒", gift["name"]):
+            box_id.append(gift["id"])
+
+    if box_id == []:
+        logger.error("未获取到盲盒数据")
+        return
+
+    for id in box_id:
+        gifts = []
+        box_gifts = GiftManager.get_blind_box(id)
+
+        if box_gifts != []:
+            try:
+                box_gifts_list = box_gifts["gifts"]
+            except Exception as e:
+                if config.get("SESSDATA", "") == "":
+                    logger.error(f"获取盲盒数据失败：{e}，未登录账号")
+                else:
+                    logger.error(f"获取盲盒数据失败：{e}")
+                return blind_box
+
+            for gift in box_gifts_list:
+                gifts.append(gift["gift_name"])
+            blind_box[box_gifts["blind_gift_name"]] = gifts
+        else:
+            logger.error("盲盒数据为空")
+
+    with open("data/blinx_box_data.json", "w+", encoding="utf-8") as f:
+        json.dump(blind_box, f, ensure_ascii=False, indent=4)
+
+    return blind_box
+
 def init_config():
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -200,8 +238,11 @@ def init_config():
             if not gift_config:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
                 GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
         else:
-            # 如果没有room_id，则从Nya-WSL服务器或本地注入方式写入
-            GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
+            # 如果没有room_id，则创建空文件
+            with open("data/gifts.json", "w+", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=4)
+            with open("data/gift_img.json", "w+", encoding="utf-8") as f:
+                json.dump({}, f, ensure_ascii=False, indent=4)
 
     # 初始化数据
     if not os.path.exists("data/special.json"):
@@ -387,8 +428,13 @@ class BiliHandler(blivedm.BaseHandler):
                                 json.dump(gifts, f, indent=4, ensure_ascii=False)
 
                     # 初始化盲盒数据
-                    blind_box = gift_map.blind_box
+                    blind_box = create_blind_box()
                     blind_box_gifts = []
+
+                    if blind_box == {}:
+                        logger.error("初始化盲盒失败，将使用默认数据")
+                        blind_box = gift_map.blind_box
+
                     for v in blind_box.values():
                         for blind_gift in v:
                             blind_box_gifts.append(blind_gift)
@@ -471,8 +517,13 @@ class BiliHandler(blivedm.BaseHandler):
                                 json.dump(gifts, f, indent=4, ensure_ascii=False)
 
                     # 初始化盲盒数据
-                    blind_box = gift_map.blind_box
+                    blind_box = create_blind_box()
                     blind_box_gifts = []
+
+                    if blind_box == {}:
+                        logger.error("初始化盲盒失败，将使用默认数据")
+                        blind_box = gift_map.blind_box
+
                     for v in blind_box.values():
                         for blind_gift in v:
                             blind_box_gifts.append(blind_gift)
@@ -1439,7 +1490,7 @@ async def check_b_connect_status():
             with open("config.json", "r", encoding="utf-8") as f:
                 config = json.load(f)
             if config["SESSDATA"] == "":
-                ui.notify("未登录B站账号，历史礼物功能可能无法显示用户名", type="warning")
+                ui.notify("未登录B站账号，历史礼物功能可能无法显示用户名且无法获取最新的盲盒数据", type="warning")
             asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
@@ -1475,6 +1526,10 @@ def open_capture():
 # 更新礼物数据
 async def refresh_gift():
     async def check_refresh():
+        if room_id.value == "":
+            ui.notify("请输入房间号", type="negative")
+            return
+
         check_dialog.close()
         ui.notify("正在更新礼物数据，请稍后...", type="info")
 
@@ -1650,9 +1705,9 @@ async def capture():
                             ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
-                                    ui.image(blive_crower.get_bili_img(gifts[gift_name]))
+                                    ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
                                 else:
-                                    ui.image(gifts[gift_name])
+                                    ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
                             ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
 
@@ -1810,9 +1865,9 @@ async def capture():
                             ui.label(f"{gift_user}").classes("text-xl font-extrabold")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
-                                    ui.image(blive_crower.get_bili_img(gifts[gift_name]))
+                                    ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
                                 else:
-                                    ui.image(gifts[gift_name])
+                                    ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold")
                             ui.label(gift_rule).classes("text-xl font-extrabold")
 
@@ -1941,7 +1996,7 @@ with ui.card(align_items="center").classes("absolute-center"):
 
     # 房间号和颜色输入框，颜色只在about和capture页面生效
     with ui.row():
-        room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id") # 实时写入房间号到配置文件
+        room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
         b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
         show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list").props('color="btn"')
 
@@ -1973,9 +2028,9 @@ with ui.card(align_items="center").classes("absolute-center"):
                 ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
                 with ui.avatar(color="").classes("w-6 h-6"):
                     if gift not in ["舰长", "提督", "总督"]:
-                        ui.image(blive_crower.get_bili_img(gifts[gift]))
+                        ui.image(blive_crower.get_bili_img(gifts.get(gift, "")))
                     else:
-                        ui.image(gifts[gift])
+                        ui.image(gifts.get(gift, ""))
                 ui.label(f"{gift}x{num}").classes("text-l")
                 ui.label(time).classes("text-l")
         gift_scroll.scroll_to(percent=1, duration=0.5)
@@ -2004,7 +2059,7 @@ with ui.card(align_items="center").classes("absolute-center"):
         # Changelog button
         ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
         # Login bilibili button
-        ui.button("登录账号", on_click=lambda: bili_login())
+        ui.button("登录账号", on_click=lambda: choice_login_dialog())
 
     # obs源
     with ui.label(f"http://127.0.0.1:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://127.0.0.1:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
@@ -2019,7 +2074,7 @@ with ui.card(align_items="center").classes("absolute-center"):
 
         with ui.dialog() as init_login_dialog, ui.card(align_items="center"):
             ui.label("您似乎未登录B站账号，是否需要登录？")
-            ui.label("未登录历史礼物功能可能无法显示用户名")
+            ui.label("未登录历史礼物功能可能无法显示用户名且无法获取最新的盲盒数据")
             ui.label("建议使用小号登录，以免账号被风控")
             with ui.row():
                 ui.button("扫码登录", on_click=lambda: bili_login(True))

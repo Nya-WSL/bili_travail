@@ -11,7 +11,13 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.28.2-alpha', subtitle='2025-7-26', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.29.0-alpha', subtitle='2025-08-05', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 礼物数据将获取房间礼物而不是全站礼物，初次运行时不再自动更新礼物')
+                    ui.label('● 盲盒数据将从B站获取，默认数据只在未登录时使用')
+                    ui.label('● 投喂记录获取不到礼物图片将默认为空而不是报错')
+                    ui.label('● 手动登录允许使用浏览器Cookie')
+            with ui.timeline_entry(title='Release of 0.28.2-alpha', subtitle='2025-07-26'):
                 ui.label('● 倒计时礼物现在将按照正负数的绝对值进行排序，加倍清空随机除外')
             with ui.timeline_entry(title='Release of 0.27.2-alpha', subtitle='2025-06-20'):
                 with ui.column().classes('gap-3'):

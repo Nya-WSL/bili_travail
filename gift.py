@@ -1,5 +1,4 @@
 import os
-import re
 import json
 import shutil
 import requests
@@ -9,6 +8,18 @@ from log import logger
 from typing import Union
 
 class BiliGiftManager:
+    def __init__(self):
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        if config.get("room_id", "") != "":
+            self.room_id = config.get("room_id", "")
+        else:
+            self.room_id = 0
+
+        self.area_parent_id = 0
+        self.area_id = 0
+
     def init_gift(self, img_path, time_path, time: Union[int, float] = 0):
         """
         从服务器或本地预置数据初始化礼物
@@ -51,20 +62,108 @@ class BiliGiftManager:
             with open(img_path, "w+", encoding="utf-8") as f:
                 json.dump(gift_mapping, f, ensure_ascii=False, indent=4)
 
+    def set_room_id(self, room_id):
+        """
+        设置房间号
+
+        :param room_id: 房间号
+        """
+
+        self.room_id = room_id
+
+    def get_blind_box(self, gift_id) -> list:
+        """
+        获取盲盒礼物列表
+        
+        :param gift_id: 盲盒礼物ID
+        :return dict: 盲盒礼物列表
+        """
+
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
+        params = {
+            "gift_id": gift_id
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+            "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
+        }
+
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data['code'] == 0:
+                return data['data']
+            else:
+                logger.error(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
+                return {}
+        else:
+            logger.error(f"请求盲盒礼物列表({gift_id})失败: {response.status_code}")
+            return {}
+
+    def get_area_id(self):
+        """
+        获取直播分区
+        """
+
+        url = "https://api.live.bilibili.com/room/v1/Room/get_info"
+        params = {
+            "room_id": self.room_id
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
+        }
+
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data["code"] == 0:
+                self.area_parent_id = data["data"]["parent_area_id"]
+                self.area_id = data["data"]["area_id"]
+            else:
+                logger.error(f"获取直播分区失败：{data['message']}")
+        else:
+            logger.error(f"请求直播分区失败：{response.status_code}")
+
+    def get_room_gift(self, platform = "android"):
+        """
+        获取房间礼物
+
+        Args:
+            platform (_str_): web、android
+        """
+
+        self.get_area_id()
+
+        url = "https://api.live.bilibili.com/xlive/web-room/v1/giftPanel/roomGiftList"
+        params = {
+            "platform": platform,
+            "room_id": self.room_id,
+            "area_parent_id": self.area_parent_id,
+            "area_id": self.area_id
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
+        }
+
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data["code"] == 0:
+                return data["data"]["gift_config"]["base_config"]["list"]
+            else:
+                logger.error(f"获取房间礼物失败：{data['message']}")
+        else:
+            logger.error(f"请求房间礼物失败：{response.status_code}")
+
     def get_config(self, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, init = True):
         try:
-            api = "https://api.live.bilibili.com/gift/v3/live/gift_config"
-            User_Agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
-            response = requests.get(api, headers={"User-Agent": User_Agent})
-            response.encoding = "utf-8"
-            response = response.json()
-            gifts_data = response['data']
+            gifts_data = self.get_room_gift("android")
             gift_mapping = {}
             for data in gifts_data:
-                name = data['name']
-                img = data['img_basic']
-                if not re.search("测试", name):
-                    gift_mapping[name] = img
+                gift_mapping[data['name']] = data['img_basic']
 
             # 更新舰队数据
             guard = {
