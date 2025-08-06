@@ -26,7 +26,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.29.0-alpha"
+version = "0.30.0-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -1944,8 +1944,31 @@ def check_update(init = False):
     else:
         ui.notify("已是最新版本", type="positive")
 
-# 创建主界面
+# 礼物设置弹窗
+with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
+    with ui.row():
+        ui.button("加班设置", on_click=lambda: cd_setting_dialog())
+        ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
+        ui.button("更新礼物", on_click=lambda: refresh_gift())
+    ui.button("关闭", on_click=lambda: gift_setting_dialog.close())
 
+# 统计相关弹窗
+with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
+    with ui.row():
+        ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
+        ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
+    ui.button("关闭", on_click=lambda: gift_count_dialog.close())
+
+
+with ui.dialog() as color_dialog, ui.card(align_items="center"):
+    # 颜色输入框，颜色只在about和capture页面生效
+    with ui.row():
+        ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+        ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
+        ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
+    ui.button("关闭", on_click=lambda: color_dialog.close())
+
+# 创建主界面
 with ui.card(align_items="center").classes("absolute-center"):
     check_update(True)
     time_badge = ui.badge("00:00:00", outline=True, color="").classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
@@ -1963,8 +1986,6 @@ with ui.card(align_items="center").classes("absolute-center"):
         input_hour = ui.number("时", value=0, min=0).style("width: 100px")
         input_minute = ui.number("分", value=0, min=0).style("width: 100px")
         input_second = ui.number("秒", value=0, min=0).style("width: 100px")
-        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
-        gift_challenge_switch.disable()
 
     # 倒计时按钮
     with ui.row():
@@ -1985,39 +2006,33 @@ with ui.card(align_items="center").classes("absolute-center"):
         cancel_button.disable()
 
         # Add time Button
-        add_button = ui.button("手动增加", on_click=lambda: add_time())
+        add_button = ui.button("增加", on_click=lambda: add_time())
         add_button.disable()
 
         # Sub Time Button
-        sub_button = ui.button("手动减少", on_click=lambda: sub_time())
+        sub_button = ui.button("减少", on_click=lambda: sub_time())
         sub_button.disable()
 
     ui.separator()
 
-    # 房间号和颜色输入框，颜色只在about和capture页面生效
-    with ui.row():
+    # 房间号
+    with ui.row(align_items="center"):
         room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
-        b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
-        show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list").props('color="btn"')
+
+        with ui.column().classes("gap-0"):
+            b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+            show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list").props('color="btn"')
+
+        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
+        gift_challenge_switch.disable()
 
     ui.separator()
 
-    with ui.row():
-        ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
-        ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
-        ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
-        # ui.link("查看礼物统计", "/count", new_tab=True).style("text-decoration: none;")
-
     # 按钮组
     with ui.row():
-        # Gift Setting button
-        # ui.button("礼物设置", on_click=lambda: gift())
-        ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-        ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
-        ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
-        ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
-        # Show gift list button
-        ui.button("界面预览", on_click=lambda: open_capture())
+        ui.button("礼物设置", on_click=lambda: gift_setting_dialog.open())
+        ui.button("颜色设置", on_click=lambda: color_dialog.open())
+        ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
 
     def gift_list_show(name, gift, num, time):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
@@ -2052,14 +2067,14 @@ with ui.card(align_items="center").classes("absolute-center"):
         select_login_dialog.open()
 
     with ui.row():
-        # Update gift data button
-        ui.button("更新礼物", on_click=lambda: refresh_gift())
+        # Login bilibili button
+        ui.button("登录账号", on_click=lambda: choice_login_dialog())
         # Update version button
         ui.button("检查更新", on_click=lambda: check_update())
         # Changelog button
         ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
-        # Login bilibili button
-        ui.button("登录账号", on_click=lambda: choice_login_dialog())
+        # Preview page button
+        ui.button("界面预览", on_click=lambda: open_capture())
 
     # obs源
     with ui.label(f"http://127.0.0.1:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://127.0.0.1:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
@@ -2215,4 +2230,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[575, 815])
+ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 760])
