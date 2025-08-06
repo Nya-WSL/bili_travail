@@ -2087,7 +2087,7 @@ with ui.card(align_items="center").classes("absolute-center"):
 
 # about按钮
 with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
-    ui.button(on_click=lambda: ui.navigate.to("/about"), icon='contact_support').props('fab')
+    ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @ui.page('/changelog')
 def _():
@@ -2186,13 +2186,13 @@ def _():
         # 开发组成员显示
         with ui.row(align_items="center"):
             with ui.column(align_items="center"):
-                ui.label("代码架构").classes("text-blue")
+                ui.label("程序架构").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/16748991", new_tab=True):
                     with ui.avatar():
                         ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"))
                 ui.badge("高橋はるき", outline=True)
             with ui.column(align_items="center"):
-                ui.label("代码开发").classes("text-blue")
+                ui.label("程序开发").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/8907402", new_tab=True):
                     with ui.avatar():
                         ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
