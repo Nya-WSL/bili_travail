@@ -26,7 +26,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.30.1-alpha"
+version = "0.30.2-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -165,9 +165,10 @@ diff = config.keys() - example_config.keys()
 for key in diff:
     config.pop(key, None)
 
+config["cwd"] = os.getcwd() # 保存工作目录用于debug
+
 with open("config.json", "w", encoding="utf-8") as f:
     json.dump(config, f, ensure_ascii=False, indent=4)
-
 
 port = config["port"]
 btn_color = config["btn_color"]
@@ -315,6 +316,12 @@ class BiliHandler(blivedm.BaseHandler):
             b_connect_switch.set_text("已连接弹幕服务器")
             logger.info(f"已连接至{room_id.value}")
 
+            uid = client.uid
+            if uid != 0:
+                login_status.set_text("已登录")
+                login_status.classes("text-green")
+            else:
+                login_status.set_text("未登录")
 
     # 礼物数据
     def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
@@ -1415,12 +1422,14 @@ def bili_auto_login(init = False):
 
     if config["room_id"] == "":
         ui.notify("请先填入房间号", type="negative")
+        select_login_dialog.close()
         return
 
     cookies = get_browser_cookies('bilibili.com')
 
     if "SESSDATA" not in cookies.keys():
         ui.notify("未获取到SESSDATA，请使用扫码登录", type="negative")
+        select_login_dialog.close()
         return
 
     for cookie_name, cookie_value in cookies.items():
@@ -1434,6 +1443,7 @@ def bili_auto_login(init = False):
                 init_login_dialog.close()
 
             ui.notify("自动登录成功", type="positive")
+            select_login_dialog.close()
 
 def bili_login(init = False):
     global qrcode_ui
@@ -1446,7 +1456,8 @@ def bili_login(init = False):
     with ui.dialog() as auth_dialog, ui.card(align_items="center"):
         qrcode_ui = ui.image(loginInfo[1])
         ui.label("请使用B站APP扫描二维码登录")
-        qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo)).on(type="click", handler=lambda: auth_dialog.close())
+        qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo))
+        qr_button.on_click(lambda: auth_dialog.close()).on_click(lambda: select_login_dialog.close()).on_click(lambda: os.remove(loginInfo[1])) # 因为太长了所以换一行写
         if init:
             qr_button.on_click(lambda: init_login_dialog.close())
 
@@ -1973,6 +1984,14 @@ with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
         ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
     ui.button("关闭", on_click=lambda: gift_count_dialog.close())
 
+# 登录方式选择弹窗
+with ui.dialog() as select_login_dialog, ui.card(align_items="center"):
+    ui.label("请选择登录方式")
+    ui.label("获取浏览器Cookie仅支持firefox，请先确保浏览器已登录B站账号")
+    ui.label("无论使用哪种方式，皆建议使用小号登录，以免账号被风控")
+    with ui.row():
+        ui.button("扫码登录", on_click=lambda: bili_login())
+        ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login())
 
 with ui.dialog() as color_dialog, ui.card(align_items="center"):
     # 颜色输入框，颜色只在about和capture页面生效
@@ -2037,8 +2056,12 @@ with ui.card(align_items="center").classes("absolute-center"):
             b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
             show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list").props('color="btn"')
 
-        gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
-        gift_challenge_switch.disable()
+        with ui.column(align_items="center").classes("gap-0"):
+            with ui.row().classes("gap-0"):
+                ui.label("登录状态：")
+                login_status = ui.label("未连接").classes("text-red")
+            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
+            gift_challenge_switch.disable()
 
     ui.separator()
 
@@ -2072,20 +2095,9 @@ with ui.card(align_items="center").classes("absolute-center"):
             tmp_label = ui.label()
             tmp_label.set_visibility(False)
 
-    def choice_login_dialog():
-        with ui.dialog() as select_login_dialog, ui.card(align_items="center"):
-            ui.label("请选择登录方式")
-            ui.label("获取浏览器Cookie仅支持firefox，请先确保浏览器已登录B站账号")
-            ui.label("无论使用哪种方式，皆建议使用小号登录，以免账号被风控")
-            with ui.row():
-                ui.button("扫码登录", on_click=lambda: bili_login())
-                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login())
-
-        select_login_dialog.open()
-
     with ui.row():
         # Login bilibili button
-        ui.button("登录账号", on_click=lambda: choice_login_dialog())
+        ui.button("登录账号", on_click=lambda: select_login_dialog.open())
         # Update version button
         ui.button("检查更新", on_click=lambda: check_update())
         # Changelog button
