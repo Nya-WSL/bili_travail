@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import shutil
 import requests
@@ -71,7 +72,7 @@ class BiliGiftManager:
 
         self.room_id = room_id
 
-    def get_blind_box(self, gift_id) -> list:
+    def get_blind_box(self, gift_id) -> dict:
         """
         获取盲盒礼物列表
         
@@ -160,10 +161,34 @@ class BiliGiftManager:
 
     def get_config(self, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, init = True):
         try:
+            # 获取房间礼物
             gifts_data = self.get_room_gift("android")
+
+            box_gifts_list = {}
             gift_mapping = {}
+            box_id = []
+
+            # 获取盲盒礼物
             for data in gifts_data:
                 gift_mapping[data['name']] = data['img_basic']
+                if re.search("盲盒", data['name']):
+                    box_id.append(data["id"])
+
+            if box_id == []:
+                logger.error("初始化礼物时未获取到盲盒数据")
+            else:
+                for id in box_id:
+                    blind_box = self.get_blind_box(id)
+
+                    if blind_box != {}:
+                        box_gifts_list = blind_box.get("gifts", {})
+                        if box_gifts_list != {}:
+                            for gift in box_gifts_list:
+                                gift_mapping[gift["gift_name"]] = gift["gift_img"]
+                        else:
+                            logger.error(f"盲盒数据为空，可能是因为未登录账号")
+                    else:
+                        logger.error(f"盲盒({id})数据为空")
 
             # 更新舰队数据
             guard = {
@@ -228,7 +253,10 @@ class BiliGiftManager:
                 shutil.copy(time_path, "data/gifts_count.json")
                 logger.success("礼物数据初始化成功...")
 
-            return True
+            if box_gifts_list == {}:
+                return "blind_box_none"
+            else:
+                return True
 
         except Exception as e:
             logger.exception(f"获取礼物数据失败: {e}")

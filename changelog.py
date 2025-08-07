@@ -11,7 +11,13 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.30.0-alpha', subtitle='2025-08-07', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.30.1-alpha', subtitle='2025-08-08', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 修复因为房间礼物不包含盲盒礼物导致无法选择盲盒礼物的问题')
+                    ui.label('● 礼物图片url优先从礼物API回调获取，如获取失败则从本地数据获取图片url')
+                    ui.label('● 修复获取盲盒礼物函数的默认返回值指定了错误的类型的问题')
+                    ui.label('● 修复从B站获取盲盒礼物时如果返回空数据不会正确报错的问题')
+            with ui.timeline_entry(title='Release of 0.30.0-alpha', subtitle='2025-08-07'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 合并部分按钮')
                     ui.label('● 调整部分按钮位置')

@@ -26,7 +26,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.30.0-alpha"
+version = "0.30.1-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -202,7 +202,7 @@ def create_blind_box():
         gifts = []
         box_gifts = GiftManager.get_blind_box(id)
 
-        if box_gifts != []:
+        if box_gifts != {}:
             try:
                 box_gifts_list = box_gifts["gifts"]
             except Exception as e:
@@ -326,7 +326,7 @@ class BiliHandler(blivedm.BaseHandler):
         if len(uname.split()) > 8:
             uname = uname.split()[0-5] + "..."
 
-        self._on_gift_play(gift, num, uname, price)
+        self._on_gift_play(gift, num, uname, message, price)
         self._on_gift_statistics(gift, num, uname, price)
         logger.info(message)
 
@@ -351,7 +351,7 @@ class BiliHandler(blivedm.BaseHandler):
         if len(uname.split()) > 8:
             uname = uname.split()[0-5] + "..."
 
-        self._on_gift_play(gift, num, uname)
+        self._on_gift_play(gift, num, uname, False)
         self._on_gift_statistics(gift, num, uname, price)
         logger.info(message)
 
@@ -390,7 +390,7 @@ class BiliHandler(blivedm.BaseHandler):
             json.dump(count, f, ensure_ascii=False, indent=4)
 
     # 收到礼物后执行函数
-    def _on_gift_play(self, gift, num, uname, price = 0):
+    def _on_gift_play(self, gift, num, uname, message, price = 0):
         is_blind_box = False
 
         def blind_box_value(gift, num : int, price : int, box_name):
@@ -482,9 +482,9 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
-                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
+                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
+                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
 
                     # 如果收到的礼物不在special.json中
                     else:
@@ -494,9 +494,9 @@ class BiliHandler(blivedm.BaseHandler):
                             gift = origin_gift
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
                         if gifts[gift] != 0 or is_blind_box:
-                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
+                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text)
+                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
 
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
@@ -569,9 +569,9 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
-                            gift_list_show(uname, gift, num, format_seconds(total_changed_time))
+                            gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time))
+                                capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
@@ -580,9 +580,9 @@ class BiliHandler(blivedm.BaseHandler):
                             gift = origin_gift
                         result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
                         if gifts[gift] != 0 or is_blind_box:
-                            gift_list_show(uname, gift, num, format_seconds(gift_list_show_time))
+                            gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time))
+                                capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
 
@@ -1531,10 +1531,13 @@ async def refresh_gift():
             return
 
         check_dialog.close()
+
         ui.notify("正在更新礼物数据，请稍后...", type="info")
 
         await asyncio.sleep(1)
+
         gift_config = GiftManager.get_config(img_path="data/gift_img.json", time_path="data/gifts.json", init=False)
+
         if gift_config == True:
             ui.notify("礼物数据更新完成", type="positive")
         # 如果本地礼物配置数据不存在，则直接初始化
@@ -1542,6 +1545,11 @@ async def refresh_gift():
             ui.notify("未检测到本地礼物数据，将初始化礼物数据...", type="info")
             init_config()
             ui.notify("礼物数据初始化完成", type="positive")
+        # 如果更新盲盒礼物出错
+        elif gift_config == "blind_box_none":
+            ui.notify("未登录账号，无法更新盲盒礼物，将使用默认数据...", type="negative")
+            await asyncio.sleep(2)
+            ui.notify("礼物数据更新完成", type="positive")
         # 如果礼物数据更新失败，则使用本地数据重置
         else:
             ui.notify("礼物数据更新失败，请检查日志或稍后重试，或者使用本地数据重置", type="negative")
@@ -1662,7 +1670,7 @@ async def capture():
                             v = "加倍"
                         ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
-        def capture_cd_gift_list_show(name, gift, num, time):
+        def capture_cd_gift_list_show(name, gift, num, time, message):
             if not show_capture_gift_list_switch.value:
                 scroll_card.set_visibility(False)
             else:
@@ -1705,7 +1713,10 @@ async def capture():
                             ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
-                                    ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
+                                    if message:
+                                        ui.image(blive_crower.get_bili_img(message.gift_img_basic))
+                                    else:
+                                        ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
@@ -1822,7 +1833,7 @@ async def capture():
                             v = "加倍"
                         ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
-        def capture_challenge_gift_list_show(name, gift, num, time):
+        def capture_challenge_gift_list_show(name, gift, num, time, message):
             if not show_capture_gift_list_switch.value:
                 scroll_card.set_visibility(False)
             else:
@@ -1865,7 +1876,10 @@ async def capture():
                             ui.label(f"{gift_user}").classes("text-xl font-extrabold")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
-                                    ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
+                                    if message:
+                                        ui.image(blive_crower.get_bili_img(message.gift_img_basic))
+                                    else:
+                                        ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold")
@@ -2034,7 +2048,7 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("颜色设置", on_click=lambda: color_dialog.open())
         ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
 
-    def gift_list_show(name, gift, num, time):
+    def gift_list_show(name, gift, num, time, message):
         with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
 
@@ -2043,7 +2057,10 @@ with ui.card(align_items="center").classes("absolute-center"):
                 ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
                 with ui.avatar(color="").classes("w-6 h-6"):
                     if gift not in ["舰长", "提督", "总督"]:
-                        ui.image(blive_crower.get_bili_img(gifts.get(gift, "")))
+                        if message:
+                            ui.image(blive_crower.get_bili_img(message.gift_img_basic))
+                        else:
+                            ui.image(blive_crower.get_bili_img(gifts.get(gift, "")))
                     else:
                         ui.image(gifts.get(gift, ""))
                 ui.label(f"{gift}x{num}").classes("text-l")
