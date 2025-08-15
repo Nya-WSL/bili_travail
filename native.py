@@ -17,6 +17,8 @@ import re
 import json
 import shutil
 import random
+import psutil
+import cpuinfo
 import asyncio
 import aiohttp
 import requests
@@ -26,7 +28,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.30.2-alpha"
+version = "0.30.3-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -180,7 +182,8 @@ color: {btn_color} !important;
 
 .bg-btn {{
 background: {btn_color} !important;
-}}""",
+}}
+""",
 shared=True)
 
 ui.button.__init__.__kwdefaults__['color'] = btn_color # 设置所有按钮颜色为配置文件中的btn_color
@@ -258,6 +261,64 @@ def init_config():
             json.dump({}, f, ensure_ascii=False, indent=4)
 
 init_config()
+
+def get_pid_info(pid):
+    p = psutil.Process(pid)
+    p_cpu_percent = p.cpu_percent(interval=None)
+    p_memory_info = p.memory_info()
+
+    return p_cpu_percent, p_memory_info
+
+def check_sys(timer = False):
+    # CPU信息
+    cpu_model = cpuinfo.get_cpu_info().get('brand_raw', '未知')
+    cpu_usage = psutil.cpu_percent(interval=None)
+    cpu_freq = psutil.cpu_freq()
+
+    # 内存信息
+    mem = psutil.virtual_memory()
+    swap = psutil.swap_memory()
+
+    p_cpu_percent, p_memory_info = get_pid_info(os.getpid())
+
+    sys_info = {
+                "CPU型号": cpu_model,
+                "CPU总使用率": cpu_usage,
+                "CPU频率": f"{cpu_freq.current / 1000} GHz" if cpu_freq else 0,
+                "内存大小": mem.total / (1024**3),
+                "已使用内存": mem.used / (1024**3),
+                "剩余内存": mem.free / (1024**3),
+                "内存使用率": mem.percent,
+                "swap分区大小": swap.total / (1024**3),
+                "已使用swap分区": swap.used / (1024**3),
+                "剩余swap分区": swap.free / (1024**3),
+                "swap分区使用率": swap.percent,
+                "加班姬CPU使用率": p_cpu_percent,
+                "加班姬内存占用": f"{p_memory_info.rss / (1024 * 1024):.2f} MB"
+            }
+
+    if timer:
+        if not os.path.exists("data/sys_info"):
+            os.mkdir("data/sys_info")
+
+        with open(f"data/sys_info/{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w+", encoding="utf-8") as f:
+            json.dump(sys_info, f, ensure_ascii=False, indent=4)
+
+    return sys_info
+
+@ui.page("/debug")
+async def index():
+    ui.label(f"统计时间: {datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')}")
+    for k, v in check_sys().items():
+        if isinstance(v, list):
+            ui.label(f"{k}: {', '.join(map(str, v))}")
+        elif isinstance(v, (int, float)):
+            if "使用率" in k:
+                ui.label(f"{k}: {v:.2f}%")
+            else:
+                ui.label(f"{k}: {v:.2f}GB")
+        else:
+            ui.label(f"{k}: {v}")
 
 # ================================
 # 程序运行
@@ -1347,7 +1408,7 @@ def init_task():
     global countdown_timer
     global reset_inherit_status
     countdown_timer = CountdownTimer(int(time_badge_inherit.text))
-    if app.storage.general["countdown_time"] != 0: # 如果存在可继承的倒计时
+    if app.storage.general.get("countdown_time", 0) != 0: # 如果存在可继承的倒计时
         cancel_button.set_text("重置")
         cancel_button.enable()
         reset_inherit_status = True # 设置重置继承倒计时状态为True
@@ -1993,6 +2054,14 @@ with ui.dialog() as select_login_dialog, ui.card(align_items="center"):
         ui.button("扫码登录", on_click=lambda: bili_login())
         ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login())
 
+with ui.dialog() as debug_dialog, ui.card(align_items="center"):
+    ui.label("获取系统信息时可能会使主进程阻塞几秒钟")
+    ui.label("不建议在倒计时运行时debug")
+    ui.label("是否开始debug？")
+    with ui.row():
+        ui.button("开始", on_click=lambda: ui.navigate.to("/debug", new_tab=True)).on_click(lambda: debug_dialog.close())
+        ui.button("取消", on_click=lambda: debug_dialog.close())
+
 with ui.dialog() as color_dialog, ui.card(align_items="center"):
     # 颜色输入框，颜色只在about和capture页面生效
     with ui.row():
@@ -2104,6 +2173,8 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
         # Preview page button
         ui.button("界面预览", on_click=lambda: open_capture())
+        # Debug page button
+        ui.button("debug", on_click=lambda: debug_dialog.open())
 
     # obs源
     with ui.label(f"http://127.0.0.1:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://127.0.0.1:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):

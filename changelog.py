@@ -11,7 +11,9 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.30.2-alpha', subtitle='2025-08-08', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.30.3-alpha', subtitle='2025-08-11', avatar='static/logo.ico'):
+                ui.label('● 新增debug页面')
+            with ui.timeline_entry(title='Release of 0.30.2-alpha', subtitle='2025-08-08'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 连接弹幕服务器后会显示B站账号登录状态，在连接前状态默认未连接')
                     ui.label('● 在启动时会将工作目录写入配置文件用于debug')

@@ -181,3 +181,4 @@ bili_qrcode.png
 *.png
 *.zip
 /data/blind_box
+/data/sys_info
