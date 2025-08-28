@@ -73,7 +73,8 @@ def main() -> None:
     guard = {
             "舰长": "guard-level-3.png",
             "提督": "guard-level-2.png",
-            "总督": "guard-level-1.png"
+            "总督": "guard-level-1.png",
+            "辣条": "latiao.png"
 }
     for i in guard.values():
         save_path = os.path.join("dist", "bili_travail", "data")

@@ -194,7 +194,8 @@ class BiliGiftManager:
             guard = {
                 "舰长": "guard-level-3.png",
                 "提督": "guard-level-2.png",
-                "总督": "guard-level-1.png"
+                "总督": "guard-level-1.png",
+                "辣条": "latiao.png"
             } # 舰队列表
 
             url = "https://travail.nya-wsl.com/bili_travail/gift/guard/" # 舰队图片url

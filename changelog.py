@@ -11,7 +11,14 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.30.3-alpha', subtitle='2025-08-11', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.30.4-alpha', subtitle='2025-08-29', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 修复投喂记录的礼物图标会被新礼物覆盖的问题')
+                    ui.label('● 修复加倍和清空玩法投喂记录报错的问题')
+                    ui.label('● 移除主界面投喂记录防止记录过长可能导致的性能问题')
+                    ui.label('● 调整UI')
+                    ui.label('● 移除debug按钮')
+            with ui.timeline_entry(title='Release of 0.30.3-alpha', subtitle='2025-08-16'):
                 ui.label('● 新增debug页面')
             with ui.timeline_entry(title='Release of 0.30.2-alpha', subtitle='2025-08-08'):
                 with ui.column().classes('gap-3'):

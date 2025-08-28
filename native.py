@@ -28,7 +28,7 @@ import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.30.3-alpha"
+version = "0.30.4-alpha"
 logger.debug("version: {}", version)
 
 # ================================
@@ -527,17 +527,17 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
-                            gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                                capture_challenge_gift_list_show(uname, gift, num, f"{2 * int(num)}倍", message)
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
                             if is_blind_box:
                                 gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
-                            gift_list_show(uname, gift, num, "清空")
+                            # gift_list_show(uname, gift, num, "清空")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, "清空")
+                                capture_challenge_gift_list_show(uname, gift, num, "清空", message)
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
                                 # random_num = random.randint(special[gift][0], special[gift][1]) # 从列表第一位和第二位的范围内随机抽一个int值
                                 # changed_num = int(gift_challenge_count.text) + (random_num * num) # 目前总数 + random_num生成的随机数
@@ -550,7 +550,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
                             result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
-                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
+                            # gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
 
@@ -562,7 +562,7 @@ class BiliHandler(blivedm.BaseHandler):
                             gift = origin_gift
                         result = f"礼物：{gift}\n数量：{num}\n总数量："
                         if gifts[gift] != 0 or is_blind_box:
-                            gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
+                            # gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
 
@@ -615,18 +615,18 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
-                            gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                                capture_cd_gift_list_show(uname, gift, num, f"{2 * int(num)}倍", message)
 
                         if special[gift] == "clear":
                             changed_time = 3
                             if is_blind_box:
                                 gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
-                            gift_list_show(uname, gift, num, "清空")
+                            # gift_list_show(uname, gift, num, "清空")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, "清空")
+                                capture_cd_gift_list_show(uname, gift, num, "清空", message)
 
                         if type(special[gift]) == list:
                             total_changed_time = 0
@@ -637,7 +637,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
                             result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
-                            gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
+                            # gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
@@ -648,7 +648,7 @@ class BiliHandler(blivedm.BaseHandler):
                             gift = origin_gift
                         result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
                         if gifts[gift] != 0 or is_blind_box:
-                            gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
+                            # gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
@@ -1768,7 +1768,9 @@ async def capture():
                     "name": name,
                     "gift": gift,
                     "num": num,
-                    "rule": time
+                    "rule": time,
+                    "url": message.gift_img_basic if message else gifts.get(data["gift"], ""),
+                    "time": datetime.datetime.now().strftime('%H:%M:%S')
                 })
 
                 with open("data/gift_history.json", "w+", encoding="utf-8") as f:
@@ -1781,12 +1783,13 @@ async def capture():
                             gift_num = data["num"]
                             gift_rule = data["rule"]
                             gift_name = data["gift"]
+                            gift_img = data["url"]
 
                             ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
-                                        ui.image(blive_crower.get_bili_img(message.gift_img_basic))
+                                        ui.image(blive_crower.get_bili_img(gift_img))
                                     else:
                                         ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
                                 else:
@@ -1931,7 +1934,9 @@ async def capture():
                     "name": name,
                     "gift": gift,
                     "num": num,
-                    "rule": time
+                    "rule": time,
+                    "url": message.gift_img_basic if message else gifts.get(data["gift"], ""),
+                    "time": datetime.datetime.now().strftime('%H:%M:%S')
                 })
 
                 with open("data/gift_history.json", "w+", encoding="utf-8") as f:
@@ -1944,12 +1949,13 @@ async def capture():
                             gift_num = data["num"]
                             gift_rule = data["rule"]
                             gift_name = data["gift"]
+                            gift_img = data["url"]
 
                             ui.label(f"{gift_user}").classes("text-xl font-extrabold")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
-                                        ui.image(blive_crower.get_bili_img(message.gift_img_basic))
+                                        ui.image(blive_crower.get_bili_img(gift_img))
                                     else:
                                         ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
                                 else:
@@ -2054,13 +2060,13 @@ with ui.dialog() as select_login_dialog, ui.card(align_items="center"):
         ui.button("扫码登录", on_click=lambda: bili_login())
         ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login())
 
-with ui.dialog() as debug_dialog, ui.card(align_items="center"):
-    ui.label("获取系统信息时可能会使主进程阻塞几秒钟")
-    ui.label("不建议在倒计时运行时debug")
-    ui.label("是否开始debug？")
-    with ui.row():
-        ui.button("开始", on_click=lambda: ui.navigate.to("/debug", new_tab=True)).on_click(lambda: debug_dialog.close())
-        ui.button("取消", on_click=lambda: debug_dialog.close())
+# with ui.dialog() as debug_dialog, ui.card(align_items="center"):
+#     ui.label("获取系统信息时可能会使主进程阻塞几秒钟")
+#     ui.label("不建议在倒计时运行时debug")
+#     ui.label("是否开始debug？")
+#     with ui.row():
+#         ui.button("开始", on_click=lambda: ui.navigate.to("/debug", new_tab=True)).on_click(lambda: debug_dialog.close())
+#         ui.button("取消", on_click=lambda: debug_dialog.close())
 
 with ui.dialog() as color_dialog, ui.card(align_items="center"):
     # 颜色输入框，颜色只在about和capture页面生效
@@ -2140,29 +2146,26 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("颜色设置", on_click=lambda: color_dialog.open())
         ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
 
-    def gift_list_show(name, gift, num, time, message):
-        with open("data/gift_img.json", "r", encoding="utf-8") as f:
-            gifts = json.load(f)
+    # def gift_list_show(name, gift, num, time):
+    #     with open("data/gift_img.json", "r", encoding="utf-8") as f:
+    #         gifts = json.load(f)
 
-        with gift_scroll:
-            with ui.row().classes("w-full"):
-                ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
-                with ui.avatar(color="").classes("w-6 h-6"):
-                    if gift not in ["舰长", "提督", "总督"]:
-                        if message:
-                            ui.image(blive_crower.get_bili_img(message.gift_img_basic))
-                        else:
-                            ui.image(blive_crower.get_bili_img(gifts.get(gift, "")))
-                    else:
-                        ui.image(gifts.get(gift, ""))
-                ui.label(f"{gift}x{num}").classes("text-l")
-                ui.label(time).classes("text-l")
-        gift_scroll.scroll_to(percent=1, duration=0.5)
+    #     with gift_scroll:
+    #         with ui.row().classes("w-full"):
+    #             ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
+    #             with ui.avatar(color="").classes("w-6 h-6"):
+    #                 if gift not in ["舰长", "提督", "总督"]:
+    #                         ui.image(blive_crower.get_bili_img(gifts.get(gift, "")))
+    #                 else:
+    #                     ui.image(gifts.get(gift, ""))
+    #             ui.label(f"{gift}x{num}").classes("text-l")
+    #             ui.label(time).classes("text-l")
+    #     gift_scroll.scroll_to(percent=1, duration=0.5)
 
-    with ui.card(align_items="stretch").classes("w-full"):
-        with ui.scroll_area().classes('h-16') as gift_scroll:
-            tmp_label = ui.label()
-            tmp_label.set_visibility(False)
+    # with ui.card(align_items="stretch").classes("w-full"):
+    #     with ui.scroll_area().classes('h-16') as gift_scroll:
+    #         tmp_label = ui.label()
+    #         tmp_label.set_visibility(False)
 
     with ui.row():
         # Login bilibili button
@@ -2173,8 +2176,6 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
         # Preview page button
         ui.button("界面预览", on_click=lambda: open_capture())
-        # Debug page button
-        ui.button("debug", on_click=lambda: debug_dialog.open())
 
     # obs源
     with ui.label(f"http://127.0.0.1:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://127.0.0.1:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
@@ -2201,7 +2202,7 @@ with ui.card(align_items="center").classes("absolute-center"):
             init_login_dialog.open()
 
 # about按钮
-with ui.page_sticky(position='bottom-right', x_offset=15, y_offset=10):
+with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
     ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @ui.page('/changelog')
@@ -2330,4 +2331,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 760])
+ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 650])
