@@ -11,7 +11,15 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.30.4-alpha', subtitle='2025-08-29', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.31.4-alpha', subtitle='2025-09-02', avatar='static/logo.ico'):
+                with ui.column().classes('gap-3'):
+                    ui.label('● 移除礼物设置的通知')
+                    ui.label('● 移除使用cookie登录')
+                    ui.label('● 移除礼物设置和obs捕获页面支持显示时长为0的礼物')
+                    ui.label('● 优化obs捕获页面礼物数据不存在时初始化礼物的逻辑')
+                    ui.label('● 新增源代码行数统计')
+                    ui.label('● 新增自动检测更新源')
+            with ui.timeline_entry(title='Release of 0.30.4-alpha', subtitle='2025-08-29'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 修复投喂记录的礼物图标会被新礼物覆盖的问题')
                     ui.label('● 修复加倍和清空玩法投喂记录报错的问题')

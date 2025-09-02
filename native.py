@@ -1,4 +1,5 @@
 # Local Packages
+import ping
 import blive_crower
 
 import gift as get_gift
@@ -24,12 +25,18 @@ import aiohttp
 import requests
 import datetime
 import http.cookies
-import browser_cookie3
 from typing import *
 from nicegui import ui, app
 
-version = "0.30.4-alpha"
+version = "0.31.4-alpha"
 logger.debug("version: {}", version)
+
+if os.path.exists("lines.txt"):
+    with open("lines.txt", "r", encoding="utf-8") as f:
+        app.storage.general["lines"] = f.read()
+
+if app.storage.general.get("lines", 0) == 0:
+    app.storage.general["lines"] = 0
 
 # ================================
 # 检查环境状态
@@ -96,7 +103,6 @@ def format_seconds(seconds):
 example_config = {
     "room_id": "",
     "port": 65000,
-    "show_zero": False,
     "SESSDATA": "",
     "background_image": [
         "https://nya-wsl.com/images/image001.png",
@@ -991,18 +997,12 @@ def cd_setting_dialog():
             special = json.load(f)
 
         for k,v in gifts.items():
-            if config["show_zero"]: # 如果配置文件的"show_zero"为True，则显示值为0的礼物
+            if v != 0:
                 with ui.row().classes('w-full'):
                     ui.label(k)
                     ui.space()
                     ui.label(format_seconds(v))
-            else:
-                if v != 0:
-                    with ui.row().classes('w-full'):
-                        ui.label(k)
-                        ui.space()
-                        ui.label(format_seconds(v))
-                        ui.button("删除", on_click=lambda k = k: del_gift(False, k))
+                    ui.button("删除", on_click=lambda k = k: del_gift(False, k))
 
         if special != {}: # 如果特殊礼物的数据不是空的
             for k,v in special.items():
@@ -1166,22 +1166,18 @@ def gift_count_setting_dialog():
                 gifts[gift_name.value] = int(number.value)
                 if gift_name.value in special:
                     special.pop(gift_name.value)
-                result = f'添加成功，{gift_name.value} | +{number.value}'
             elif status.value == "sub":
                 gifts[gift_name.value] = float(f"-{number.value}")
                 if gift_name.value in special:
                     special.pop(gift_name.value)
-                result = f'添加成功，{gift_name.value} | -{number.value}'
             elif status.value == "double":
                 special[gift_name.value] = "double"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | 加倍'
             elif status.value == "clear":
                 special[gift_name.value] = "clear"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | 清空'
             elif status.value == "random":
                 try:
                     if min.value <= max.value:
@@ -1193,13 +1189,12 @@ def gift_count_setting_dialog():
                     ui.notify("随机的值为空", type="negative")
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | {min.value} ~ {max.value}随机'
 
             with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
             with open("data/special_count.json", "w+", encoding="utf-8") as f:
                 json.dump(special, f, ensure_ascii=False, indent=4)
-            ui.notify(result, type="positive")
+
             refresh_capture_gift = True
             refresh_card()
 
@@ -1240,13 +1235,12 @@ def gift_count_setting_dialog():
             gifts[gift_name.value] = 0
         if gift_name.value in special:
             special.pop(gift_name.value)
-        result = f'删除成功 → {gift_name.value}'
+
         with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
         with open("data/special_count.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
 
-        ui.notify(result, type="positive")
         refresh_capture_gift = True # 设置capture刷新状态
         refresh_card()
 
@@ -1275,21 +1269,15 @@ def gift_count_setting_dialog():
         with open("data/special_count.json", "r", encoding="utf-8") as f:
             special = json.load(f)
         for k,v in gifts.items():
-            if config["show_zero"]:
+            if v != 0:
                 with ui.row().classes('w-full'):
                     ui.label(k)
                     ui.space()
-                    ui.label(f"{v}")
-            else:
-                if v != 0:
-                    with ui.row().classes('w-full'):
-                        ui.label(k)
-                        ui.space()
-                        if v <= 0:
-                            ui.label(f"{int(v)}{gift_play_unit_main.text}")
-                        elif v > 0:
-                            ui.label(f"+{int(v)}{gift_play_unit_main.text}")
-                        ui.button("删除", on_click=lambda k = k: del_gift(False, k))
+                    if v <= 0:
+                        ui.label(f"{int(v)}{gift_play_unit_main.text}")
+                    elif v > 0:
+                        ui.label(f"+{int(v)}{gift_play_unit_main.text}")
+                    ui.button("删除", on_click=lambda k = k: del_gift(False, k))
 
         if special != {}:
             for k,v in special.items():
@@ -1448,6 +1436,7 @@ def save_config():
     with open("config.json", "w+", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
+
 def check_auth(loginInfo):
     status = bili_auth.login(loginInfo[0])
 
@@ -1461,50 +1450,6 @@ def check_auth(loginInfo):
     else:
         ui.notify(status, type="negative")
 
-def get_browser_cookies(url: str):
-    """
-    :param url: 需获取cookies的网址，不带http(s)://
-    """
-
-    try:
-        # chrome, firefox, edge, opera, brave...
-        cookies = browser_cookie3.firefox(domain_name=url)
-
-        cookie_dict = {cookie.name: cookie.value for cookie in cookies}
-        return cookie_dict
-
-    except Exception as e:
-        logger.exception(e)
-        return {}
-
-def bili_auto_login(init = False):
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-
-    if config["room_id"] == "":
-        ui.notify("请先填入房间号", type="negative")
-        select_login_dialog.close()
-        return
-
-    cookies = get_browser_cookies('bilibili.com')
-
-    if "SESSDATA" not in cookies.keys():
-        ui.notify("未获取到SESSDATA，请使用扫码登录", type="negative")
-        select_login_dialog.close()
-        return
-
-    for cookie_name, cookie_value in cookies.items():
-        if cookie_name == 'SESSDATA':
-            config["SESSDATA"] = cookie_value
-
-            with open("config.json", "w+", encoding="utf-8") as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
-
-            if init:
-                init_login_dialog.close()
-
-            ui.notify("自动登录成功", type="positive")
-            select_login_dialog.close()
 
 def bili_login(init = False):
     global qrcode_ui
@@ -1518,12 +1463,13 @@ def bili_login(init = False):
         qrcode_ui = ui.image(loginInfo[1])
         ui.label("请使用B站APP扫描二维码登录")
         qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo))
-        qr_button.on_click(lambda: auth_dialog.close()).on_click(lambda: select_login_dialog.close()).on_click(lambda: os.remove(loginInfo[1])) # 因为太长了所以换一行写
+        qr_button.on_click(lambda: auth_dialog.close()).on_click(lambda: os.remove(loginInfo[1])) # 因为太长了所以换一行写
         if init:
             qr_button.on_click(lambda: init_login_dialog.close())
 
     auth_dialog.open()
     auth_dialog.on("hide", lambda: os.remove(loginInfo[1]))
+
 
 # 检查弹幕服务器连接状态
 async def check_b_connect_status():
@@ -1552,7 +1498,7 @@ async def check_b_connect_status():
             b_connect_switch.set_value(False)
             b_connect_switch.set_text("连接至弹幕服务器")
 
-    # 
+    # 尝试连接弹幕服务器
     if b_connect_switch.value == "null":
         if room_id.value == "":
             b_connect_switch.set_value(False)
@@ -1651,6 +1597,7 @@ async def refresh_gift():
 @ui.page("/capture_cd", title="倒计时 | bili_travail")
 async def capture():
     global capture_cd_gift_list_show, capture_cd_is_created
+
     # 检查是否需要刷新页面
     def check_cd_refresh():
         global refresh_capture_cd
@@ -1667,20 +1614,16 @@ async def capture():
 
     capture_cd_is_created = True
 
+    if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
+        init_config()
+
+
     # 初始化礼物列表
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
 
-
-    if not os.path.exists("data/gifts.json"):
-        init_config()
-
     with open("data/gifts.json", "r", encoding="utf-8") as f:
         gifts = json.load(f)
-
-
-    if not os.path.exists("data/gift_img.json"):
-        init_config()
 
     with open("data/gift_img.json", "r", encoding="utf-8") as f:
         gift_img = json.load(f)
@@ -1696,11 +1639,12 @@ async def capture():
     # 创建预览界面
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"): # 居中、背景透明、取消卡片阴影、置顶居中
         ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(time_badge).classes("text-8xl") # 创建时钟
+
         ui.separator() # 分割线
 
         # 创建礼物列表
         for k,v in gifts.items():
-            if config["show_zero"]:
+            if v != 0:
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
@@ -1710,17 +1654,7 @@ async def capture():
                         ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     else:
                         ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-            else:
-                if v != 0:
-                    with ui.row().classes('w-full'):
-                        with ui.avatar(color=None):
-                            ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                        ui.space()
-                        if v < 0:
-                            ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                        else:
-                            ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
@@ -1823,20 +1757,16 @@ async def capture():
             ui.navigate.reload()
 
     capture_gift_is_created = True
+
+    if not os.path.exists("data/gifts_count.json") or not os.path.exists("data/gift_img.json"):
+        init_config()
+
     # 礼物列表
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
 
-
-    if not os.path.exists("data/gifts_count.json"):
-        init_config()
-
     with open("data/gifts_count.json", "r", encoding="utf-8") as f:
         gifts = json.load(f)
-
-
-    if not os.path.exists("data/gift_img.json"):
-        init_config()
 
     with open("data/gift_img.json", "r", encoding="utf-8") as f:
         gift_img = json.load(f)
@@ -1856,26 +1786,19 @@ async def capture():
             ui.label().bind_text_from(gift_play_text_main).style(f"color: {config['color']}").classes("text-5xl")
         ui.separator()
         for k,v in gifts.items():
-            if config["show_zero"]:
+            if v != 0:
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
                     ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     ui.space()
-                    ui.label(f"{v}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-            else:
-                if v != 0:
-                    with ui.row().classes('w-full'):
-                        with ui.avatar(color=None):
-                            ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                        ui.space()
-                        if v < 0:
-                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                        elif v > 0:
-                            ui.label(f"+{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                        else:
-                            ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                    if v < 0:
+                        ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                    elif v > 0:
+                        ui.label(f"+{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                    else:
+                        ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+
         if special != {}:
             for k,v in special.items():
                 if type(v) == list:
@@ -1971,70 +1894,88 @@ async def capture():
 
     ui.timer(5, callback=lambda: check_gift_refresh())
 
+
 # ================================
 # 主界面GUI
 # ================================
 
-
 with open("config.json", "r", encoding="utf-8") as f:
     config = json.load(f)
 
-# 检查版本更新按钮
-def check_update(init = False):
+async def ping_server():
+    servers = {
+        "GitHub": "github.com",
+        "CN-HK": "travail.nya-wsl.com",
+        "CN-QN": "qn.nya-wsl.cn"
+    }
+    server = await ping.ping(servers.values())
+    if server != False:
+        for k, v in servers.items():
+            if v == server:
+                return k
+    else:
+        return False
 
-    async def check(server, status):
-        if server == None or server == "":
-            ui.notify("请选择更新源", type="negative")
-            return
+# 检查版本更新按钮
+async def check_update(init = False):
+
+    async def update(server, status):
+        if server == "auto":
+            ui.notify(f"测速中，请稍候...", progress=True, timeout=3000, type="ongoing", color="blue-100")
+            server = await ping_server()
+            if server == False:
+                ui.notify("无法连接更新服务器", type="negative")
+                return
 
         await travail_update.update(server, status) # 调用更新函数
 
     def version_dialog():
         with ui.dialog() as dialog, ui.card(align_items="center"):
             ui.label(f"当前版本：{version} | 最新版本：{status}")
-
-            # with ui.row():
-            #     ui.button("国内源", on_click=lambda: travail_update.update("CN-HK"))
-            #     ui.button("海外源", on_click=lambda: travail_update.update("Overseas")).disable()
-            #     ui.button("GitHub", on_click=lambda: travail_update.update("GitHub"))
-            #     ui.button("取消", on_click=lambda: dialog.close())
-
-            server_select = ui.select(options={"CN-HK": "国内源", "CN-QN": "国内备用源", "GitHub": "GitHub"}, label="选择更新源").classes("w-1/2")
-            ui.button("更新", on_click=lambda: check(server_select.value, status))
+            server_select = ui.select(options={"CN-HK": "国内源", "CN-QN": "国内备用源", "GitHub": "GitHub", "auto": "自动检测"}, label="选择更新源", value="auto").classes("w-1/2")
+            ui.button("更新", on_click=lambda: update(server_select.value, status))
 
         dialog.open()
 
     def version_check():
-        url = ["http://version.nya-wsl.cn/bili_travail/version.txt", "https://nya-wsl.com/bili_travail/version.txt"]
+        url = ["http://version.nya-wsl.cn/bili_travail/version.json", "https://nya-wsl.com/bili_travail/version.json"]
         try:
-            latest_version = requests.get(url[0]) # 优先从Nya-WSL中国服务器获取版本信息
-            if latest_version.status_code == 200:
-                latest_version = latest_version.text.replace("\n", "") # 服务器返回内容
+            response = requests.get(url[0]) # 优先从Nya-WSL中国服务器获取版本信息
+            if response.status_code == 200:
+                data = response.json()
+                latest_version = data["version"]
             else:
                 raise ValueError("From Nya-WSL CN to get version info was error") # 抛出错误
-        except:
+        except Exception as e:
+            logger.error(e)
             try:
-                latest_version = requests.get(url[1]) # 从Nya-WSL海外服务器获取版本信息
-                if latest_version.status_code == 200: # 服务器请求返回值
-                    latest_version = latest_version.text.replace("\n", "") # 服务器返回内容
+                response = requests.get(url[1]) # 从Nya-WSL海外服务器获取版本信息
+                if response.status_code == 200: # 服务器请求返回值
+                    data = response.json()
+                    latest_version = data["version"]
                 else:
                     latest_version = "Error"
-            except:
+            except Exception as e:
+                logger.error(e)
                 latest_version = "Error" # 如果请求均失败版本信息设为"Error"
 
         return latest_version
 
     status = version_check()
+
     if status != version:
         if status != "Error":
             if init:
-                ui.notify(f"检查到可用更新：v{status}", progress=True, timeout=10000, color="orange-10")
+                with main_card:
+                    ui.notify(f"检查到可用更新：v{status}", progress=True, timeout=10000, color="orange-10")
             else:
                 version_dialog()
         else:
-            ui.notify("检查更新失败", type="negative")
+            with main_card:
+                ui.notify("检查更新失败", type="negative")
     else:
-        ui.notify("已是最新版本", type="positive")
+        with main_card:
+            ui.notify("已是最新版本", type="positive")
 
 # 礼物设置弹窗
 with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
@@ -2051,23 +1992,6 @@ with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
         ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
     ui.button("关闭", on_click=lambda: gift_count_dialog.close())
 
-# 登录方式选择弹窗
-with ui.dialog() as select_login_dialog, ui.card(align_items="center"):
-    ui.label("请选择登录方式")
-    ui.label("获取浏览器Cookie仅支持firefox，请先确保浏览器已登录B站账号")
-    ui.label("无论使用哪种方式，皆建议使用小号登录，以免账号被风控")
-    with ui.row():
-        ui.button("扫码登录", on_click=lambda: bili_login())
-        ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login())
-
-# with ui.dialog() as debug_dialog, ui.card(align_items="center"):
-#     ui.label("获取系统信息时可能会使主进程阻塞几秒钟")
-#     ui.label("不建议在倒计时运行时debug")
-#     ui.label("是否开始debug？")
-#     with ui.row():
-#         ui.button("开始", on_click=lambda: ui.navigate.to("/debug", new_tab=True)).on_click(lambda: debug_dialog.close())
-#         ui.button("取消", on_click=lambda: debug_dialog.close())
-
 with ui.dialog() as color_dialog, ui.card(align_items="center"):
     # 颜色输入框，颜色只在about和capture页面生效
     with ui.row():
@@ -2076,18 +2000,19 @@ with ui.dialog() as color_dialog, ui.card(align_items="center"):
         ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
     ui.button("关闭", on_click=lambda: color_dialog.close())
 
+
 # 创建主界面
-with ui.card(align_items="center").classes("absolute-center"):
-    check_update(True)
+with ui.card(align_items="center").classes("absolute-center") as main_card:
+    asyncio.run(check_update(True))
     time_badge = ui.badge("00:00:00", outline=True, color="").classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
     time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
-    time_badge_inherit.set_visibility(False)
-    gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 将结果写入storage) # 投喂挑战总数
+    gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 投喂挑战总数
     gift_play_unit_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_unit") # 投喂挑战单位
     gift_play_text_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_text") # 投喂挑战项目
-    gift_challenge_count.set_visibility(False)
-    gift_play_unit_main.set_visibility(False)
-    gift_play_text_main.set_visibility(False)
+    time_badge_inherit.set_visibility(False) # 隐藏继承数据徽章
+    gift_challenge_count.set_visibility(False) # 隐藏投喂挑战总数徽章
+    gift_play_unit_main.set_visibility(False) # 隐藏投喂挑战单位标签
+    gift_play_text_main.set_visibility(False) # 隐藏投喂挑战项目标签
 
     # 时间输入框
     with ui.row():
@@ -2131,12 +2056,17 @@ with ui.card(align_items="center").classes("absolute-center"):
             b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
             show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list").props('color="btn"')
 
-        with ui.column(align_items="center").classes("gap-0"):
+        with ui.column().classes("gap-0"):
+            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
+            gift_challenge_switch.disable()
+
             with ui.row().classes("gap-0"):
                 ui.label("登录状态：")
                 login_status = ui.label("未连接").classes("text-red")
-            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
-            gift_challenge_switch.disable()
+
+            with ui.row().classes("gap-0"):
+                ui.label("当前行数：")
+                ui.label().bind_text_from(app.storage.general, "lines")
 
     ui.separator()
 
@@ -2146,30 +2076,9 @@ with ui.card(align_items="center").classes("absolute-center"):
         ui.button("颜色设置", on_click=lambda: color_dialog.open())
         ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
 
-    # def gift_list_show(name, gift, num, time):
-    #     with open("data/gift_img.json", "r", encoding="utf-8") as f:
-    #         gifts = json.load(f)
-
-    #     with gift_scroll:
-    #         with ui.row().classes("w-full"):
-    #             ui.label(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {name} 赠送").classes("text-l")
-    #             with ui.avatar(color="").classes("w-6 h-6"):
-    #                 if gift not in ["舰长", "提督", "总督"]:
-    #                         ui.image(blive_crower.get_bili_img(gifts.get(gift, "")))
-    #                 else:
-    #                     ui.image(gifts.get(gift, ""))
-    #             ui.label(f"{gift}x{num}").classes("text-l")
-    #             ui.label(time).classes("text-l")
-    #     gift_scroll.scroll_to(percent=1, duration=0.5)
-
-    # with ui.card(align_items="stretch").classes("w-full"):
-    #     with ui.scroll_area().classes('h-16') as gift_scroll:
-    #         tmp_label = ui.label()
-    #         tmp_label.set_visibility(False)
-
     with ui.row():
         # Login bilibili button
-        ui.button("登录账号", on_click=lambda: select_login_dialog.open())
+        ui.button("登录账号", on_click=lambda: bili_login())
         # Update version button
         ui.button("检查更新", on_click=lambda: check_update())
         # Changelog button
@@ -2187,14 +2096,12 @@ with ui.card(align_items="center").classes("absolute-center"):
     countdown_timer.inherit_time(int(time_badge_inherit.text))
 
     if not app.storage.general["startup_check_bili_auth"]:
-
         with ui.dialog() as init_login_dialog, ui.card(align_items="center"):
             ui.label("您似乎未登录B站账号，是否需要登录？")
             ui.label("未登录历史礼物功能可能无法显示用户名且无法获取最新的盲盒数据")
             ui.label("建议使用小号登录，以免账号被风控")
             with ui.row():
                 ui.button("扫码登录", on_click=lambda: bili_login(True))
-                ui.button("获取浏览器Cookie", on_click=lambda: bili_auto_login(True))
                 ui.button("取消", on_click=lambda: init_login_dialog.close())
 
         if config["room_id"] != "":

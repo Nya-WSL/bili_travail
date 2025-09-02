@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import nicegui
+import lines
 
 DESCRIPTION = '''
 Build a package of your NiceGUI app
@@ -84,6 +85,12 @@ def main() -> None:
         shutil.copy(os.path.join("data", i), save_file)
 
     # shutil.copytree("data/gifts", os.path.join("dist", "bili_travail", "data", "gifts"))
+
+    with open("lines.txt", "w+", encoding="utf-8") as f:
+        total_lines = lines.lines()
+        f.write(str(total_lines))
+
+    shutil.copy("lines.txt", os.path.join("dist", "bili_travail"))
 
 if __name__ == '__main__':
     main()
