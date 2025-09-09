@@ -28,7 +28,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.31.4-alpha"
+version = "0.31.5-alpha"
 logger.debug("version: {}", version)
 
 if os.path.exists("lines.txt"):
@@ -102,6 +102,7 @@ def format_seconds(seconds):
 
 example_config = {
     "room_id": "",
+    "host": "127.0.0.1",
     "port": 65000,
     "SESSDATA": "",
     "background_image": [
@@ -178,6 +179,7 @@ config["cwd"] = os.getcwd() # 保存工作目录用于debug
 with open("config.json", "w", encoding="utf-8") as f:
     json.dump(config, f, ensure_ascii=False, indent=4)
 
+host = config["host"]
 port = config["port"]
 btn_color = config["btn_color"]
 
@@ -2087,9 +2089,9 @@ with ui.card(align_items="center").classes("absolute-center") as main_card:
         ui.button("界面预览", on_click=lambda: open_capture())
 
     # obs源
-    with ui.label(f"http://127.0.0.1:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://127.0.0.1:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
+    with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
         ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
-    with ui.label(f"http://127.0.0.1:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://127.0.0.1:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
+    with ui.label(f"http://{host}:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
         ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
 
     init_task()
@@ -2238,4 +2240,4 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 650])
+ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 650])

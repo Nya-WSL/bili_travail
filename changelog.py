@@ -11,7 +11,9 @@ def changelog():
             ui.button("GitHub", on_click=lambda: ui.navigate.to('https://github.com/Nya-WSL/bili_travail', new_tab=True), color=config["btn_color"]).style("right: -15%")
         with ui.timeline(side='right', layout='comfortable', color="btn"):
             # ui.timeline_entry('更新日志', heading=True)
-            with ui.timeline_entry(title='Release of 0.31.4-alpha', subtitle='2025-09-02', avatar='static/logo.ico'):
+            with ui.timeline_entry(title='Release of 0.31.5-alpha', subtitle='2025-09-10', avatar='static/logo.ico'):
+                ui.label('● 支持修改IP地址（需重启生效）')
+            with ui.timeline_entry(title='Release of 0.31.4-alpha', subtitle='2025-09-02'):
                 with ui.column().classes('gap-3'):
                     ui.label('● 移除礼物设置的通知')
                     ui.label('● 移除使用cookie登录')
