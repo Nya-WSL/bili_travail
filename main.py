@@ -1,6 +1,6 @@
 # Local Packages
 import ping
-import blive_crower
+import bili_api
 
 import gift as get_gift
 import update as travail_update
@@ -28,7 +28,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.31.5-alpha"
+version = "0.31.6-alpha"
 logger.debug("version: {}", version)
 
 if os.path.exists("lines.txt"):
@@ -1725,9 +1725,9 @@ async def capture():
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
-                                        ui.image(blive_crower.get_bili_img(gift_img))
+                                        ui.image(bili_api.get_bili_img(gift_img))
                                     else:
-                                        ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
+                                        ui.image(bili_api.get_bili_img(gifts.get(gift_name, "")))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
@@ -1880,9 +1880,9 @@ async def capture():
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
-                                        ui.image(blive_crower.get_bili_img(gift_img))
+                                        ui.image(bili_api.get_bili_img(gift_img))
                                     else:
-                                        ui.image(blive_crower.get_bili_img(gifts.get(gift_name, "")))
+                                        ui.image(bili_api.get_bili_img(gifts.get(gift_name, "")))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold")
@@ -2190,17 +2190,17 @@ def _():
                     msg_index.append(k)
                 msg_index.remove("group_a")
                 msg = text.json()[random.choice(msg_index)]
-                ui.chat_message(msg["text_a"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
-                ui.chat_message(msg["text_b"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
+                ui.chat_message(msg["text_a"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
+                ui.chat_message(msg["text_b"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
             else:
-                ui.chat_message(text.json()["group_a"]["text_a"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
-                ui.chat_message(text.json()["group_a"]["text_b"], avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
+                ui.chat_message(text.json()["group_a"]["text_a"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
+                ui.chat_message(text.json()["group_a"]["text_b"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
         else:
             text_a = read_or_create_file("data/text_a.txt", "代码没写完，哪有脸睡觉")
             text_b = read_or_create_file("data/text_b.txt", 'alias cd="sudo rm -rf"')
 
-            ui.chat_message(text_a, avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
-            ui.chat_message(text_b, avatar=blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
+            ui.chat_message(text_a, avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
+            ui.chat_message(text_b, avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
 
         # 项目介绍
         ui.html('A Project of <u><a href="https://nya-wsl.com" target="_blank">Nya-WSL</a></u>.')
@@ -2214,19 +2214,19 @@ def _():
                 ui.label("程序架构").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/16748991", new_tab=True):
                     with ui.avatar():
-                        ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"))
+                        ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"))
                 ui.badge("高橋はるき", outline=True)
             with ui.column(align_items="center"):
                 ui.label("程序开发").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/8907402", new_tab=True):
                     with ui.avatar():
-                        ui.image(blive_crower.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
+                        ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
                 ui.badge("狐日泽", outline=True)
             with ui.column(align_items="center"):
                 ui.label("特别感谢").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/3546729020394298/", new_tab=True):
                     with ui.avatar():
-                        ui.image(blive_crower.get_bili_img("https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"))
+                        ui.image(bili_api.get_bili_img("https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"))
                 ui.badge("千蚀vita", outline=True)
         ui.separator()
 

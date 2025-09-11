@@ -1,3 +1,5 @@
+# 和礼物关联性不大的BILIBILI接口
+
 import base64
 import requests
 

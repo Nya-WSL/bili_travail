@@ -1,6 +1,6 @@
 [project]
 name = "bili-travail"
-version = "0.26.0-alpha"
+version = "0.31.6-alpha"
 description = "基于blivedm的B站直播加班姬"
 authors = [
     {name = "Nya-WSL"}
