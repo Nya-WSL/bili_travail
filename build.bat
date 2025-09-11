@@ -1,1 +1,1 @@
-poetry run python build.py --name bili_travail --windowed --icon static/logo.ico native.py
+poetry run python build.py --name bili_travail --windowed --icon static/logo.ico main.py
