@@ -24,6 +24,7 @@ import asyncio
 import aiohttp
 import requests
 import datetime
+import traceback
 import http.cookies
 from typing import *
 from nicegui import ui, app
@@ -55,8 +56,16 @@ reset_inherit_status = False # 初始化重置继承倒计时状态
 capture_cd_is_created = False # 初始化倒计时页面状态
 capture_gift_is_created = False # 初始化投喂挑战页面状态
 
+# 检查data文件夹状态
+if not os.path.exists("data"):
+    os.mkdir("data")
+
+# 移除残留的更新包
 if os.path.exists("update.bat"):
     os.remove("update.bat")
+if os.path.exists("cache"):
+    shutil.rmtree("cache")
+
 if os.path.exists("data/gift_history.json"):
     if not os.path.exists("data/history"):
         os.mkdir("data/history")
@@ -69,8 +78,6 @@ if os.path.exists("data/blind_box_value.json"):
     if not os.path.exists("data/blind_box"):
         os.mkdir("data/blind_box")
     shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
-if os.path.exists("cache"):
-    shutil.rmtree("cache")
 
 def format_seconds(seconds):
     """
@@ -112,8 +119,8 @@ example_config = {
         "static/sample1.png",
         "static/sample2.png"
     ],
-    "color": "#5898d4",
-    "btn_color": "#eddad2",
+    "color": "#fcefe8",
+    "btn_color": "#fcefe8",
     "text_color": "#000000",
     "local_text": False,
     "show_capture_gift_list": False,
@@ -121,38 +128,18 @@ example_config = {
 }
 
 # 检查配置文件状态
-# 如配置文件不存在，则注入示例文件/使用内置预设
+# 如配置文件不存在，则注入内置预设
 if not os.path.exists("config.json"):
-    if not os.path.exists("config.example.json"):
-        with open("config.json", "w+", encoding="utf-8") as f:
-            json.dump(example_config, f, indent=4, ensure_ascii=False)
-    else:
-        shutil.copy("config.example.json", "config.json")
+    with open("config.json", "w+", encoding="utf-8") as f:
+        json.dump(example_config, f, indent=4, ensure_ascii=False)
 
-if not os.path.exists(".nicegui/storage-general.json"):
-    app.storage.general["gift_challenge_count"] = 0
-    app.storage.general["gift_challenge_unit"] = ""
-    app.storage.general["gift_challenge_text"] = ""
-    app.storage.general["countdown_time"] = 0
-    app.storage.general["version"] = version
-    app.storage.general["startup_check_bili_auth"] = False
-else:
-    try:
-        with open(".nicegui/storage-general.json", "r", encoding="utf-8") as f:
-            storage = json.load(f)
-            if storage == "" or storage == {}:
-                raise json.JSONDecodeError("No JSON object could be decoded", "", 0)
-    except:
-        app.storage.general["gift_challenge_count"] = 0
-        app.storage.general["gift_challenge_unit"] = ""
-        app.storage.general["gift_challenge_text"] = ""
-        app.storage.general["countdown_time"] = 0
-        app.storage.general["version"] = version
-        app.storage.general["startup_check_bili_auth"] = False
-
-# 检查data文件夹状态
-if not os.path.exists("data"):
-    os.mkdir("data")
+# 检查storage状态
+app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
+app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
+app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_challenge_text", "")
+app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
+app.storage.general["version"] = app.storage.general.get("version", version)
+app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
 
 # ================================
 # 初始化配置文件
@@ -183,16 +170,18 @@ host = config["host"]
 port = config["port"]
 btn_color = config["btn_color"]
 
-ui.add_css(f"""
+ui.add_css(
+    f"""
 .text-btn {{
-color: {btn_color} !important;
+color: {btn_color};
 }}
 
 .bg-btn {{
-background: {btn_color} !important;
+background: {btn_color};
 }}
 """,
-shared=True)
+    shared=True,
+)
 
 ui.button.__init__.__kwdefaults__['color'] = btn_color # 设置所有按钮颜色为配置文件中的btn_color
 
@@ -236,18 +225,23 @@ def create_blind_box():
     return blind_box
 
 def init_config():
+    """
+    初始化礼物数据
+    """
+
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
     # 初始化gifts.json数据
-    # 确保礼物数据文件存在，如果不存在，则先进行初始化礼物数据
-    if not os.path.exists("data/gifts.json"):
+    # 确保礼物数据文件存在，如果不存在，则先初始化礼物数据
+    if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
         # 如果配置文件中包含房间号，则传入；否则会触发 init_gift
         room_id = config.get("room_id", "")
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
             gift_config = GiftManager.get_config(img_path="data/gift_img.json", time_path="data/gifts.json") # 使用B站api
-            if not gift_config:  # 若获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
+            # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
+            if not gift_config:
                 GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
         else:
             # 如果没有room_id，则创建空文件
@@ -277,7 +271,7 @@ def get_pid_info(pid):
 
     return p_cpu_percent, p_memory_info
 
-def check_sys(timer = False):
+def check_sys():
     # CPU信息
     cpu_model = cpuinfo.get_cpu_info().get('brand_raw', '未知')
     cpu_usage = psutil.cpu_percent(interval=None)
@@ -305,12 +299,11 @@ def check_sys(timer = False):
                 "加班姬内存占用": f"{p_memory_info.rss / (1024 * 1024):.2f} MB"
             }
 
-    if timer:
-        if not os.path.exists("data/sys_info"):
-            os.mkdir("data/sys_info")
+    if not os.path.exists("data/sys_info"):
+        os.mkdir("data/sys_info")
 
-        with open(f"data/sys_info/{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w+", encoding="utf-8") as f:
-            json.dump(sys_info, f, ensure_ascii=False, indent=4)
+    with open(f"data/sys_info/{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w+", encoding="utf-8") as f:
+        json.dump(sys_info, f, ensure_ascii=False, indent=4)
 
     return sys_info
 
@@ -357,8 +350,7 @@ async def start_handler():
         session = aiohttp.ClientSession()
         session.cookie_jar.update_cookies(cookies)
 
-        room_id = ROOM_ID
-        client = blivedm.BLiveClient(room_id, session=session)
+        client = blivedm.BLiveClient(ROOM_ID, session=session)
         handler = BiliHandler()
         client.set_handler(handler)
         client.start()
@@ -399,8 +391,8 @@ class BiliHandler(blivedm.BaseHandler):
         uname = message.uname
         price = message.price / 100
         result = ""
-        if len(uname.split()) > 8:
-            uname = uname.split()[0-5] + "..."
+        if len(uname.split("")) > 8:
+            uname = uname.split("")[0-5] + "..."
 
         self._on_gift_play(gift, num, uname, message, price)
         self._on_gift_statistics(gift, num, uname, price)
@@ -424,8 +416,8 @@ class BiliHandler(blivedm.BaseHandler):
         else:
             gift = "神秘物种"
 
-        if len(uname.split()) > 8:
-            uname = uname.split()[0-5] + "..."
+        if len(uname.split("")) > 8:
+            uname = uname.split("")[0-5] + "..."
 
         self._on_gift_play(gift, num, uname, False)
         self._on_gift_statistics(gift, num, uname, price)
@@ -2240,4 +2232,7 @@ def _():
         ui.button("返回", on_click=lambda: ui.navigate.to("/"))
 
 # 运行NiceGUI
-ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 650])
+try:
+    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 650])
+except:
+    logger.error(f"run error: {traceback.format_exc()}")
