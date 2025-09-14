@@ -70,7 +70,6 @@ def main() -> None:
 
     subprocess.call(command)
     shutil.copytree("static", os.path.join("dist", "bili_travail", "static"))
-    shutil.copy("config.example.json", os.path.join("dist", "bili_travail"))
     guard = {
             "舰长": "guard-level-3.png",
             "提督": "guard-level-2.png",
@@ -88,6 +87,7 @@ def main() -> None:
 
     with open("lines.txt", "w+", encoding="utf-8") as f:
         total_lines = lines.lines()
+        print(total_lines)
         f.write(str(total_lines))
 
     shutil.copy("lines.txt", os.path.join("dist", "bili_travail"))
