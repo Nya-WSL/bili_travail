@@ -436,7 +436,6 @@ class BiliHandler(blivedm.BaseHandler):
 
     def _on_gift_statistics(self, gift, num, uname, price = 0):
         if not os.path.exists("data/gift_statistics.json"):
-
             with open("data/gift_statistics.json", "w+", encoding="utf-8") as f:
                 json.dump({}, f, ensure_ascii=False, indent=4)
 
@@ -448,11 +447,13 @@ class BiliHandler(blivedm.BaseHandler):
 
         if uname not in users:
             users.append(uname)
+
         num += count[gift]["num"]
+
         if gift == "辣条":
-            count[gift] = {"num": num, "price": 0, "user": users}
-        else:
-            count[gift] = {"num": num, "price": price, "user": users}
+            price = 0
+
+        count[gift] = {"num": num, "price": price, "user": users}
 
         with open("data/gift_statistics.json", "w+", encoding="utf-8") as f:
             json.dump(count, f, ensure_ascii=False, indent=4)
@@ -465,6 +466,7 @@ class BiliHandler(blivedm.BaseHandler):
             if not os.path.exists("data/blind_box_value.json"):
                 with open("data/blind_box_value.json", "w+", encoding="utf-8") as f:
                     json.dump({}, f, ensure_ascii=False, indent=4)
+
             with open("data/blind_box_value.json", "r", encoding="utf-8") as f:
                 box_value = json.load(f)
 
@@ -524,32 +526,37 @@ class BiliHandler(blivedm.BaseHandler):
                     if gift in special:
                         if special[gift] == "double": # 加倍挑战
                             changed_num = int(gift_challenge_count.text) * (2 * int(num))
+
                             if is_blind_box:
                                 gift = origin_gift
-                            result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num}\n总数量："
+
                             # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, f"{2 * int(num)}倍", message)
+
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
+
                             if is_blind_box:
                                 gift = origin_gift
-                            result = f"礼物：{gift}\n数量：{num}\n加减：{changed_num - int(gift_challenge_count.text)}\n总数量："
+
                             # gift_list_show(uname, gift, num, "清空")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, "清空", message)
+
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
-                                # random_num = random.randint(special[gift][0], special[gift][1]) # 从列表第一位和第二位的范围内随机抽一个int值
-                                # changed_num = int(gift_challenge_count.text) + (random_num * num) # 目前总数 + random_num生成的随机数
                             total_changed_num = 0
+
                             for i in range(num):
                                 random_num = random.randint(special[gift][0], special[gift][1] + 1)
                                 total_changed_num += random_num
+
                             changed_num = int(gift_challenge_count.text) + total_changed_num
                             gift_list_show_num = str(int(gifts[gift] * int(num)))
+
                             if is_blind_box:
                                 gift = origin_gift
-                            result = f"礼物：{gift}\n数量：{num}\n加减：{random_num}\n总数量："
+
                             # gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
@@ -558,9 +565,10 @@ class BiliHandler(blivedm.BaseHandler):
                     else:
                         changed_num = (gifts[gift] * int(num)) + int(gift_challenge_count.text) # （设定的值 * 礼物数量） + 目前总数
                         gift_list_show_num = str(int(gifts[gift] * int(num)))
+
                         if is_blind_box:
                             gift = origin_gift
-                        result = f"礼物：{gift}\n数量：{num}\n总数量："
+
                         if gifts[gift] != 0 or is_blind_box:
                             # gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
@@ -612,18 +620,20 @@ class BiliHandler(blivedm.BaseHandler):
                     if gift in special:
                         if special[gift] == "double":
                             changed_time = tmp_time * (2 * int(num))
+
                             if is_blind_box:
                                 gift = origin_gift
-                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time)}]
+
                             # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, f"{2 * int(num)}倍", message)
 
                         if special[gift] == "clear":
                             changed_time = 3
+
                             if is_blind_box:
                                 gift = origin_gift
-                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(changed_time - tmp_time)}]
+
                             # gift_list_show(uname, gift, num, "清空")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, "清空", message)
@@ -633,10 +643,12 @@ class BiliHandler(blivedm.BaseHandler):
                             for i in range(num):
                                 random_time = random.randint(special[gift][0], special[gift][1] + 1)
                                 total_changed_time += random_time
+
                             changed_time = tmp_time + total_changed_time
+
                             if is_blind_box:
                                 gift = origin_gift
-                            result = [{"gift": gift}, {"num": num}, {"time": format_seconds(random_time)}]
+
                             # gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
@@ -644,9 +656,10 @@ class BiliHandler(blivedm.BaseHandler):
                     else:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
                         gift_list_show_time = gifts[gift] * int(num)
+
                         if is_blind_box:
                             gift = origin_gift
-                        result = [{"gift": gift}, {"num": num}, {"time": format_seconds(gifts[gift] * int(num))}]
+
                         if gifts[gift] != 0 or is_blind_box:
                             # gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
@@ -662,7 +675,7 @@ class CountdownTimer:
         self._paused = False # 初始化暂停状态
         self._running = False # 初始化运行状态
         self._paused_event = asyncio.Event() # 初始化event
-        self._paused_event.set()  # Initially not paused
+        self._paused_event.set()  # 最开始没有暂停
         self._task = None # 初始化task
 
     # 获取当前倒计时
@@ -873,22 +886,18 @@ def cd_setting_dialog():
                 gifts[gift_name.value] = int(time.value)
                 if gift_name.value in special:
                     special.pop(gift_name.value)
-                result = f'添加成功，{gift_name.value} | {format_seconds(time.value)}'
             elif status.value == "sub":
                 gifts[gift_name.value] = float(f"-{time.value}")
                 if gift_name.value in special:
                     special.pop(gift_name.value)
-                result = f'添加成功，{gift_name.value} | {format_seconds(time.value)}'
             elif status.value == "double":
                 special[gift_name.value] = "double"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | 加倍'
             elif status.value == "clear":
                 special[gift_name.value] = "clear"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | 清空(缓冲3秒)'
             elif status.value == "random":
                 try:
                     if min.value <= max.value:
@@ -900,7 +909,6 @@ def cd_setting_dialog():
                     ui.notify("随机的值为空", type="negative")
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
-                result = f'添加成功，{gift_name.value} | {format_seconds(min.value)} ~ {format_seconds(max.value)}随机'
 
             gifts = sort_dict(gifts)  # 对礼物数据进行排序
 
@@ -909,7 +917,6 @@ def cd_setting_dialog():
             with open("data/special.json", "w+", encoding="utf-8") as f:
                 json.dump(special, f, ensure_ascii=False, indent=4)
 
-            ui.notify(result, type="positive")
             refresh_capture_cd = True # 设置capture刷新状态
             refresh_card()
 
@@ -951,7 +958,6 @@ def cd_setting_dialog():
             gifts[gift_name.value] = 0
         if gift_name.value in special:
             special.pop(gift_name.value)
-        result = f'删除成功 → {gift_name.value}'
 
         gifts = sort_dict(gifts)  # 对礼物数据进行排序
 
@@ -960,7 +966,6 @@ def cd_setting_dialog():
         with open("data/special.json", "w+", encoding="utf-8") as f:
             json.dump(special, f, ensure_ascii=False, indent=4)
 
-        ui.notify(result, type="positive")
         refresh_capture_cd = True # 设置capture刷新状态
         refresh_card()
 
@@ -1098,8 +1103,8 @@ def blind_box_value_dialog():
                         for i in v:
                             ui.label(i)
                         ui.label(f"盈亏：{price_list[k]}电池")
-
                 ui.separator() # 分割线
+
             all_price = 0
             for i in price_list.values():
                 all_price += i
