@@ -29,7 +29,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.31.6-alpha"
+version = "0.31.7-alpha"
 logger.debug("version: {}", version)
 
 if os.path.exists("lines.txt"):
@@ -140,6 +140,7 @@ app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_chall
 app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
 app.storage.general["version"] = app.storage.general.get("version", version)
 app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
+app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
 
 # ================================
 # 初始化配置文件
@@ -577,7 +578,7 @@ class BiliHandler(blivedm.BaseHandler):
                     gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
                     gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
 
-            if cd_status:  # True则倒计时为启动状态
+            if cd_status or app.storage.general.get("ignore_cd", False):  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
                     with open("data/gifts.json", "r", encoding="utf-8") as f:
                         gifts = json.load(f)
@@ -2049,19 +2050,23 @@ with ui.card(align_items="center").classes("absolute-center") as main_card:
 
     # 房间号
     with ui.row(align_items="center"):
-        room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px").bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
+        room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px")
+        room_id.bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
 
-        with ui.column().classes("gap-0"):
+        with ui.column(align_items="center").classes("gap-0"):
             b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
-            show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config()).bind_value(config, "show_capture_gift_list").props('color="btn"')
-
-        with ui.column().classes("gap-0"):
-            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
-            gift_challenge_switch.disable()
-
+            show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config())
+            show_capture_gift_list_switch.bind_value(config, "show_capture_gift_list").props('color="btn"')
             with ui.row().classes("gap-0"):
                 ui.label("登录状态：")
                 login_status = ui.label("未连接").classes("text-red")
+
+        with ui.column(align_items="center").classes("gap-0"):
+            with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
+                ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
+
+            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
+            gift_challenge_switch.disable()
 
             with ui.row().classes("gap-0"):
                 ui.label("当前行数：")
@@ -2074,6 +2079,8 @@ with ui.card(align_items="center").classes("absolute-center") as main_card:
         ui.button("礼物设置", on_click=lambda: gift_setting_dialog.open())
         ui.button("颜色设置", on_click=lambda: color_dialog.open())
         ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
+        # Preview page button
+        ui.button("界面预览", on_click=lambda: open_capture())
 
     with ui.row():
         # Login bilibili button
@@ -2082,8 +2089,7 @@ with ui.card(align_items="center").classes("absolute-center") as main_card:
         ui.button("检查更新", on_click=lambda: check_update())
         # Changelog button
         ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
-        # Preview page button
-        ui.button("界面预览", on_click=lambda: open_capture())
+        ui.button("打开日志", on_click=lambda: os.startfile(os.path.join("logs", f"bili_travail_{datetime.datetime.now().strftime("%Y%m%d")}.log")))
 
     # obs源
     with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
@@ -2238,6 +2244,6 @@ def _():
 
 # 运行NiceGUI
 try:
-    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 650])
+    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 670])
 except:
     logger.error(f"run error: {traceback.format_exc()}")
