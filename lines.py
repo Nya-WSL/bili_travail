@@ -65,7 +65,7 @@ def lines() -> int:
         file_extension = '.' + file_extension
 
     # 自定义要排除的文件（可选）
-    custom_exclude_files = "web.py,test.py,test1.py,gift_mapping.py,changelog.py,lines.py".strip()
+    custom_exclude_files = "web.py,test.py,test1.py,gift_mapping.py,lines.py".strip()
 
     exclude_files = None
     if custom_exclude_files:
