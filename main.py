@@ -29,7 +29,7 @@ import http.cookies
 from typing import *
 from nicegui import ui, app
 
-version = "0.31.7-alpha"
+version = "0.31.8-alpha"
 logger.debug("version: {}", version)
 
 if os.path.exists("lines.txt"):
@@ -392,8 +392,8 @@ class BiliHandler(blivedm.BaseHandler):
         uname = message.uname
         price = message.price / 100
         result = ""
-        if len(uname.split("")) > 8:
-            uname = uname.split("")[0-5] + "..."
+        if len(uname) > 8:
+            uname = uname[:5] + "..."
 
         self._on_gift_play(gift, num, uname, message, price)
         self._on_gift_statistics(gift, num, uname, price)
@@ -417,8 +417,8 @@ class BiliHandler(blivedm.BaseHandler):
         else:
             gift = "神秘物种"
 
-        if len(uname.split("")) > 8:
-            uname = uname.split("")[0-5] + "..."
+        if len(uname) > 8:
+            uname = uname[:5] + "..."
 
         self._on_gift_play(gift, num, uname, False)
         self._on_gift_statistics(gift, num, uname, price)
@@ -685,6 +685,7 @@ class CountdownTimer:
 
     # 倒计时运行函数
     async def _run(self, label):
+        global cd_status
         while self._running and self._remaining_time > 0:
             if self._paused:
                 await self._paused_event.wait()  # Wait until unpaused
@@ -710,6 +711,9 @@ class CountdownTimer:
             input_hour.set_value(0)
             input_minute.set_value(0)
             input_second.set_value(0)
+
+        elif self._remaining_time > 0:
+            cd_status = True
 
     # 运行倒计时
     def start(self, label):
@@ -2247,3 +2251,15 @@ try:
     ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 670])
 except:
     logger.error(f"run error: {traceback.format_exc()}")
+
+# 只是想凑个3k行
+# Only want 3k lines
+#
+#
+#
+#
+#
+#
+#
+#
+#
