@@ -1507,6 +1507,21 @@ dev = ["abi3audit", "black (==24.10.0)", "check-manifest", "coverage", "packagin
 test = ["pytest", "pytest-xdist", "setuptools"]
 
 [[package]]
+name = "pure-protobuf"
+version = "3.1.2"
+description = "Protocol Buffers using Python type annotations"
+optional = false
+python-versions = "<4.0.0,>=3.8.0"
+groups = ["main"]
+files = [
+    {file = "pure_protobuf-3.1.2-py3-none-any.whl", hash = "sha256:1a05c95fc97b6290e1721658eca1ba17fb6a7c0a274e141f13e8e7b5f3712450"},
+    {file = "pure_protobuf-3.1.2.tar.gz", hash = "sha256:700f70671b892d52b5c2f1d7330bce3e57eb5fac3d8831a8d8a631457eaac236"},
+]
+
+[package.dependencies]
+typing-extensions = ">=4.4.0,<5.0.0"
+
+[[package]]
 name = "py-cpuinfo"
 version = "9.0.0"
 description = "Get CPU info with pure Python"
@@ -2668,4 +2683,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "b4984d8d7769ddac6a475b59b6cd621d4fb9ab8fec90adc8f12ae82438722259"
+content-hash = "b92da54376f10f8047f4ecd63805b3d5af8c3c923412d3778d51868ccd95db94"

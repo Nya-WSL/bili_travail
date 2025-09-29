@@ -4,13 +4,13 @@ import requests
 from nicegui import ui
 
 
-def get_log():
+def get_log() -> dict:
     url = "http://version.nya-wsl.cn/bili_travail/changelog.json"
     response = requests.get(url)
     if response.status_code == 200:
         return response.json()
     else:
-        return False
+        return {}
 
 
 def changelog():
@@ -39,7 +39,7 @@ def changelog():
                 color=config["btn_color"],
             ).style("right: -15%")
 
-        if logs:
+        if logs != {}:
             with ui.timeline(side="right", layout="comfortable", color="btn"):
                 for k, v in logs.items():
                     with ui.timeline_entry(title=f"Release of {k}", subtitle=v["date"]):

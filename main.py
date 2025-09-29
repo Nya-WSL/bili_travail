@@ -10,7 +10,7 @@ import blivedm.blivedm.models.web as web_models
 
 from log import logger
 from blivedm import blivedm
-from changelog import changelog
+from changelog import changelog, get_log
 
 # Third Party Packages
 import os
@@ -28,8 +28,9 @@ import traceback
 import http.cookies
 from typing import *
 from nicegui import ui, app
+from itertools import islice
 
-version = "0.31.8-alpha"
+version = "0.31.9-alpha"
 logger.debug("version: {}", version)
 
 if os.path.exists("lines.txt"):
@@ -431,7 +432,7 @@ class BiliHandler(blivedm.BaseHandler):
     def _on_super_chat(self, client: blivedm.BLiveClient, message: web_models.SuperChatMessage):
         logger.info(f'[{client.room_id}] 醒目留言 ¥{message.price} {message.uname}：{message.message}')
 
-    def _on_interact_word(self, client: blivedm.BLiveClient, message: web_models.InteractWordMessage):
+    def _on_interact_word_v2(self, client: blivedm.BLiveClient, message: web_models.InteractWordV2Message):
         if message.msg_type == 1:
             logger.info(f'{message.username} 进入房间')
 
@@ -1920,8 +1921,23 @@ async def ping_server():
     else:
         return False
 
+def get_version():
+    logs = get_log()
+    version_flag = False
+    num = 0
+
+    if logs != {}:
+        for i in logs.keys():
+            if not version_flag:
+                num += 1
+            if i == version:
+                version_flag = True
+        return dict(islice(logs.items(), num - 1))
+    else:
+        return {}
+
 # 检查版本更新按钮
-async def check_update(init = False):
+async def check_update():
 
     async def update(server, status):
         if server == "auto":
@@ -1938,6 +1954,12 @@ async def check_update(init = False):
             ui.label(f"当前版本：{version} | 最新版本：{status}")
             server_select = ui.select(options={"CN-HK": "国内源", "CN-QN": "国内备用源", "GitHub": "GitHub", "auto": "自动检测"}, label="选择更新源", value="auto").classes("w-1/2")
             ui.button("更新", on_click=lambda: update(server_select.value, status))
+            for k,v in get_version().items():
+                with ui.timeline(side="right", layout="dense", color="btn"):
+                    with ui.timeline_entry(title=f"Release of {k}", subtitle=v["date"]):
+                        with ui.column().classes("gap-3"):
+                            for item in v["content"]:
+                                ui.label(f"● {item}")
 
         dialog.open()
 
@@ -1969,10 +1991,7 @@ async def check_update(init = False):
 
     if status != version:
         if status != "Error":
-            if init:
-                with main_card:
-                    ui.notify(f"检查到可用更新：v{status}", progress=True, timeout=10000, color="orange-10")
-            else:
+            with main_card:
                 version_dialog()
         else:
             with main_card:
@@ -2007,7 +2026,7 @@ with ui.dialog() as color_dialog, ui.card(align_items="center"):
 
 # 创建主界面
 with ui.card(align_items="center").classes("absolute-center") as main_card:
-    asyncio.run(check_update(True))
+    asyncio.run(check_update())
     time_badge = ui.badge("00:00:00", outline=True, color="").classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
     time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
     gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 投喂挑战总数
@@ -2229,7 +2248,7 @@ def _():
                     with ui.avatar():
                         ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
                 ui.badge("狐日泽", outline=True)
-            with ui.column(align_items="center"):
+            with ui.column(align_items="center"): 
                 ui.label("特别感谢").classes("text-blue")
                 with ui.link(target="https://space.bilibili.com/3546729020394298/", new_tab=True):
                     with ui.avatar():
@@ -2251,15 +2270,3 @@ try:
     ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 670])
 except:
     logger.error(f"run error: {traceback.format_exc()}")
-
-# 只是想凑个3k行
-# Only want 3k lines
-#
-#
-#
-#
-#
-#
-#
-#
-#
