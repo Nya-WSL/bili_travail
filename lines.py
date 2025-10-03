@@ -21,7 +21,7 @@ def count_lines_in_files(
     
     # 默认排除的目录
     if exclude_dirs is None:
-        exclude_dirs = ['venv', '.venv', 'site-packages', 'dist', 'blivedm']
+        exclude_dirs = ['venv', '.venv', 'site-packages', 'dist']
     
     # 默认排除的文件
     if exclude_files is None:
@@ -65,7 +65,7 @@ def lines() -> int:
         file_extension = '.' + file_extension
 
     # 自定义要排除的文件（可选）
-    custom_exclude_files = "web.py,test.py,test1.py,gift_mapping.py,lines.py".strip()
+    custom_exclude_files = "web.py,test.py,test1.py,gift_mapping.py,sample.py,open_live_sample.py".strip()
 
     exclude_files = None
     if custom_exclude_files:
@@ -80,3 +80,7 @@ def lines() -> int:
         return total
     else:
         return 0
+
+if __name__ == "__main__":
+    total_lines = lines()
+    print(f"Total lines of code: {total_lines}")
