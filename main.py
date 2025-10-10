@@ -530,7 +530,7 @@ class BiliHandler(blivedm.BaseHandler):
                     # 如果收到的礼物在special.json中
                     if gift in special:
                         if special[gift] == "double": # 加倍挑战
-                            changed_num = int(gift_challenge_count.text) * (2 * int(num))
+                            changed_num = int(gift_challenge_count.text) * (2 ** int(num))
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -557,7 +557,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 total_changed_num += random_num
 
                             changed_num = int(gift_challenge_count.text) + total_changed_num
-                            gift_list_show_num = str(int(gifts[gift] * int(num)))
+                            gift_list_show_num = str(total_changed_num)
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -624,7 +624,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                     if gift in special:
                         if special[gift] == "double":
-                            changed_time = tmp_time * (2 * int(num))
+                            changed_time = tmp_time * (2 ** int(num))
 
                             if is_blind_box:
                                 gift = origin_gift
