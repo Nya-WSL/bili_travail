@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.31.10-alpha"
+version = "0.31.10-dev2"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -530,14 +530,24 @@ class BiliHandler(blivedm.BaseHandler):
                     # 如果收到的礼物在special.json中
                     if gift in special:
                         if special[gift] == "double": # 加倍挑战
-                            changed_num = int(gift_challenge_count.text) * (2 ** int(num))
+                            changed_num = int(gift_challenge_count.text) << int(num)
 
                             if is_blind_box:
                                 gift = origin_gift
 
                             # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, f"{2 * int(num)}倍", message)
+                                capture_challenge_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
+
+                        if special[gift] == "half": # 减半挑战
+                            changed_num = int(gift_challenge_count.text) >> int(num)
+
+                            if is_blind_box:
+                                gift = origin_gift
+
+                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                            if show_capture_gift_list_switch.value and capture_gift_is_created:
+                                capture_challenge_gift_list_show(uname, gift, num, f"2^(-{int(num)})倍", message)
 
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
@@ -624,14 +634,24 @@ class BiliHandler(blivedm.BaseHandler):
 
                     if gift in special:
                         if special[gift] == "double":
-                            changed_time = tmp_time * (2 ** int(num))
+                            changed_time = int(tmp_time) << int(num)
 
                             if is_blind_box:
                                 gift = origin_gift
 
                             # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, f"{2 * int(num)}倍", message)
+                                capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
+
+                        if special[gift] == "half":
+                            changed_time = int(tmp_time) >> int(num)
+
+                            if is_blind_box:
+                                gift = origin_gift
+
+                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
+                            if show_capture_gift_list_switch.value and capture_cd_is_created:
+                                capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "clear":
                             changed_time = 3
@@ -871,7 +891,7 @@ def cd_setting_dialog():
         else:
             min.set_visibility(False)
             max.set_visibility(False)
-        if status.value == "double" or status.value == "clear" or status.value == "random":
+        if status.value == "double" or status.value == "clear" or status.value == "random" or status.value == "half":
             time.disable()
         else:
             time.enable()
@@ -901,6 +921,10 @@ def cd_setting_dialog():
                     special.pop(gift_name.value)
             elif status.value == "double":
                 special[gift_name.value] = "double"
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+            elif status.value == "half":
+                special[gift_name.value] = "half"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
             elif status.value == "clear":
@@ -1030,6 +1054,8 @@ def cd_setting_dialog():
                             v = "清空"
                         if v == "double":
                             v = "加倍"
+                        if v == "half":
+                            v = "减半"
                         ui.label(v)
                         ui.button("删除", on_click=lambda k = k: del_gift(True, k))
 
@@ -1056,7 +1082,7 @@ def cd_setting_dialog():
                 gifts_name.append(k)
             gift_name = ui.select(label="礼物选择", options=gifts_name, with_input=True, clearable=True).style("width: 200px")
 
-        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
+        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
 
         # 数值输入框
         with ui.row():
@@ -1151,7 +1177,7 @@ def gift_count_setting_dialog():
         else:
             min.set_visibility(False)
             max.set_visibility(False)
-        if status.value == "double" or status.value == "clear" or status.value == "random":
+        if status.value == "double" or status.value == "clear" or status.value == "random" or status.value == "half":
             number.disable()
         else:
             number.enable()
@@ -1180,6 +1206,10 @@ def gift_count_setting_dialog():
                     special.pop(gift_name.value)
             elif status.value == "double":
                 special[gift_name.value] = "double"
+                if gift_name.value in gifts:
+                    gifts[gift_name.value] = 0
+            elif status.value == "half":
+                special[gift_name.value] = "half"
                 if gift_name.value in gifts:
                     gifts[gift_name.value] = 0
             elif status.value == "clear":
@@ -1314,6 +1344,8 @@ def gift_count_setting_dialog():
                             v = "清空"
                         if v == "double":
                             v = "加倍"
+                        if v == "half":
+                            v = "减半"
                         ui.label(v)
                         ui.button("删除", on_click=lambda k = k: del_gift(True, k))
 
@@ -1339,7 +1371,7 @@ def gift_count_setting_dialog():
                 gifts_name.append(k)
             gift_name = ui.select(label="礼物选择", options=gifts_name, with_input=True, clearable=True).style("width: 200px")
 
-        status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
+        status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
             min = ui.number("随机最小数", value=0)
             max = ui.number("随机最大数", value=0)
@@ -1702,6 +1734,8 @@ async def capture():
                             v = "清空"
                         if v == "double":
                             v = "加倍"
+                        if v == "half":
+                            v = "减半"
                         ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
         def capture_cd_gift_list_show(name, gift, num, time, message):
@@ -1857,6 +1891,8 @@ async def capture():
                             v = "清空"
                         if v == "double":
                             v = "加倍"
+                        if v == "half":
+                            v = "减半"
                         ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
         def capture_challenge_gift_list_show(name, gift, num, time, message):
