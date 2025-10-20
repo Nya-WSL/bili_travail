@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.31.10-alpha"
+version = "0.31.11-alpha"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -1765,7 +1765,7 @@ async def capture():
                     "gift": gift,
                     "num": num,
                     "rule": time,
-                    "url": message.gift_img_basic if message else gifts.get(data["gift"], ""),
+                    "url": message.gift_img_basic if message else gifts.get(gift, ""),
                     "time": datetime.datetime.now().strftime('%H:%M:%S')
                 })
 
@@ -1922,7 +1922,7 @@ async def capture():
                     "gift": gift,
                     "num": num,
                     "rule": time,
-                    "url": message.gift_img_basic if message else gifts.get(data["gift"], ""),
+                    "url": message.gift_img_basic if message else gifts.get(gift, ""),
                     "time": datetime.datetime.now().strftime('%H:%M:%S')
                 })
 
