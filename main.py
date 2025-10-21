@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.31.11-alpha"
+version = "0.32.0-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -110,6 +110,11 @@ def format_seconds(seconds):
     if seconds > 0 or (hours == 0 and minutes == 0):  # 有秒或时分均为 0 时，才显示秒
         parts.append(f"{seconds}秒")
     return sign + "".join(parts)  # 返回结果，注意是字符串形式
+
+def format_cd(seconds):
+    minute, second = divmod(seconds, 60)
+    hour, minute = divmod(minute, 60)
+    return ("%02d:%02d:%02d" % (hour, minute, second))
 
 example_config = {
     "room_id": "",
@@ -530,22 +535,20 @@ class BiliHandler(blivedm.BaseHandler):
                     # 如果收到的礼物在special.json中
                     if gift in special:
                         if special[gift] == "double": # 加倍挑战
-                            changed_num = int(gift_challenge_count.text) << int(num)
+                            changed_num = int(app.storage.general["gift_challenge_count"]) << int(num)
 
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "half": # 减半挑战
-                            changed_num = int(gift_challenge_count.text) >> int(num)
+                            changed_num = int(app.storage.general["gift_challenge_count"]) >> int(num)
 
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, f"2^(-{int(num)})倍", message)
 
@@ -555,7 +558,6 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, "清空")
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, "清空", message)
 
@@ -566,31 +568,28 @@ class BiliHandler(blivedm.BaseHandler):
                                 random_num = random.randint(special[gift][0], special[gift][1] + 1)
                                 total_changed_num += random_num
 
-                            changed_num = int(gift_challenge_count.text) + total_changed_num
+                            changed_num = int(app.storage.general["gift_challenge_count"]) + total_changed_num
                             gift_list_show_num = str(total_changed_num)
 
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
+                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
                     # 如果收到的礼物不在special.json中
                     else:
-                        changed_num = (gifts[gift] * int(num)) + int(gift_challenge_count.text) # （设定的值 * 礼物数量） + 目前总数
+                        changed_num = (gifts[gift] * int(num)) + int(app.storage.general["gift_challenge_count"]) # （设定的值 * 礼物数量） + 目前总数
                         gift_list_show_num = str(int(gifts[gift] * int(num)))
 
                         if is_blind_box:
                             gift = origin_gift
 
                         if gifts[gift] != 0 or is_blind_box:
-                            # gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + gift_play_unit_main.text, message)
+                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
-                    gift_challenge_count.set_text(changed_num) # 将label的text设定为结果
-                    gift_challenge_count.bind_text_to(app.storage.general, "gift_challenge_count") # 将结果写入storage
+                    app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
 
             if cd_status or app.storage.general.get("ignore_cd", False):  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
@@ -639,7 +638,6 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
@@ -649,7 +647,6 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, f"{2 * int(num)}倍")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
@@ -659,7 +656,6 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, "清空")
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, "清空", message)
 
@@ -674,7 +670,6 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            # gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
@@ -686,7 +681,6 @@ class BiliHandler(blivedm.BaseHandler):
                             gift = origin_gift
 
                         if gifts[gift] != 0 or is_blind_box:
-                            # gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
@@ -708,7 +702,7 @@ class CountdownTimer:
         return float(self._remaining_time)
 
     # 倒计时运行函数
-    async def _run(self, label):
+    async def _run(self):
         global cd_status
         while self._running and self._remaining_time > 0:
             if self._paused:
@@ -724,12 +718,11 @@ class CountdownTimer:
             # 格式化时间数据
             minute, second = divmod(self._remaining_time, 60)
             hour, minute = divmod(minute, 60)
-            label.set_text("%02d:%02d:%02d" % (hour, minute, second))
             await asyncio.sleep(1) # 异步阻塞1s
 
         # 判断倒计时状态
         if self._remaining_time <= 0:
-            await self.stop(time_badge)
+            await self.stop()
 
             # 倒计时结束后重置时间输入框
             input_hour.set_value(0)
@@ -740,14 +733,14 @@ class CountdownTimer:
             cd_status = True
 
     # 运行倒计时
-    def start(self, label):
+    def start(self):
         global cd_status
         # 如果倒计时未在运行
         if not self._running:
             self._running = True # 修改运行状态
             self._remaining_time = self._start_time  # 设置开始时间
             if self._remaining_time != 0: # 防止写入0时开始倒计时
-                self._task = asyncio.create_task(self._run(label)) # 创建倒计时协程
+                self._task = asyncio.create_task(self._run()) # 创建倒计时协程
                 # 重置时间输入框
                 input_hour.set_value(0)
                 input_minute.set_value(0)
@@ -786,14 +779,13 @@ class CountdownTimer:
             cd_status = True
 
     # 停止倒计时
-    async def stop(self, label):
+    async def stop(self):
         global cd_status
         if self._running:
             self._running = False
             self._paused = False
             if self._task:
                 self._task.cancel() # 结束协程
-            label.set_text("00:00:00")
             app.storage.general["countdown_time"] = 0
             self._start_time = int(app.storage.general["countdown_time"])
             self._remaining_time = self._start_time  # Reset the timer
@@ -809,7 +801,6 @@ class CountdownTimer:
             cd_status = False
         else:
             if reset_inherit_status:
-                label.set_text("00:00:00")
                 app.storage.general["countdown_time"] = 0
                 self._start_time = int(app.storage.general["countdown_time"])
                 self._remaining_time = self._start_time  # Reset the timer
@@ -828,15 +819,10 @@ class CountdownTimer:
         self._start_time = time
         self._remaining_time = time
 
-        # 更新 UI 上的显示
-        hour, minute = divmod(self._remaining_time, 3600)
-        minute, second = divmod(minute, 60)
-        time_badge.set_text("%02d:%02d:%02d" % (hour, minute, second))
-
         # 如果计时器没有运行，则重新启动计时器
         if not self._running:
             self._running = True
-            self._task = asyncio.create_task(self._run(time_badge))
+            self._task = asyncio.create_task(self._run())
 
     # 继承倒计时
     def inherit_time(self, time):
@@ -849,12 +835,6 @@ class CountdownTimer:
         # 更新起始时间和剩余时间
         self._start_time = time
         self._remaining_time = time
-
-        # 更新 UI 上的显示
-        hour, minute = divmod(self._remaining_time, 3600)
-        minute, second = divmod(minute, 60)
-        time_badge.set_text("%02d:%02d:%02d" % (hour, minute, second))
-
 
 def sort_dict(d):
     # 分离正数（包括零）和负数
@@ -1312,9 +1292,9 @@ def gift_count_setting_dialog():
                     ui.label(k)
                     ui.space()
                     if v <= 0:
-                        ui.label(f"{int(v)}{gift_play_unit_main.text}")
+                        ui.label(f"{int(v)}{app.storage.general["gift_challenge_unit"]}")
                     elif v > 0:
-                        ui.label(f"+{int(v)}{gift_play_unit_main.text}")
+                        ui.label(f"+{int(v)}{app.storage.general["gift_challenge_unit"]}")
                     ui.button("删除", on_click=lambda k = k: del_gift(False, k))
 
         if special != {}:
@@ -1324,17 +1304,17 @@ def gift_count_setting_dialog():
                         ui.label(k)
                         ui.space()
                         if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}{gift_play_unit_main.text}")
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general["gift_challenge_unit"]}")
                         elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}{gift_play_unit_main.text}")
+                            ui.label(f"{int(v[0])} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}")
                         elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}{gift_play_unit_main.text}")
+                            ui.label(f"{int(v[0])} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}")
                         elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}")
+                            ui.label(f"{v[0]} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}")
                         elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
+                            ui.label(f"{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}")
                         else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}")
+                            ui.label(f"+{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}")
                         ui.button("删除", on_click=lambda k = k: del_gift(True, k))
                 else:
                     with ui.row().classes('w-full'):
@@ -1378,14 +1358,14 @@ def gift_count_setting_dialog():
             number = ui.number(label="数量", value=0, min=0).style("width: 150px")
 
             # 自定义单位、项目输入框
-            if gift_play_unit_main != "":
-                gift_play_unit = ui.input("单位", value=gift_play_unit_main.text, on_change=lambda e: gift_play_unit_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_unit")
+            if app.storage.general["gift_challenge_unit"] != "":
+                gift_play_unit = ui.input("单位").bind_value(app.storage.general, "gift_challenge_unit")
             else:
-                gift_play_unit = ui.input("单位", on_change=lambda e: gift_play_unit_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_unit")
-            if gift_play_text_main != "":
-                gift_play_text = ui.input("项目", value=gift_play_text_main.text, on_change=lambda e: gift_play_text_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_text")
+                gift_play_unit = ui.input("单位").bind_value(app.storage.general, "gift_challenge_unit")
+            if app.storage.general["gift_challenge_text"] != "":
+                gift_play_text = ui.input("项目").bind_value(app.storage.general, "gift_challenge_text")
             else:
-                gift_play_text = ui.input("项目", on_change=lambda e: gift_play_text_main.set_text(e.value)).bind_value_to(app.storage.general, "gift_challenge_text")
+                gift_play_text = ui.input("项目").bind_value(app.storage.general, "gift_challenge_text")
 
             number.set_visibility(False)
             min.set_visibility(False)
@@ -1435,7 +1415,7 @@ def gift_count_setting_dialog():
 def init_task():
     global countdown_timer
     global reset_inherit_status
-    countdown_timer = CountdownTimer(int(time_badge_inherit.text))
+    countdown_timer = CountdownTimer(int(app.storage.general["countdown_time"]))
     if app.storage.general.get("countdown_time", 0) != 0: # 如果存在可继承的倒计时
         cancel_button.set_text("重置")
         cancel_button.enable()
@@ -1446,7 +1426,7 @@ def start_task():
     if countdown_timer._start_time == 0:
         countdown_timer._start_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
         countdown_timer._remaining_time = countdown_timer._start_time
-    countdown_timer.start(time_badge)
+    countdown_timer.start()
 
 
 # 手动加时
@@ -1698,7 +1678,7 @@ async def capture():
 
     # 创建预览界面
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"): # 居中、背景透明、取消卡片阴影、置顶居中
-        ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(time_badge).classes("text-8xl") # 创建时钟
+        ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl") # 创建时钟
 
         ui.separator() # 分割线
 
@@ -1843,9 +1823,9 @@ async def capture():
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
         with ui.row():
             ui.label("总计").classes("text-4xl").style(f"color: {config['color']}").classes("text-5xl")
-            ui.label().bind_text_from(gift_challenge_count).style(f"color: {config['color']}").classes("text-5xl")
-            ui.label().bind_text_from(gift_play_unit_main).style(f"color: {config['color']}").classes("text-5xl")
-            ui.label().bind_text_from(gift_play_text_main).style(f"color: {config['color']}").classes("text-5xl")
+            ui.label().bind_text_from(app.storage.general, "gift_challenge_count").style(f"color: {config['color']}").classes("text-5xl")
+            ui.label().bind_text_from(app.storage.general, "gift_challenge_unit").style(f"color: {config['color']}").classes("text-5xl")
+            ui.label().bind_text_from(app.storage.general, "gift_challenge_text").style(f"color: {config['color']}").classes("text-5xl")
         ui.separator()
         for k,v in gifts.items():
             if v != 0:
@@ -1854,12 +1834,10 @@ async def capture():
                         ui.image().bind_source_from(gift_img, k)
                     ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     ui.space()
-                    if v < 0:
-                        ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                    elif v > 0:
-                        ui.label(f"+{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                    if v <= 0:
+                        ui.label(f"{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     else:
-                        ui.label(f"{int(v)}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                        ui.label(f"+{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
         if special != {}:
             for k,v in special.items():
@@ -1870,17 +1848,17 @@ async def capture():
                         ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         ui.space()
                         if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{v[0]} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                         else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}{gift_play_unit_main.text}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"+{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
@@ -1958,246 +1936,241 @@ async def capture():
 
     ui.timer(5, callback=lambda: check_gift_refresh())
 
+@ui.page("/")
+def index():
+    # ================================
+    # 主界面GUI
+    # ================================
 
-# ================================
-# 主界面GUI
-# ================================
+    global show_capture_gift_list_switch, room_id, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, init_login_dialog, start_button, pause_button, resume_button, add_button, sub_button
 
-with open("config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
 
-async def ping_server():
-    servers = {
-        "GitHub": "github.com",
-        "CN-HK": "travail.nya-wsl.com",
-        "CN-QN": "qn.nya-wsl.cn"
-    }
-    server = await ping.ping(servers.values())
-    if server != False:
-        for k, v in servers.items():
-            if v == server:
-                return k
-    else:
-        return False
+    async def ping_server():
+        servers = {
+            "GitHub": "github.com",
+            "CN-HK": "travail.nya-wsl.com",
+            "CN-QN": "qn.nya-wsl.cn"
+        }
+        server = await ping.ping(servers.values())
+        if server != False:
+            for k, v in servers.items():
+                if v == server:
+                    return k
+        else:
+            return False
 
-def get_version():
-    logs = get_log()
-    version_flag = False
-    num = 0
+    def get_version():
+        logs = get_log()
+        version_flag = False
+        num = 0
 
-    if logs != {}:
-        for i in logs.keys():
-            if not version_flag:
-                num += 1
-            if i == version:
-                version_flag = True
-        return dict(islice(logs.items(), num - 1))
-    else:
-        return {}
+        if logs != {}:
+            for i in logs.keys():
+                if not version_flag:
+                    num += 1
+                if i == version:
+                    version_flag = True
+            return dict(islice(logs.items(), num - 1))
+        else:
+            return {}
 
-# 检查版本更新按钮
-async def check_update():
+    # 检查版本更新按钮
+    async def check_update():
 
-    async def update(server, status):
-        if server == "auto":
-            ui.notify(f"测速中，请稍候...", progress=True, timeout=3000, type="ongoing", color="blue-100")
-            server = await ping_server()
-            if server == False:
-                ui.notify("无法连接更新服务器", type="negative")
-                return
+        async def update(server, status):
+            if server == "auto":
+                ui.notify(f"测速中，请稍候...", progress=True, timeout=3000, type="ongoing", color="blue-100")
+                server = await ping_server()
+                if server == False:
+                    ui.notify("无法连接更新服务器", type="negative")
+                    return
 
-        await travail_update.update(server, status) # 调用更新函数
+            await travail_update.update(server, status) # 调用更新函数
 
-    def version_dialog():
-        with ui.dialog() as dialog, ui.card(align_items="center"):
-            ui.label(f"当前版本：{version} | 最新版本：{status}")
-            server_select = ui.select(options={"CN-HK": "国内源", "CN-QN": "国内备用源", "GitHub": "GitHub", "auto": "自动检测"}, label="选择更新源", value="auto").classes("w-1/2")
-            ui.button("更新", on_click=lambda: update(server_select.value, status))
-            for k,v in get_version().items():
-                with ui.timeline(side="right", layout="dense", color="btn"):
-                    with ui.timeline_entry(title=f"Release of {k}", subtitle=v["date"]):
-                        with ui.column().classes("gap-3"):
-                            for item in v["content"]:
-                                ui.label(f"● {item}")
+        def version_dialog():
+            with ui.dialog() as dialog, ui.card(align_items="center"):
+                ui.label(f"当前版本：{version} | 最新版本：{status}")
+                server_select = ui.select(options={"CN-HK": "国内源", "CN-QN": "国内备用源", "GitHub": "GitHub", "auto": "自动检测"}, label="选择更新源", value="auto").classes("w-1/2")
+                ui.button("更新", on_click=lambda: update(server_select.value, status))
+                for k,v in get_version().items():
+                    with ui.timeline(side="right", layout="dense", color="btn"):
+                        with ui.timeline_entry(title=f"Release of {k}", subtitle=v["date"]):
+                            with ui.column().classes("gap-3"):
+                                for item in v["content"]:
+                                    ui.label(f"● {item}")
 
-        dialog.open()
+            dialog.open()
 
-    def version_check():
-        url = ["http://version.nya-wsl.cn/bili_travail/version.json", "https://nya-wsl.com/bili_travail/version.json"]
-        try:
-            response = requests.get(url[0]) # 优先从Nya-WSL中国服务器获取版本信息
-            if response.status_code == 200:
-                data = response.json()
-                latest_version = data["version"]
-            else:
-                raise ValueError("From Nya-WSL CN to get version info was error") # 抛出错误
-        except Exception as e:
-            logger.error(e)
+        def version_check():
+            url = ["http://version.nya-wsl.cn/bili_travail/version.json", "https://nya-wsl.com/bili_travail/version.json"]
             try:
-                response = requests.get(url[1]) # 从Nya-WSL海外服务器获取版本信息
-                if response.status_code == 200: # 服务器请求返回值
+                response = requests.get(url[0]) # 优先从Nya-WSL中国服务器获取版本信息
+                if response.status_code == 200:
                     data = response.json()
                     latest_version = data["version"]
                 else:
-                    latest_version = "Error"
+                    raise ValueError("From Nya-WSL CN to get version info was error") # 抛出错误
             except Exception as e:
                 logger.error(e)
-                latest_version = "Error" # 如果请求均失败版本信息设为"Error"
+                try:
+                    response = requests.get(url[1]) # 从Nya-WSL海外服务器获取版本信息
+                    if response.status_code == 200: # 服务器请求返回值
+                        data = response.json()
+                        latest_version = data["version"]
+                    else:
+                        latest_version = "Error"
+                except Exception as e:
+                    logger.error(e)
+                    latest_version = "Error" # 如果请求均失败版本信息设为"Error"
 
-        return latest_version
+            return latest_version
 
-    status = version_check()
+        status = version_check()
 
-    if status != version:
-        if status != "Error":
-            with main_card:
-                version_dialog()
+        if status != version:
+            if status != "Error":
+                with main_card:
+                    version_dialog()
+            else:
+                with main_card:
+                    ui.notify("检查更新失败", type="negative")
         else:
             with main_card:
-                ui.notify("检查更新失败", type="negative")
-    else:
-        with main_card:
-            ui.notify("已是最新版本", type="positive")
+                ui.notify("已是最新版本", type="positive")
 
-# 礼物设置弹窗
-with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
-    with ui.row():
-        ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-        ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
-        ui.button("更新礼物", on_click=lambda: refresh_gift())
-    ui.button("关闭", on_click=lambda: gift_setting_dialog.close())
+    # 礼物设置弹窗
+    with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
+        with ui.row():
+            ui.button("加班设置", on_click=lambda: cd_setting_dialog())
+            ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
+            ui.button("更新礼物", on_click=lambda: refresh_gift())
+        ui.button("关闭", on_click=lambda: gift_setting_dialog.close())
 
-# 统计相关弹窗
-with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
-    with ui.row():
-        ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
-        ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
-    ui.button("关闭", on_click=lambda: gift_count_dialog.close())
+    # 统计相关弹窗
+    with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
+        with ui.row():
+            ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
+            ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
+        ui.button("关闭", on_click=lambda: gift_count_dialog.close())
 
-with ui.dialog() as color_dialog, ui.card(align_items="center"):
-    # 颜色输入框
-    with ui.row():
-        ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
-        ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
-        ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
-    ui.button("关闭", on_click=lambda: color_dialog.close())
+    with ui.dialog() as color_dialog, ui.card(align_items="center"):
+        # 颜色输入框
+        with ui.row():
+            ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+            ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
+            ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
+        ui.button("关闭", on_click=lambda: color_dialog.close())
 
 
-# 创建主界面
-with ui.card(align_items="center").classes("absolute-center") as main_card:
-    asyncio.run(check_update())
-    time_badge = ui.badge("00:00:00", outline=True, color="").classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
-    time_badge_inherit = ui.badge(0).bind_text_from(app.storage.general, "countdown_time") # 倒计时数据继承
-    gift_challenge_count = ui.badge(0).bind_text_from(app.storage.general, "gift_challenge_count") # 投喂挑战总数
-    gift_play_unit_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_unit") # 投喂挑战单位
-    gift_play_text_main = ui.label().bind_text_from(app.storage.general, "gift_challenge_text") # 投喂挑战项目
-    time_badge_inherit.set_visibility(False) # 隐藏继承数据徽章
-    gift_challenge_count.set_visibility(False) # 隐藏投喂挑战总数徽章
-    gift_play_unit_main.set_visibility(False) # 隐藏投喂挑战单位标签
-    gift_play_text_main.set_visibility(False) # 隐藏投喂挑战项目标签
+    # 创建主界面
+    with ui.card(align_items="center").classes("absolute-center") as main_card:
+        asyncio.create_task(check_update())
+        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
 
-    # 时间输入框
-    with ui.row():
-        input_hour = ui.number("时", value=0, min=0).style("width: 100px")
-        input_minute = ui.number("分", value=0, min=0).style("width: 100px")
-        input_second = ui.number("秒", value=0, min=0).style("width: 100px")
+        # 时间输入框
+        with ui.row():
+            input_hour = ui.number("时", value=0, min=0).style("width: 100px")
+            input_minute = ui.number("分", value=0, min=0).style("width: 100px")
+            input_second = ui.number("秒", value=0, min=0).style("width: 100px")
 
-    # 倒计时按钮
-    with ui.row():
-        # Start button
-        start_button = ui.button('开始', on_click=lambda: start_task())
-        start_button.disable()
+        # 倒计时按钮
+        with ui.row():
+            # Start button
+            start_button = ui.button('开始', on_click=lambda: start_task())
+            start_button.disable()
 
-        # Pause button
-        pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause())
-        pause_button.disable()
+            # Pause button
+            pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause())
+            pause_button.disable()
 
-        # Resume button
-        resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
-        resume_button.disable()
+            # Resume button
+            resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
+            resume_button.disable()
 
-        # Stop button
-        cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop(time_badge))
-        cancel_button.disable()
+            # Stop button
+            cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop())
+            cancel_button.disable()
 
-        # Add time Button
-        add_button = ui.button("增加", on_click=lambda: add_time())
-        add_button.disable()
+            # Add time Button
+            add_button = ui.button("增加", on_click=lambda: add_time())
+            add_button.disable()
 
-        # Sub Time Button
-        sub_button = ui.button("减少", on_click=lambda: sub_time())
-        sub_button.disable()
+            # Sub Time Button
+            sub_button = ui.button("减少", on_click=lambda: sub_time())
+            sub_button.disable()
 
-    ui.separator()
+        ui.separator()
 
-    # 房间号
-    with ui.row(align_items="center"):
-        room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px")
-        room_id.bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
+        # 房间号
+        with ui.row(align_items="center"):
+            room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px")
+            room_id.bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
 
-        with ui.column(align_items="center").classes("gap-0"):
-            b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
-            show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config())
-            show_capture_gift_list_switch.bind_value(config, "show_capture_gift_list").props('color="btn"')
-            with ui.row().classes("gap-0"):
-                ui.label("登录状态：")
-                login_status = ui.label("未连接").classes("text-red")
+            with ui.column(align_items="center").classes("gap-0"):
+                b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+                show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config())
+                show_capture_gift_list_switch.bind_value(config, "show_capture_gift_list").props('color="btn"')
+                with ui.row().classes("gap-0"):
+                    ui.label("登录状态：")
+                    login_status = ui.label("未连接").classes("text-red")
 
-        with ui.column(align_items="center").classes("gap-0"):
-            with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
-                ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
+            with ui.column(align_items="center").classes("gap-0"):
+                with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
+                    ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
 
-            gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
-            gift_challenge_switch.disable()
+                gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
+                gift_challenge_switch.disable()
 
-            with ui.row().classes("gap-0"):
-                ui.label("当前行数：")
-                ui.label().bind_text_from(app.storage.general, "lines")
+                with ui.row().classes("gap-0"):
+                    ui.label("当前行数：")
+                    ui.label().bind_text_from(app.storage.general, "lines")
 
-    ui.separator()
+        ui.separator()
 
-    # 按钮组
-    with ui.row():
-        ui.button("礼物设置", on_click=lambda: gift_setting_dialog.open())
-        ui.button("颜色设置", on_click=lambda: color_dialog.open())
-        ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
-        # Preview page button
-        ui.button("界面预览", on_click=lambda: open_capture())
+        # 按钮组
+        with ui.row():
+            ui.button("礼物设置", on_click=lambda: gift_setting_dialog.open())
+            ui.button("颜色设置", on_click=lambda: color_dialog.open())
+            ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
+            # Preview page button
+            ui.button("界面预览", on_click=lambda: open_capture())
 
-    with ui.row():
-        # Login bilibili button
-        ui.button("登录账号", on_click=lambda: bili_login())
-        # Update version button
-        ui.button("检查更新", on_click=lambda: check_update())
-        # Changelog button
-        ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
-        ui.button("打开日志", on_click=lambda: os.startfile(os.path.join("logs", f"bili_travail_{datetime.datetime.now().strftime("%Y%m%d")}.log")))
+        with ui.row():
+            # Login bilibili button
+            ui.button("登录账号", on_click=lambda: bili_login())
+            # Update version button
+            ui.button("检查更新", on_click=lambda: check_update())
+            # Changelog button
+            ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
+            ui.button("打开日志", on_click=lambda: os.startfile(os.path.join("logs", f"bili_travail_{datetime.datetime.now().strftime("%Y%m%d")}.log")))
 
-    # obs源
-    with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
-        ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
-    with ui.label(f"http://{host}:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
-        ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
+        # obs源
+        with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
+            ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
+        with ui.label(f"http://{host}:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
+            ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
 
-    init_task()
-    countdown_timer.inherit_time(int(time_badge_inherit.text))
+        init_task()
+        countdown_timer.inherit_time(int(app.storage.general["countdown_time"]))
 
-    if not app.storage.general["startup_check_bili_auth"]:
-        with ui.dialog() as init_login_dialog, ui.card(align_items="center"):
-            ui.label("您似乎未登录B站账号，是否需要登录？")
-            ui.label("未登录历史礼物功能可能无法显示用户名且无法获取最新的盲盒数据")
-            ui.label("建议使用小号登录，以免账号被风控")
-            with ui.row():
-                ui.button("扫码登录", on_click=lambda: bili_login(True))
-                ui.button("取消", on_click=lambda: init_login_dialog.close())
+        if not app.storage.general["startup_check_bili_auth"]:
+            with ui.dialog() as init_login_dialog, ui.card(align_items="center"):
+                ui.label("您似乎未登录B站账号，是否需要登录？")
+                ui.label("未登录历史礼物功能可能无法显示用户名且无法获取最新的盲盒数据")
+                ui.label("建议使用小号登录，以免账号被风控")
+                with ui.row():
+                    ui.button("扫码登录", on_click=lambda: bili_login(True))
+                    ui.button("取消", on_click=lambda: init_login_dialog.close())
 
-        if config["room_id"] != "":
-            app.storage.general["startup_check_bili_auth"] = True
-            init_login_dialog.open()
+            if config["room_id"] != "":
+                app.storage.general["startup_check_bili_auth"] = True
+                init_login_dialog.open()
 
-# about按钮
-with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
-    ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
+    # about按钮
+    with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
+        ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @ui.page('/changelog')
 def _():
