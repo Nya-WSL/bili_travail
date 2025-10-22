@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.0-dev"
+version = "0.32.1-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -82,6 +82,33 @@ if os.path.exists("data/blind_box_value.json"):
     if not os.path.exists("data/blind_box"):
         os.mkdir("data/blind_box")
     shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+
+
+# 清理旧版本冲突的礼物数据
+def clear_old_data(paths: list):
+    for file_path in paths:
+        modified = False
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            old_key = [k for k, v in data.items() if v == 0] # 记录需要删除的key，防止破坏迭代器
+
+            # 执行删除
+            if old_key != []:
+                for k in old_key:
+                    data.pop(k)
+                    modified = True
+
+            if modified:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+                logger.debug(f"已清理与新版本冲突的礼物数据：{file_path}")
+
+        except Exception as e:
+            logger.error(f"清理数据 {file_path} 时出错: {str(e)}")
+
+clear_old_data(["data/gifts.json", "data/gifts_count.json"])
 
 def format_seconds(seconds):
     """
@@ -249,24 +276,27 @@ def init_config():
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
-            gift_config = GiftManager.get_config(img_path="data/gift_img.json", time_path="data/gifts.json") # 使用B站api
+            gift_config = GiftManager.get_config("data/gift_img.json") # 使用B站api
             # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
             if not gift_config:
-                GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
-        else:
-            # 如果没有room_id，则创建空文件
-            with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                json.dump({}, f, ensure_ascii=False, indent=4)
-            with open("data/gift_img.json", "w+", encoding="utf-8") as f:
-                json.dump({}, f, ensure_ascii=False, indent=4)
+                GiftManager.init_gift("data/gift_img.json")
 
     # 初始化数据
-    if not os.path.exists("data/special.json"):
-        with open("data/special.json", "w+", encoding="utf-8") as f:
+    if not os.path.exists("data/gift_img.json"):
+        with open("data/gift_img.json", "w+", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
+
+    if not os.path.exists("data/gifts.json"):
+        with open("data/gifts.json", "w+", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
 
     if not os.path.exists("data/gifts_count.json"):
-        shutil.copy("data/gifts.json", "data/gifts_count.json")
+        with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
+
+    if not os.path.exists("data/special.json"):
+        with open("data/special.json", "w+", encoding="utf-8") as f:
+            json.dump({}, f, ensure_ascii=False, indent=4)
 
     if not os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "w+", encoding="utf-8") as f:
@@ -406,7 +436,7 @@ class BiliHandler(blivedm.BaseHandler):
 
         self._on_gift_play(gift, num, uname, message, price)
         self._on_gift_statistics(gift, num, uname, price)
-        logger.info(message)
+        logger.debug(message)
 
 
     # 舰队数据
@@ -431,7 +461,7 @@ class BiliHandler(blivedm.BaseHandler):
 
         self._on_gift_play(gift, num, uname, False)
         self._on_gift_statistics(gift, num, uname, price)
-        logger.info(message)
+        logger.debug(message)
 
     # ================================
     # 醒目留言
@@ -501,11 +531,12 @@ class BiliHandler(blivedm.BaseHandler):
                         special = json.load(f)
 
                     # 如果礼物数据没有该礼物则写入
-                    if gift not in gifts:
-                        if gift not in special:
-                            gifts[gift] = 0
-                            with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
-                                json.dump(gifts, f, indent=4, ensure_ascii=False)
+                    if gift not in gifts and gift not in special:
+                        with open("data/gift_img.json", "r", encoding="utf-8") as f:
+                            gift_img = json.load(f)
+                        gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
+                        with open("data/gift_img.json", "w+", encoding="utf-8") as f:
+                            json.dump(gift_img, f, indent=4, ensure_ascii=False)
 
                     # 初始化盲盒数据
                     blind_box = create_blind_box()
@@ -590,6 +621,8 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
                     app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
+                else:
+                    logger.error("投喂挑战失败，未找到礼物数据文件")
 
             if cd_status or app.storage.general.get("ignore_cd", False):  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
@@ -600,11 +633,12 @@ class BiliHandler(blivedm.BaseHandler):
 
                     tmp_time = countdown_timer.get_tmp_time() # 获取当前倒计时
 
-                    if gift not in gifts:
-                        if gift not in special:
-                            gifts[gift] = 0
-                            with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                                json.dump(gifts, f, indent=4, ensure_ascii=False)
+                    if gift not in gifts and gift not in special:
+                        with open("data/gift_img.json", "r", encoding="utf-8") as f:
+                            gift_img = json.load(f)
+                        gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
+                        with open("data/gift_img.json", "w+", encoding="utf-8") as f:
+                            json.dump(gift_img, f, indent=4, ensure_ascii=False)
 
                     # 初始化盲盒数据
                     blind_box = create_blind_box()
@@ -685,6 +719,8 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
                     countdown_timer.set_time(changed_time) # 重设倒计时数据
+                else:
+                    logger.error("计时失败，未找到礼物数据文件")
 
 # 倒计时类
 class CountdownTimer:
@@ -715,9 +751,6 @@ class CountdownTimer:
             self._remaining_time -= 1 # 倒计时减1s
             app.storage.general["countdown_time"] = self._remaining_time
 
-            # 格式化时间数据
-            minute, second = divmod(self._remaining_time, 60)
-            hour, minute = divmod(minute, 60)
             await asyncio.sleep(1) # 异步阻塞1s
 
         # 判断倒计时状态
@@ -885,6 +918,7 @@ def cd_setting_dialog():
             gifts = json.load(f)
         with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
+
         if gift_name.value == None or time.value < 0:
             if gift_name.value == None:
                 ui.notify("请选择礼物", type="negative")
@@ -902,15 +936,15 @@ def cd_setting_dialog():
             elif status.value == "double":
                 special[gift_name.value] = "double"
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
             elif status.value == "half":
                 special[gift_name.value] = "half"
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
             elif status.value == "clear":
                 special[gift_name.value] = "clear"
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
             elif status.value == "random":
                 try:
                     if min.value <= max.value:
@@ -921,7 +955,7 @@ def cd_setting_dialog():
                 except TypeError:
                     ui.notify("随机的值为空", type="negative")
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
 
             gifts = sort_dict(gifts)  # 对礼物数据进行排序
 
@@ -937,17 +971,10 @@ def cd_setting_dialog():
     def reset():
         def double_check():
             global refresh_capture_cd
-            with open("data/gifts.json", "r+", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special.json", "r+", encoding="utf-8") as f:
-                special = json.load(f)
-            for k in gifts.keys():
-                gifts[k] = 0
-            special = {}
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, ensure_ascii=False, indent=4)
+                json.dump({}, f, ensure_ascii=False, indent=4)
             with open("data/special.json", "w+", encoding="utf-8") as f:
-                json.dump(special, f, ensure_ascii=False, indent=4)
+                json.dump({}, f, ensure_ascii=False, indent=4)
             refresh_capture_cd = True
             double_check_dialog.close()
             refresh_card()
@@ -967,8 +994,9 @@ def cd_setting_dialog():
             gifts = json.load(f)
         with open("data/special.json", "r+", encoding="utf-8") as f:
             special = json.load(f)
+
         if gift_name.value in gifts:
-            gifts[gift_name.value] = 0
+            gifts.pop(gift_name.value)
         if gift_name.value in special:
             special.pop(gift_name.value)
 
@@ -994,7 +1022,7 @@ def cd_setting_dialog():
             with open("data/special.json", "w+", encoding="utf-8") as f:
                 json.dump(special, f, ensure_ascii=False, indent=4)
         else:
-            gifts[k] = 0
+            gifts.pop(k)
             gifts = sort_dict(gifts)  # 对礼物数据进行排序
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -1008,8 +1036,8 @@ def cd_setting_dialog():
         with open("data/special.json", "r", encoding="utf-8") as f:
             special = json.load(f)
 
-        for k,v in gifts.items():
-            if v != 0:
+        if gifts != {}:
+            for k,v in gifts.items():
                 with ui.row().classes('w-full'):
                     ui.label(k)
                     ui.space()
@@ -1046,7 +1074,7 @@ def cd_setting_dialog():
 
     # 弹窗
     with ui.dialog() as cd_dialog, ui.card(align_items="center"):
-        with open("data/gifts.json", "r", encoding="utf-8") as f:
+        with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
 
         ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
@@ -1057,10 +1085,7 @@ def cd_setting_dialog():
         ui.separator() # 分割线
 
         with ui.row(align_items="center"):
-            gifts_name = []
-            for k,v in gifts.items():
-                gifts_name.append(k)
-            gift_name = ui.select(label="礼物选择", options=gifts_name, with_input=True, clearable=True).style("width: 200px")
+            gift_name = ui.select(label="礼物选择", options=gifts.keys(), with_input=True, clearable=True).style("width: 200px")
 
         status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
 
@@ -1187,15 +1212,15 @@ def gift_count_setting_dialog():
             elif status.value == "double":
                 special[gift_name.value] = "double"
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
             elif status.value == "half":
                 special[gift_name.value] = "half"
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
             elif status.value == "clear":
                 special[gift_name.value] = "clear"
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
             elif status.value == "random":
                 try:
                     if min.value <= max.value:
@@ -1206,7 +1231,9 @@ def gift_count_setting_dialog():
                 except TypeError:
                     ui.notify("随机的值为空", type="negative")
                 if gift_name.value in gifts:
-                    gifts[gift_name.value] = 0
+                    gifts.pop(gift_name.value)
+
+            gifts = sort_dict(gifts)  # 对礼物数据进行排序
 
             with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -1219,17 +1246,10 @@ def gift_count_setting_dialog():
     def reset():
         def double_check():
             global refresh_capture_gift
-            with open("data/gifts_count.json", "r+", encoding="utf-8") as f:
-                gifts = json.load(f)
-            with open("data/special_count.json", "r+", encoding="utf-8") as f:
-                special = json.load(f)
-            for k in gifts.keys():
-                gifts[k] = 0
-            special = {}
             with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
-                json.dump(gifts, f, ensure_ascii=False, indent=4)
+                json.dump({}, f, ensure_ascii=False, indent=4)
             with open("data/special_count.json", "w+", encoding="utf-8") as f:
-                json.dump(special, f, ensure_ascii=False, indent=4)
+                json.dump({}, f, ensure_ascii=False, indent=4)
             refresh_capture_gift = True
             double_check_dialog.close()
             refresh_card()
@@ -1249,10 +1269,13 @@ def gift_count_setting_dialog():
             gifts = json.load(f)
         with open("data/special_count.json", "r+", encoding="utf-8") as f:
             special = json.load(f)
+
         if gift_name.value in gifts:
-            gifts[gift_name.value] = 0
+            gifts.pop(gift_name.value)
         if gift_name.value in special:
             special.pop(gift_name.value)
+
+        gifts = sort_dict(gifts)  # 对礼物数据进行排序
 
         with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -1274,7 +1297,7 @@ def gift_count_setting_dialog():
             with open("data/special_count.json", "w+", encoding="utf-8") as f:
                 json.dump(special, f, ensure_ascii=False, indent=4)
         else:
-            gifts[k] = 0
+            gifts.pop(k)
             with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
 
@@ -1286,12 +1309,13 @@ def gift_count_setting_dialog():
             gifts = json.load(f)
         with open("data/special_count.json", "r", encoding="utf-8") as f:
             special = json.load(f)
-        for k,v in gifts.items():
-            if v != 0:
+
+        if gifts != {}:
+            for k,v in gifts.items():
                 with ui.row().classes('w-full'):
                     ui.label(k)
                     ui.space()
-                    if v <= 0:
+                    if v < 0:
                         ui.label(f"{int(v)}{app.storage.general["gift_challenge_unit"]}")
                     elif v > 0:
                         ui.label(f"+{int(v)}{app.storage.general["gift_challenge_unit"]}")
@@ -1335,7 +1359,7 @@ def gift_count_setting_dialog():
             create_card()
 
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
-        with open("data/gifts_count.json", "r", encoding="utf-8") as f:
+        with open("data/gift_img.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
 
         ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
@@ -1346,10 +1370,7 @@ def gift_count_setting_dialog():
         ui.separator()
 
         with ui.row(align_items="center"):
-            gifts_name = []
-            for k,v in gifts.items():
-                gifts_name.append(k)
-            gift_name = ui.select(label="礼物选择", options=gifts_name, with_input=True, clearable=True).style("width: 200px")
+            gift_name = ui.select(label="礼物选择", options=gifts.keys(), with_input=True, clearable=True).style("width: 200px")
 
         status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
@@ -1566,7 +1587,7 @@ async def refresh_gift_loop():
         logger.warning("房间号为空，跳过礼物更新")
         return
     
-    gift_config = GiftManager.get_config(img_path="data/gift_img.json", time_path="data/gifts.json", init=False)
+    gift_config = GiftManager.get_config("data/gift_img.json")
     
     if gift_config:
         result = "礼物数据定时更新完成"
@@ -1594,7 +1615,7 @@ async def refresh_gift():
 
         await asyncio.sleep(1)
 
-        gift_config = GiftManager.get_config(img_path="data/gift_img.json", time_path="data/gifts.json", init=False)
+        gift_config = GiftManager.get_config("data/gift_img.json")
 
         if gift_config == True:
             ui.notify("礼物数据更新完成", type="positive")
@@ -1615,7 +1636,7 @@ async def refresh_gift():
     def reset_local_gift():
         # 重置本地数据
         try:
-            GiftManager.init_gift("data/gift_img.json", "data/gifts.json")
+            GiftManager.init_gift("data/gift_img.json")
             ui.notify("重置成功", type="positive")
         except Exception as e:
             logger.exception(f"使用本地数据重置失败：{e}")

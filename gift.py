@@ -21,7 +21,7 @@ class BiliGiftManager:
         self.area_parent_id = 0
         self.area_id = 0
 
-    def init_gift(self, img_path, time_path, time: Union[int, float] = 0):
+    def init_gift(self, img_path):
         """
         从服务器或本地预置数据初始化礼物
         
@@ -36,32 +36,18 @@ class BiliGiftManager:
         try:
             get_basic_gift = requests.get(url)
             if get_basic_gift.status_code == 200:
-                time_dict = {}
-                for gift in get_basic_gift.keys():
-                    time_dict[gift] = time
                 with open(img_path, "w+", encoding="utf-8") as f:
                     json.dump(get_basic_gift.json(), f, ensure_ascii=False, indent=4) # 从服务器拉取返回的json数据并写入
-                with open(time_path, "w+", encoding="utf-8") as f:
-                    json.dump(time_dict, f, ensure_ascii=False, indent=4)
             else:
                 raise ValueError("无法获取Nya-WSL服务器存档数据...")
 
         # 读取内置数据
         except:
-            time_dict = {}
             gift_mapping = gift_map.gift_mapping
             blind_box = gift_map.blind_box
 
-            for gift in gift_mapping.keys():
-                time_dict[gift] = time
-            for v in blind_box.values():
-                for gift in v:
-                    time_dict[gift] = time
-
-            with open(time_path, "w+", encoding="utf-8") as f:
-                json.dump(time_dict, f, ensure_ascii=False, indent=4)
             with open(img_path, "w+", encoding="utf-8") as f:
-                json.dump(gift_mapping, f, ensure_ascii=False, indent=4)
+                json.dump(gift_mapping + blind_box, f, ensure_ascii=False, indent=4)
 
     def set_room_id(self, room_id):
         """
@@ -159,7 +145,7 @@ class BiliGiftManager:
         else:
             logger.error(f"请求房间礼物失败：{response.status_code}")
 
-    def get_config(self, img_path = "data/gift_img.json", time_path = "data/gifts.json", time: Union[int, float] = 0, init = True):
+    def get_config(self, img_path = "data/gift_img.json"):
         try:
             # 获取房间礼物
             gifts_data = self.get_room_gift("android")
@@ -208,51 +194,6 @@ class BiliGiftManager:
 
             with open(img_path, "w", encoding="utf-8") as file:
                 json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
-
-            # 初始化礼物规则数据
-            for i in gift_mapping.keys():
-                gift_mapping[i] = time
-
-            # 如果不是初始化状态，则使用已设定的礼物时长替换默认时长
-            if not init:
-                # 如果本地不存在数据，则返回None
-                if os.path.exists(time_path) and os.path.exists(img_path):
-                    with open(time_path, "r", encoding="utf-8") as file:
-                        gifts = json.load(file)
-                    with open("data/gifts_count.json", "r", encoding="utf-8") as file:
-                        gifts_count = json.load(file)
-
-                    gift_mapping_keys = gift_mapping.keys()
-
-                    for k, v in gifts.items():
-                        if v != 0:
-                            if k in gift_mapping_keys:
-                                gift_mapping[k] = v
-
-                    with open(time_path, "w", encoding="utf-8") as file:
-                        json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
-
-                    # 重新初始化礼物规则数据，防止倒计时数据污染投喂挑战
-                    for i in gift_mapping.keys():
-                        gift_mapping[i] = time
-
-                    for k, v in gifts_count.items():
-                        if v != 0:
-                            if k in gift_mapping_keys:
-                                gift_mapping[k] = v
-
-                    with open("data/gifts_count.json", "w", encoding="utf-8") as file:
-                        json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
-
-                    logger.success("礼物数据更新成功...")
-                else:
-                    logger.warning("本地不存在礼物数据，初始化中...")
-                    return None
-            else:
-                with open(time_path, "w", encoding="utf-8") as file:
-                    json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
-                shutil.copy(time_path, "data/gifts_count.json")
-                logger.success("礼物数据初始化成功...")
 
             if box_gifts_list == {}:
                 return "blind_box_none"
