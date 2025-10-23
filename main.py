@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.1-dev"
+version = "0.32.2-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -555,9 +555,9 @@ class BiliHandler(blivedm.BaseHandler):
                     if gift in blind_box_gifts:
                         for box_name, gifts_name in blind_box.items():
                             if gift in gifts_name:
-                                if gifts[box_name] != 0 or special.get(box_name, None) != None:
+                                if gifts.get(box_name, None) != None or special.get(box_name, None) != None:
                                     origin_gift = gift
-                                    if gift not in special and gifts[gift] == 0:
+                                    if gift not in special and gifts.get(gift, None) == None:
                                         is_blind_box = True
                                         gift = box_name
 
@@ -608,8 +608,10 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
+                            app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
+
                     # 如果收到的礼物不在special.json中
-                    else:
+                    elif gift in gifts:
                         changed_num = (gifts[gift] * int(num)) + int(app.storage.general["gift_challenge_count"]) # （设定的值 * 礼物数量） + 目前总数
                         gift_list_show_num = str(int(gifts[gift] * int(num)))
 
@@ -620,7 +622,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
-                    app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
+                        app.storage.general["gift_challenge_count"] = changed_num
                 else:
                     logger.error("投喂挑战失败，未找到礼物数据文件")
 
@@ -657,9 +659,9 @@ class BiliHandler(blivedm.BaseHandler):
                     if gift in blind_box_gifts:
                         for box_name, gifts_name in blind_box.items():
                             if gift in gifts_name:
-                                if gifts[box_name] != 0 or special.get(box_name, None) != None:
+                                if gifts.get(box_name, None) != None or special.get(box_name, None) != None:
                                     origin_gift = gift
-                                    if gift not in special and gifts[gift] == 0:
+                                    if gift not in special and gifts.get(gift, None) == None:
                                         is_blind_box = True
                                         gift = box_name
 
@@ -707,7 +709,9 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
-                    else:
+                            countdown_timer.set_time(changed_time) # 重设倒计时数据
+
+                    elif gift in gifts:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
                         gift_list_show_time = gifts[gift] * int(num)
 
@@ -718,7 +722,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
-                    countdown_timer.set_time(changed_time) # 重设倒计时数据
+                        countdown_timer.set_time(changed_time) # 重设倒计时数据
                 else:
                     logger.error("计时失败，未找到礼物数据文件")
 
@@ -851,6 +855,7 @@ class CountdownTimer:
         # 更新起始时间和剩余时间
         self._start_time = time
         self._remaining_time = time
+        app.storage.general["countdown_time"] = time
 
         # 如果计时器没有运行，则重新启动计时器
         if not self._running:
@@ -1085,7 +1090,7 @@ def cd_setting_dialog():
         ui.separator() # 分割线
 
         with ui.row(align_items="center"):
-            gift_name = ui.select(label="礼物选择", options=gifts.keys(), with_input=True, clearable=True).style("width: 200px")
+            gift_name = ui.select(label="礼物选择", options=list(gifts.keys()), with_input=True, clearable=True).style("width: 200px")
 
         status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
 
@@ -1370,7 +1375,7 @@ def gift_count_setting_dialog():
         ui.separator()
 
         with ui.row(align_items="center"):
-            gift_name = ui.select(label="礼物选择", options=gifts.keys(), with_input=True, clearable=True).style("width: 200px")
+            gift_name = ui.select(label="礼物选择", options=list(gifts.keys()), with_input=True, clearable=True).style("width: 200px")
 
         status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
         with ui.row():
@@ -1473,9 +1478,9 @@ def sub_time():
 
 
 # 保存配置
-def save_config():
+def save_config(data):
     with open("config.json", "w+", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=4)
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 def check_auth(loginInfo):
@@ -2079,9 +2084,9 @@ def index():
     with ui.dialog() as color_dialog, ui.card(align_items="center"):
         # 颜色输入框
         with ui.row():
-            ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
-            ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
-            ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
+            ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(config), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
+            ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(config), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
+            ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(config), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
         ui.button("关闭", on_click=lambda: color_dialog.close())
 
 
@@ -2126,12 +2131,12 @@ def index():
 
         # 房间号
         with ui.row(align_items="center"):
-            room_id = ui.input("房间号", on_change=lambda: save_config()).style("width: 120px")
+            room_id = ui.input("房间号", on_change=lambda: save_config(config)).style("width: 120px")
             room_id.bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
 
             with ui.column(align_items="center").classes("gap-0"):
                 b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
-                show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config())
+                show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config(config))
                 show_capture_gift_list_switch.bind_value(config, "show_capture_gift_list").props('color="btn"')
                 with ui.row().classes("gap-0"):
                     ui.label("登录状态：")
@@ -2141,7 +2146,7 @@ def index():
                 with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
                     ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
 
-                gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config()).props('color="btn"')
+                gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config(config)).props('color="btn"')
                 gift_challenge_switch.disable()
 
                 with ui.row().classes("gap-0"):
