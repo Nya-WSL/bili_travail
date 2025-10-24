@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.2-dev"
+version = "0.32.3-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -2245,7 +2245,7 @@ def _():
     # Card框
     with ui.card(align_items="center").classes("absolute-center"):
         ui.label(f"B站加班姬").classes("text-3xl").style(f"color: {config['text_color']}")
-        ui.badge(f"v{version}", outline=True)
+        ui.badge(f"{version}", outline=True)
 
         # 私货
         def read_or_create_file(file_path, default_content):
@@ -2292,26 +2292,46 @@ def _():
         ui.label("Copyright © 2025. All rights reserved. ")
         ui.separator()
 
-        # 开发组成员显示
+        # 成员显示
         with ui.row(align_items="center"):
             with ui.column(align_items="center"):
-                ui.label("程序架构").classes("text-blue")
-                with ui.link(target="https://space.bilibili.com/16748991", new_tab=True):
-                    with ui.avatar():
-                        ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"))
-                ui.badge("高橋はるき", outline=True)
-            with ui.column(align_items="center"):
                 ui.label("程序开发").classes("text-blue")
-                with ui.link(target="https://space.bilibili.com/8907402", new_tab=True):
-                    with ui.avatar():
-                        ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
-                ui.badge("狐日泽", outline=True)
+                with ui.row(align_items="center"):
+                    with ui.column(align_items="center"):
+                        with ui.link(target="https://space.bilibili.com/16748991", new_tab=True):
+                            with ui.avatar():
+                                ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"))
+                        ui.badge("高橋はるき", outline=True)
+                    with ui.column(align_items="center"):
+                        with ui.link(target="https://space.bilibili.com/8907402", new_tab=True):
+                            with ui.avatar():
+                                ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"))
+                        ui.badge("狐日泽", outline=True)
+            ui.separator().props('vertical')
             with ui.column(align_items="center"): 
-                ui.label("特别感谢").classes("text-blue")
-                with ui.link(target="https://space.bilibili.com/3546729020394298/", new_tab=True):
-                    with ui.avatar():
-                        ui.image(bili_api.get_bili_img("https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"))
-                ui.badge("千蚀vita", outline=True)
+                ui.label("特别鸣谢").classes("text-blue")
+                with ui.row(align_items="center"):
+                    with ui.column(align_items="center"):
+                        with ui.link(target="https://space.bilibili.com/3546729020394298/", new_tab=True):
+                            with ui.avatar():
+                                ui.image(bili_api.get_bili_img("https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"))
+                        ui.badge("千蚀vita", outline=True)
+                    with ui.column(align_items="center"):
+                        with ui.link(target="https://space.bilibili.com/15104516/", new_tab=True):
+                            with ui.avatar():
+                                ui.image(bili_api.get_bili_img("https://i1.hdslb.com/bfs/face/316685ff90898018d3bb0eb7f0649db73e109e9b.jpg"))
+                        ui.badge("青岚千柊", outline=True)
+                    with ui.column(align_items="center"):
+                        with ui.link(target="https://space.bilibili.com/4015420/", new_tab=True):
+                            with ui.avatar():
+                                ui.image(bili_api.get_bili_img("https://i1.hdslb.com/bfs/face/29b2132e3371d0c9a90a21edf6a0ad87a122a831.jpg"))
+                        ui.badge("天苍八重", outline=True)
+                    with ui.column(align_items="center"):
+                        with ui.link(target="https://space.bilibili.com/11236317/", new_tab=True):
+                            with ui.avatar():
+                                ui.image(bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/7b2a5c03e0caaa516dda9e238a82ebeef0e2f56d.jpg"))
+                        ui.badge("冰蓝IceBlue", outline=True)
+
         ui.separator()
 
         # 联系我们
