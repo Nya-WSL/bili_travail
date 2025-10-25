@@ -158,7 +158,7 @@ example_config = {
     "color": "#fcefe8",
     "btn_color": "#fcefe8",
     "text_color": "#000000",
-    "local_text": False,
+    "remote_text": True,
     "show_capture_gift_list": False,
     "capture_gift_list_number": 3
 }
@@ -258,8 +258,6 @@ def create_blind_box():
 
     with open("data/blinx_box_data.json", "w+", encoding="utf-8") as f:
         json.dump(blind_box, f, ensure_ascii=False, indent=4)
-
-    return blind_box
 
 def init_config():
     """
@@ -426,6 +424,7 @@ class BiliHandler(blivedm.BaseHandler):
 
     # 礼物数据
     def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
+        logger.debug("收到礼物")
         gift = message.gift_name
         num = message.num
         uname = message.uname
@@ -539,7 +538,9 @@ class BiliHandler(blivedm.BaseHandler):
                             json.dump(gift_img, f, indent=4, ensure_ascii=False)
 
                     # 初始化盲盒数据
-                    blind_box = create_blind_box()
+                    with open("data/blinx_box_data.json", "r", encoding="utf-8") as f:
+                        blind_box = json.load(f)
+
                     blind_box_gifts = []
 
                     if blind_box == {}:
@@ -643,7 +644,9 @@ class BiliHandler(blivedm.BaseHandler):
                             json.dump(gift_img, f, indent=4, ensure_ascii=False)
 
                     # 初始化盲盒数据
-                    blind_box = create_blind_box()
+                    with open("data/blinx_box_data.json", "r", encoding="utf-8") as f:
+                        blind_box = json.load(f)
+
                     blind_box_gifts = []
 
                     if blind_box == {}:
@@ -1112,6 +1115,7 @@ def cd_setting_dialog():
 
     cd_dialog.open() # 打开弹窗
 
+
 # 盲盒价值弹窗
 def blind_box_value_dialog():
     def get_box_value():
@@ -1171,6 +1175,7 @@ def blind_box_value_dialog():
         ui.button("清零", on_click=lambda: clear_box_value())
 
     value_dialog.open()
+
 
 # 投喂挑战弹窗
 def gift_count_setting_dialog():
@@ -1429,14 +1434,6 @@ def gift_count_setting_dialog():
 
     gift_count_dialog.open()
 
-# 礼物设置弹窗
-# with ui.dialog() as dialog, ui.card(align_items="center"):
-#     with ui.row():
-#         ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-#         ui.button("投喂挑战", on_click=lambda: gift_count_setting_dialog())
-#     ui.button("关闭", on_click=lambda: dialog.close())
-
-# dialog.open()
 
 def init_task():
     global countdown_timer
@@ -1446,6 +1443,7 @@ def init_task():
         cancel_button.set_text("重置")
         cancel_button.enable()
         reset_inherit_status = True # 设置重置继承倒计时状态为True
+
 
 # 运行倒计时
 def start_task():
@@ -1593,7 +1591,8 @@ async def refresh_gift_loop():
         return
     
     gift_config = GiftManager.get_config("data/gift_img.json")
-    
+    create_blind_box()
+
     if gift_config:
         result = "礼物数据定时更新完成"
         with main_card:
@@ -1621,6 +1620,7 @@ async def refresh_gift():
         await asyncio.sleep(1)
 
         gift_config = GiftManager.get_config("data/gift_img.json")
+        create_blind_box()
 
         if gift_config == True:
             ui.notify("礼物数据更新完成", type="positive")
@@ -1791,9 +1791,9 @@ async def capture():
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
-                                        ui.image(bili_api.get_bili_img(gift_img))
+                                        ui.image(gift_img)
                                     else:
-                                        ui.image(bili_api.get_bili_img(gifts.get(gift_name, "")))
+                                        ui.image(gifts.get(gift_name, ""))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
@@ -1946,9 +1946,9 @@ async def capture():
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
-                                        ui.image(bili_api.get_bili_img(gift_img))
+                                        ui.image(gift_img)
                                     else:
-                                        ui.image(bili_api.get_bili_img(gifts.get(gift_name, "")))
+                                        ui.image(gifts.get(gift_name, ""))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold")
@@ -2090,6 +2090,10 @@ def index():
         ui.button("关闭", on_click=lambda: color_dialog.close())
 
 
+    if app.storage.general["version"] != version: # 如果版本号不一致
+        app.storage.general["version"] = version # 更新版本号
+        ui.navigate.to("/changelog") # 跳转到更新日志页面
+
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center") as main_card:
         asyncio.create_task(check_update())
@@ -2202,10 +2206,6 @@ def index():
 def _():
     changelog()
 
-if app.storage.general["version"] != version: # 如果版本号不一致
-    app.storage.general["version"] = version # 更新版本号
-    ui.navigate.to("/changelog") # 跳转到更新日志页面
-
 @ui.page('/count')
 def _():
     ui.query('body').style(f'background: url("static/bg_vita.png") fixed')
@@ -2237,7 +2237,7 @@ def _():
 
 # about页面
 @ui.page('/about')
-def _():
+async def _():
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
     ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover') # 设置背景图片
@@ -2257,38 +2257,116 @@ def _():
                     f.write(default_content)
                 return default_content
 
-        try:
-            text = requests.get("https://nya-wsl.com/bili_travail/chat_msg.json")
-        except Exception as e:
-            logger.exception(f"获取文本失败：{e}")
+        # 配置头像URL常量
+        AVATAR_A = "https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"
+        AVATAR_B = "https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"
+        NAME_A = "高橋はるき"
+        NAME_B = "狐日泽"
+
+        async def fetch_text(session, url):
+            """异步获取文本内容"""
             try:
-                text = requests.get("http://version.nya-wsl.cn/bili_travail/chat_msg.json")
+                async with session.get(url, timeout=10) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    logger.warning(f"请求失败: {url} 状态码: {response.status}")
+                    return None
+            except asyncio.TimeoutError:
+                logger.warning(f"请求超时: {url}")
+            except aiohttp.ClientError as e:
+                logger.exception(f"网络错误: {url} - {e}")
             except Exception as e:
-                logger.exception(f"获取文本失败：{e}")
+                logger.exception(f"未知错误: {url} - {e}")
+            return None
 
-        text.encoding = "utf-8"
-        if text.status_code == 200 or not config["local_text"]: # 如果请求状态为200且配置文件未启用本地文本
-            if random.random() < 0.3:
-                msg_index = []
-                for k in text.json().keys():
-                    msg_index.append(k)
-                msg_index.remove("group_a")
-                msg = text.json()[random.choice(msg_index)]
-                ui.chat_message(msg["text_a"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
-                ui.chat_message(msg["text_b"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
-            else:
-                ui.chat_message(text.json()["group_a"]["text_a"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
-                ui.chat_message(text.json()["group_a"]["text_b"], avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
-        else:
-            text_a = read_or_create_file("data/text_a.txt", "代码没写完，哪有脸睡觉")
-            text_b = read_or_create_file("data/text_b.txt", 'alias cd="sudo rm -rf"')
+        async def get_remote_text(session):
+            """尝试从多个源获取文本"""
+            urls = [
+                "https://nya-wsl.com/bili_travail/chat_msg.json",
+                "http://version.nya-wsl.cn/bili_travail/chat_msg.json"
+            ]
 
-            ui.chat_message(text_a, avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"), name="高橋はるき", text_html=True, sent=True)
-            ui.chat_message(text_b, avatar=bili_api.get_bili_img("https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"), name="狐日泽", text_html=True)
+            for url in urls:
+                text = await fetch_text(session, url)
+                if text is not None:
+                    return text
+            return None
+
+        async def display_chat_messages(config, bili_api):
+            """异步获取并显示聊天消息"""
+            try:
+                async with aiohttp.ClientSession() as session:
+                    # 获取远程文本
+                    text = await get_remote_text(session)
+
+                    # 如果获取到文本
+                    if text:
+                        # 随机选择消息组
+                        if random.random() < 0.3:
+                            # 排除group_a的其他消息
+                            msg_groups = [k for k in text.keys() if k != "group_a"]
+                            selected_group = random.choice(msg_groups) if msg_groups else "group_a"
+                        else:
+                            selected_group = "group_a"
+
+                        msg = text.get(selected_group)
+                        if msg:
+                            await display_message_pair(msg, bili_api)
+                            return
+
+                    # 使用本地文件作为回退
+                    text_a = read_or_create_file("data/text_a.txt", "代码没写完，哪有脸睡觉")
+                    text_b = read_or_create_file("data/text_b.txt", 'alias cd="sudo rm -rf"')
+                    
+                    # 显示本地消息
+                    ui.chat_message(
+                        text_a, 
+                        avatar=bili_api.get_bili_img(AVATAR_A), 
+                        name=NAME_A, 
+                        text_html=True, 
+                        sent=True, 
+                        sanitize=False
+                    )
+                    ui.chat_message(
+                        text_b, 
+                        avatar=bili_api.get_bili_img(AVATAR_B), 
+                        name=NAME_B, 
+                        text_html=True, 
+                        sanitize=False
+                    )
+
+            except Exception as e:
+                logger.exception(f"显示聊天消息失败: {e}")
+                # 显示错误消息
+                ui.notify("加载聊天消息失败，请稍后再试", type="negative")
+
+        async def display_message_pair(msg, bili_api):
+            """显示一对聊天消息"""
+            avatar_a = bili_api.get_bili_img(AVATAR_A)
+            avatar_b = bili_api.get_bili_img(AVATAR_B)
+            
+            ui.chat_message(
+                msg.get("text_a", "默认消息A"), 
+                avatar=avatar_a, 
+                name=NAME_A, 
+                text_html=True, 
+                sent=True, 
+                sanitize=False
+            )
+            ui.chat_message(
+                msg.get("text_b", "默认消息B"), 
+                avatar=avatar_b, 
+                name=NAME_B, 
+                text_html=True, 
+                sanitize=False
+            )
+
+        if config.get("remote_text", True):
+            await display_chat_messages(config, bili_api)
 
         # 项目介绍
-        ui.html('A Project of <u><a href="https://nya-wsl.com" target="_blank">Nya-WSL</a></u>.')
-        ui.html('Powered by <u><a href="https://nicegui.io" target="_blank">NiceGUI</a></u> - <u><a href="https://github.com/xfgryujk/blivedm" target="_blank">blivedm</a></u>.')
+        ui.html('A Project of <u><a href="https://nya-wsl.com" target="_blank">Nya-WSL</a></u>.', sanitize=False)
+        ui.html('Powered by <u><a href="https://nicegui.io" target="_blank">NiceGUI</a></u> - <u><a href="https://github.com/xfgryujk/blivedm" target="_blank">blivedm</a></u>.', sanitize=False)
         ui.label("Copyright © 2025. All rights reserved. ")
         ui.separator()
 
@@ -2340,8 +2418,7 @@ def _():
         ui.link("support@nya-wsl.com", "mailto:support@nya-wsl.com", True)
         ui.link("Nya-WSL服务与反馈群", "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
         ui.separator()
-        # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵').classes("text-2xl text-white")
-        ui.button("返回", on_click=lambda: ui.navigate.to("/"))
+        # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵', sanitize=False).classes("text-2xl text-white")
 
 @app.on_startup
 async def create_job():
