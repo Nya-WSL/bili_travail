@@ -1,12 +1,10 @@
 import os
 import re
 import json
-import shutil
-import requests
+import aiohttp
 import gift_mapping as gift_map
 
 from log import logger
-from typing import Union
 
 class BiliGiftManager:
     def __init__(self):
@@ -16,12 +14,12 @@ class BiliGiftManager:
         if config.get("room_id", "") != "":
             self.room_id = config.get("room_id", "")
         else:
-            self.room_id = 0
+            self.room_id = 3
 
         self.area_parent_id = 0
         self.area_id = 0
 
-    def init_gift(self, img_path):
+    async def init_gift(self, img_path):
         """
         从服务器或本地预置数据初始化礼物
         
@@ -34,12 +32,14 @@ class BiliGiftManager:
 
         # 尝试从服务器获取数据
         try:
-            get_basic_gift = requests.get(url)
-            if get_basic_gift.status_code == 200:
-                with open(img_path, "w+", encoding="utf-8") as f:
-                    json.dump(get_basic_gift.json(), f, ensure_ascii=False, indent=4) # 从服务器拉取返回的json数据并写入
-            else:
-                raise ValueError("无法获取Nya-WSL服务器存档数据...")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        with open(img_path, "w+", encoding="utf-8") as f:
+                            json.dump(data, f, ensure_ascii=False, indent=4)
+                    else:
+                        raise ValueError("无法获取Nya-WSL服务器存档数据...")
 
         # 读取内置数据
         except:
@@ -58,7 +58,7 @@ class BiliGiftManager:
 
         self.room_id = room_id
 
-    def get_blind_box(self, gift_id) -> dict:
+    async def get_blind_box(self, gift_id) -> dict:
         """
         获取盲盒礼物列表
         
@@ -78,19 +78,20 @@ class BiliGiftManager:
             "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
         }
 
-        response = requests.get(url, params=params, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            if data['code'] == 0:
-                return data['data']
-            else:
-                logger.error(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
-                return {}
-        else:
-            logger.error(f"请求盲盒礼物列表({gift_id})失败: {response.status_code}")
-            return {}
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data['code'] == 0:
+                        return data['data']
+                    else:
+                        logger.error(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
+                        return {}
+                else:
+                    logger.error(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
+                    return {}
 
-    def get_area_id(self):
+    async def get_area_id(self):
         """
         获取直播分区
         """
@@ -100,21 +101,22 @@ class BiliGiftManager:
             "room_id": self.room_id
         }
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
         }
 
-        response = requests.get(url, params=params, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            if data["code"] == 0:
-                self.area_parent_id = data["data"]["parent_area_id"]
-                self.area_id = data["data"]["area_id"]
-            else:
-                logger.error(f"获取直播分区失败：{data['message']}")
-        else:
-            logger.error(f"请求直播分区失败：{response.status_code}")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data["code"] == 0:
+                        self.area_parent_id = data["data"]["parent_area_id"]
+                        self.area_id = data["data"]["area_id"]
+                    else:
+                        logger.error(f"获取直播分区失败：{data['message']}")
+                else:
+                    logger.error(f"请求直播分区失败：{response.status}")
 
-    def get_room_gift(self, platform = "android"):
+    async def get_room_gift(self, platform = "android"):
         """
         获取房间礼物
 
@@ -122,7 +124,7 @@ class BiliGiftManager:
             platform (_str_): web、android
         """
 
-        self.get_area_id()
+        await self.get_area_id()
 
         url = "https://api.live.bilibili.com/xlive/web-room/v1/giftPanel/roomGiftList"
         params = {
@@ -135,20 +137,21 @@ class BiliGiftManager:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
         }
 
-        response = requests.get(url, params=params, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            if data["code"] == 0:
-                return data["data"]["gift_config"]["base_config"]["list"]
-            else:
-                logger.error(f"获取房间礼物失败：{data['message']}")
-        else:
-            logger.error(f"请求房间礼物失败：{response.status_code}")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data["code"] == 0:
+                        return data["data"]["gift_config"]["base_config"]["list"]
+                    else:
+                        logger.error(f"获取房间礼物失败：{data['message']}")
+                else:
+                    logger.error(f"请求房间礼物失败：{response.status}")
 
-    def get_config(self, img_path = "data/gift_img.json"):
+    async def get_config(self, img_path = "data/gift_img.json"):
         try:
             # 获取房间礼物
-            gifts_data = self.get_room_gift("android")
+            gifts_data = await self.get_room_gift("android")
 
             box_gifts_list = {}
             gift_mapping = {}
@@ -164,7 +167,7 @@ class BiliGiftManager:
                 logger.error("初始化礼物时未获取到盲盒数据")
             else:
                 for id in box_id:
-                    blind_box = self.get_blind_box(id)
+                    blind_box = await self.get_blind_box(id)
 
                     if blind_box != {}:
                         box_gifts_list = blind_box.get("gifts", {})
@@ -172,7 +175,7 @@ class BiliGiftManager:
                             for gift in box_gifts_list:
                                 gift_mapping[gift["gift_name"]] = gift["gift_img"]
                         else:
-                            logger.error(f"盲盒数据为空，可能是因为未登录账号")
+                            logger.error(f"盲盒({id})数据为空，可能是因为未登录账号")
                     else:
                         logger.error(f"盲盒({id})数据为空")
 

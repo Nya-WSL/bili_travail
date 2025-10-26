@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.4-dev"
+version = "0.32.5-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -228,10 +228,13 @@ ui.button.__init__.__kwdefaults__['color'] = btn_color # 设置所有按钮颜�
 
 GiftManager = get_gift.BiliGiftManager()
 
-def create_blind_box():
+if config.get("room_id", "") != "":
+    GiftManager.set_room_id(config.get("room_id", 3)) # 启动时初始化礼物api必须的房间号，如果未设置则默认为3号直播间
+
+async def create_blind_box():
     box_id = []
     blind_box = {}
-    gifts = GiftManager.get_room_gift("android")
+    gifts = await GiftManager.get_room_gift("android")
     for gift in gifts:
         if re.search("盲盒", gift["name"]):
             box_id.append(gift["id"])
@@ -242,7 +245,7 @@ def create_blind_box():
 
     for id in box_id:
         gifts = []
-        box_gifts = GiftManager.get_blind_box(id)
+        box_gifts = await GiftManager.get_blind_box(id)
 
         if box_gifts != {}:
             try:
@@ -263,7 +266,7 @@ def create_blind_box():
     with open("data/blinx_box_data.json", "w+", encoding="utf-8") as f:
         json.dump(blind_box, f, ensure_ascii=False, indent=4)
 
-def init_config():
+async def init_config():
     """
     初始化礼物数据
     """
@@ -278,10 +281,10 @@ def init_config():
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
-            gift_config = GiftManager.get_config("data/gift_img.json") # 使用B站api
+            gift_config = await GiftManager.get_config("data/gift_img.json") # 使用B站api
             # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
             if not gift_config:
-                GiftManager.init_gift("data/gift_img.json")
+                await GiftManager.init_gift("data/gift_img.json")
 
     # 初始化数据
     if not os.path.exists("data/gift_img.json"):
@@ -304,7 +307,7 @@ def init_config():
         with open("data/special_count.json", "w+", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
 
-init_config()
+asyncio.run(init_config())
 
 def get_pid_info(pid):
     p = psutil.Process(pid)
@@ -1601,9 +1604,9 @@ async def refresh_gift_loop():
     if room_id.value == "":
         logger.warning("房间号为空，跳过礼物更新")
         return
-    
-    gift_config = GiftManager.get_config("data/gift_img.json")
-    create_blind_box()
+
+    gift_config = await GiftManager.get_config("data/gift_img.json")
+    await create_blind_box()
 
     if gift_config:
         result = "礼物数据定时更新完成"
@@ -1631,15 +1634,15 @@ async def refresh_gift():
 
         await asyncio.sleep(1)
 
-        gift_config = GiftManager.get_config("data/gift_img.json")
-        create_blind_box()
+        gift_config = await GiftManager.get_config("data/gift_img.json")
+        await create_blind_box()
 
         if gift_config == True:
             ui.notify("礼物数据更新完成", type="positive")
         # 如果本地礼物配置数据不存在，则直接初始化
         elif gift_config == None:
             ui.notify("未检测到本地礼物数据，将初始化礼物数据...", type="info")
-            init_config()
+            await init_config()
             ui.notify("礼物数据初始化完成", type="positive")
         # 如果更新盲盒礼物出错
         elif gift_config == "blind_box_none":
@@ -1650,10 +1653,10 @@ async def refresh_gift():
         else:
             ui.notify("礼物数据更新失败，请检查日志或稍后重试，或者使用本地数据重置", type="negative")
 
-    def reset_local_gift():
+    async def reset_local_gift():
         # 重置本地数据
         try:
-            GiftManager.init_gift("data/gift_img.json")
+            await GiftManager.init_gift("data/gift_img.json")
             ui.notify("重置成功", type="positive")
         except Exception as e:
             logger.exception(f"使用本地数据重置失败：{e}")
@@ -1693,7 +1696,7 @@ async def capture():
     capture_cd_is_created = True
 
     if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
-        init_config()
+        await init_config()
 
 
     # 初始化礼物列表
@@ -1839,7 +1842,7 @@ async def capture():
     capture_gift_is_created = True
 
     if not os.path.exists("data/gifts_count.json") or not os.path.exists("data/gift_img.json"):
-        init_config()
+        await init_config()
 
     # 礼物列表
     with open("config.json", "r", encoding="utf-8") as f:
@@ -2432,14 +2435,14 @@ async def _():
         ui.separator()
         # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵', sanitize=False).classes("text-2xl text-white")
 
-# @app.on_startup
-# async def create_job():
-#     scheduler.add_job(refresh_gift_loop, trigger='cron', minute=0) # 每个整点更新一次礼物数据
-#     scheduler.start()
+@app.on_startup
+async def create_job():
+    scheduler.add_job(refresh_gift_loop, trigger='cron', minute=0) # 每个整点更新一次礼物数据
+    scheduler.start()
 
-# @app.on_shutdown
-# def shutdown():
-#     scheduler.shutdown()
+@app.on_shutdown
+def shutdown():
+    scheduler.shutdown()
 
 # 运行NiceGUI
 try:
