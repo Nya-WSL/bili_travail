@@ -21,7 +21,7 @@ def count_lines_in_files(
     
     # 默认排除的目录
     if exclude_dirs is None:
-        exclude_dirs = ['venv', '.venv', 'site-packages', 'dist', 'blivedm']
+        exclude_dirs = ['venv', '.venv', 'site-packages', 'dist', 'blivedm', 'bili_travail - 副本']
     
     # 默认排除的文件
     if exclude_files is None:

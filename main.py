@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.3-dev"
+version = "0.32.4-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -63,6 +63,10 @@ capture_gift_is_created = False # 初始化投喂挑战页面状态
 # 检查data文件夹状态
 if not os.path.exists("data"):
     os.mkdir("data")
+
+if not os.path.exists("data/blinx_box_data.json"):
+    with open("data/blinx_box_data.json", "w+", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=4)
 
 # 移除残留的更新包
 if os.path.exists("update.bat"):
@@ -609,7 +613,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
-                            app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
+                        app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
 
                     # 如果收到的礼物不在special.json中
                     elif gift in gifts:
@@ -619,7 +623,7 @@ class BiliHandler(blivedm.BaseHandler):
                         if is_blind_box:
                             gift = origin_gift
 
-                        if gifts[gift] != 0 or is_blind_box:
+                        if gifts.get(gift, None) != None or is_blind_box:
                             if show_capture_gift_list_switch.value and capture_gift_is_created:
                                 capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
@@ -712,7 +716,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
-                            countdown_timer.set_time(changed_time) # 重设倒计时数据
+                        countdown_timer.set_time(changed_time) # 重设倒计时数据
 
                     elif gift in gifts:
                         changed_time = (gifts[gift] * int(num)) + tmp_time
@@ -721,7 +725,7 @@ class BiliHandler(blivedm.BaseHandler):
                         if is_blind_box:
                             gift = origin_gift
 
-                        if gifts[gift] != 0 or is_blind_box:
+                        if gifts.get(gift, None) != None or is_blind_box:
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
@@ -1458,7 +1462,10 @@ def add_time():
     try:
         if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
             tmp_time = countdown_timer.get_tmp_time()
-            changed_time = tmp_time + ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1 # 在视觉效果上倒计时被正确反馈，实际上多加了1s
+            try:
+                changed_time = tmp_time + ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1 # 在视觉效果上倒计时被正确反馈，实际上多加了1s
+            except TypeError as e:
+                ui.notify(e, type="negative")
             countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
@@ -1469,7 +1476,10 @@ def sub_time():
     try:
         if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
             tmp_time = countdown_timer.get_tmp_time()
-            changed_time = tmp_time - ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1  # 在视觉效果上倒计时被正确反馈，实际上少减了1s
+            try:
+                changed_time = tmp_time - ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1  # 在视觉效果上倒计时被正确反馈，实际上少减了1s
+            except TypeError as e:
+                ui.notify(e, type="negative")
             countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
@@ -1497,6 +1507,8 @@ def check_auth(loginInfo):
 
 def bili_login(init = False):
     global qrcode_ui
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
     if config["room_id"] == "":
         ui.notify("请先填入房间号", type="negative")
         return
@@ -2420,14 +2432,14 @@ async def _():
         ui.separator()
         # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵', sanitize=False).classes("text-2xl text-white")
 
-@app.on_startup
-async def create_job():
-    scheduler.add_job(refresh_gift_loop, trigger='cron', minute=0) # 每个整点更新一次礼物数据
-    scheduler.start()
+# @app.on_startup
+# async def create_job():
+#     scheduler.add_job(refresh_gift_loop, trigger='cron', minute=0) # 每个整点更新一次礼物数据
+#     scheduler.start()
 
-@app.on_shutdown
-def shutdown():
-    scheduler.shutdown()
+# @app.on_shutdown
+# def shutdown():
+#     scheduler.shutdown()
 
 # 运行NiceGUI
 try:
