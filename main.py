@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.5-dev"
+version = "0.32.6-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -151,6 +151,7 @@ example_config = {
     "room_id": "",
     "host": "127.0.0.1",
     "port": 65000,
+    "server": "http://api.travail.nya-wsl.cn",
     "SESSDATA": "",
     "background_image": [
         "https://nya-wsl.com/images/image001.png",
@@ -1494,6 +1495,71 @@ def save_config(data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
+async def upload_log(room_id, file_path):
+    '''
+    发送日志到服务器
+    '''
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+
+    url = config.get("server", None)
+
+    if url is None or url == "":
+        result = "未配置服务器地址，上传日志失败"
+        ui.notify(result, type="negative")
+        logger.error(result)
+        return
+
+    # 验证文件是否存在
+    if not os.path.exists(file_path):
+        result = f"文件不存在: {file_path}"
+        ui.notify(result, type="negative")
+        logger.error(result)
+        return
+
+    url = f"{url}/log/{room_id}"
+
+    try:
+        data = aiohttp.FormData()
+
+        file_obj = open(file_path, "rb")
+
+        data.add_field(
+            name="file", # 参数名必须与FastAPI接口一致
+            value=file_obj,
+            filename=os.path.basename(file_path),
+            content_type="application/octet-stream"
+        )
+
+        timeout = aiohttp.ClientTimeout(total=60)  # 60秒超时
+
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, data=data) as response:
+                if response.status == 201:
+                    result = await response.json()
+                    ui.notify(f"日志上传成功，状态码：{result.get("status", None)}", type="positive")
+                    logger.info(f"日志上传成功：{result}")
+                else:
+                    error = await response.text()
+                    result = f"日志上传失败，状态码: {response.status}"
+                    ui.notify(result, type="negative")
+                    logger.error(result)
+
+    except aiohttp.ClientError as e:
+        result = f"日志上传失败，发生网络错误: {str(e)}"
+        ui.notify(result, type="negative")
+        logger.error(result)
+
+    except Exception as e:
+        result = f"日志上传失败，发生错误: {str(e)}"
+        ui.notify(result, type="negative")
+        logger.error(result)
+
+    finally:
+        if "file_obj" in locals() and not file_obj.closed:
+            file_obj.close()
+
 def check_auth(loginInfo):
     status = bili_auth.login(loginInfo[0])
 
@@ -2189,7 +2255,7 @@ def index():
             ui.button("检查更新", on_click=lambda: check_update())
             # Changelog button
             ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
-            ui.button("打开日志", on_click=lambda: os.startfile(os.path.join("logs", f"bili_travail_{datetime.datetime.now().strftime("%Y%m%d")}.log")))
+            ui.button("上传日志", on_click=lambda: upload_log(config.get("room_id", 3), f"logs/bili_travail_{datetime.datetime.now().strftime("%Y%m%d")}.log"))
 
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
