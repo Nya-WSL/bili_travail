@@ -31,7 +31,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.6-dev"
+version = "0.32.7-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -66,6 +66,10 @@ if not os.path.exists("data"):
 
 if not os.path.exists("data/blinx_box_data.json"):
     with open("data/blinx_box_data.json", "w+", encoding="utf-8") as f:
+        json.dump({}, f, ensure_ascii=False, indent=4)
+
+if not os.path.exists("data/time.json"):
+    with open("data/time.json", "w+", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=4)
 
 # 移除残留的更新包
@@ -2147,6 +2151,75 @@ def index():
             with main_card:
                 ui.notify("已是最新版本", type="positive")
 
+    def save_time():
+        def do_save(key):
+            with open("data/time.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data[key] = int(app.storage.general["countdown_time"])
+            with open("data/time.json", "w+", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            ui.notify("保存成功", type="positive")
+
+        def save(key):
+            if key == None or key == "":
+                ui.notify("名称不能为空", type="negative")
+                return
+            with open("data/time.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get(key, None) != None:
+                with ui.dialog() as overwrite_dialog, ui.card(align_items="center"):
+                    ui.label("该名称已存在，是否覆盖？")
+                    with ui.row():
+                        ui.button("是", on_click=lambda: do_save(key)).on_click(lambda: overwrite_dialog.close()).on_click(lambda: save_dialog.close())
+                        ui.button("否", on_click=lambda: overwrite_dialog.close())
+                overwrite_dialog.open()
+                overwrite_dialog.on("hide", lambda: overwrite_dialog.clear())
+            else:
+                do_save(key)
+                save_dialog.close()
+                save_dialog.on("hide", lambda: save_dialog.clear())
+
+        with ui.dialog() as save_dialog, ui.card(align_items="center"):
+            name = ui.input("保存名称").style("width: 200px")
+            ui.button("保存", on_click=lambda: save(name.value))
+
+        save_dialog.open()
+        save_dialog.on("hide", lambda: save_dialog.clear())
+
+    def load_time():
+        def load(key):
+            with open("data/time.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            app.storage.general["countdown_time"] = int(data[key])
+            countdown_timer._remaining_time = int(data[key])
+            load_dialog.close()
+            ui.notify("加载成功", type="positive")
+
+        def delete(key):
+            with open("data/time.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data.pop(key)
+            with open("data/time.json", "w+", encoding="utf-8") as f:
+                data = json.dump(data, f, ensure_ascii=False, indent=4)
+            ui.notify("删除成功", type="positive")
+
+        def reload() -> dict:
+            with open("data/time.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data
+
+        with open("data/time.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        with ui.dialog() as load_dialog, ui.card(align_items="center"):
+            name_select = ui.select(options=list(data.keys()), label="选择名称").style("width: 200px")
+            with ui.row():
+                ui.button("加载", on_click=lambda: load(name_select.value))
+                ui.button("删除", on_click=lambda: delete(name_select.value)).on_click(lambda: name_select.set_options(list(reload().keys())))
+
+        load_dialog.open()
+        load_dialog.on("hide", lambda: load_dialog.clear())
+
     # 礼物设置弹窗
     with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
         with ui.row():
@@ -2204,6 +2277,7 @@ def index():
             cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop())
             cancel_button.disable()
 
+        with ui.row():
             # Add time Button
             add_button = ui.button("增加", on_click=lambda: add_time())
             add_button.disable()
@@ -2211,6 +2285,9 @@ def index():
             # Sub Time Button
             sub_button = ui.button("减少", on_click=lambda: sub_time())
             sub_button.disable()
+
+            save_button = ui.button("保存", on_click=lambda: save_time())
+            load_button = ui.button("读取", on_click=lambda: load_time())
 
         ui.separator()
 
@@ -2512,6 +2589,6 @@ def shutdown():
 
 # 运行NiceGUI
 try:
-    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 670])
+    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 720])
 except:
     logger.error(f"run error: {traceback.format_exc()}")
