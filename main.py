@@ -25,13 +25,14 @@ import aiohttp
 import requests
 import datetime
 import traceback
+import itertools
 import http.cookies
 from typing import *
 from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.7-dev"
+version = "0.32.8-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -169,6 +170,8 @@ example_config = {
     "text_color": "#000000",
     "remote_text": True,
     "show_capture_gift_list": False,
+    "short_list": False,
+    "short_time": 5,
     "capture_gift_list_number": 3
 }
 
@@ -889,20 +892,39 @@ class CountdownTimer:
         self._start_time = time
         self._remaining_time = time
 
-def sort_dict(d):
-    # 分离正数（包括零）和负数
-    positive = {k: v for k, v in d.items() if v >= 0}
-    negative = {k: v for k, v in d.items() if v < 0}
+def sort_dict(dictionary, type_order=None, sort_within_type=False):
+    """
+    高级排序：先按类型排序，再按值排序
 
-    # 正数按值降序排序，负数按值升序排序
-    sorted_positive = sorted(positive.items(), key=lambda x: x[1], reverse=True)
-    sorted_negative = sorted(negative.items(), key=lambda x: x[1])
+    Args:
+        dictionary: 要排序的字典
+        type_order: 类型顺序, None: [int, str, list]
+        sort_within_type: 是否在同一类型内进行排序
+    """
+    if type_order is None:
+        type_order = [int, str, list]
 
-    # 合并结果并创建有序字典
-    sorted_items = sorted_positive + sorted_negative
-    return OrderedDict(sorted_items)
-    # 或者直接返回字典（Python 3.7+）
-    # return dict(sorted_items)
+    type_priority = {t: i for i, t in enumerate(type_order)}
+
+    def sort_key(item):
+        key, value = item
+        value_type = type(value)
+        type_rank = type_priority.get(value_type, len(type_order))
+
+        if sort_within_type:
+            # 在同一类型内，按值排序
+            if value_type == int or value_type == str:
+                return (type_rank, value)
+            elif value_type == list:
+                return (type_rank, str(value))  # 列表转换为字符串进行比较
+            else:
+                return (type_rank, str(value))
+        else:
+            # 只按类型排序
+            return type_rank
+
+    sorted_items = sorted(dictionary.items(), key=sort_key)
+    return dict(sorted_items)
 
 # ================================
 # GUI
@@ -977,7 +999,7 @@ def cd_setting_dialog():
                 if gift_name.value in gifts:
                     gifts.pop(gift_name.value)
 
-            gifts = sort_dict(gifts)  # 对礼物数据进行排序
+            gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -1020,7 +1042,7 @@ def cd_setting_dialog():
         if gift_name.value in special:
             special.pop(gift_name.value)
 
-        gifts = sort_dict(gifts)  # 对礼物数据进行排序
+        gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
         with open("data/gifts.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -1043,7 +1065,7 @@ def cd_setting_dialog():
                 json.dump(special, f, ensure_ascii=False, indent=4)
         else:
             gifts.pop(k)
-            gifts = sort_dict(gifts)  # 对礼物数据进行排序
+            gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
             with open("data/gifts.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
 
@@ -1255,7 +1277,7 @@ def gift_count_setting_dialog():
                 if gift_name.value in gifts:
                     gifts.pop(gift_name.value)
 
-            gifts = sort_dict(gifts)  # 对礼物数据进行排序
+            gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
             with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
                 json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -1297,7 +1319,7 @@ def gift_count_setting_dialog():
         if gift_name.value in special:
             special.pop(gift_name.value)
 
-        gifts = sort_dict(gifts)  # 对礼物数据进行排序
+        gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
         with open("data/gifts_count.json", "w+", encoding="utf-8") as f:
             json.dump(gifts, f, ensure_ascii=False, indent=4)
@@ -1763,6 +1785,116 @@ async def capture():
             # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
             ui.navigate.reload()
 
+    def change_gift_element(v_type, k, v):
+        '''
+        修改礼物列表UI元素
+        
+        :param v_type: 礼物类型：加减时为normal，随机为list，其它为special
+        :param k: 礼物名称
+        :param v: 设定礼物的值
+        '''
+
+        with open("data/gift_img.json", "r", encoding="utf-8") as f:
+            gift_img = json.load(f)
+
+        if v_type == "normal":
+            gift_img_avatar.set_source(gift_img.get(k, ""))
+            k_label.set_text(k)
+            v_label.set_text(format_seconds(v))
+
+        if v_type == "list":
+            gift_img_avatar.set_source(gift_img.get(k, ""))
+            k_label.set_text(k)
+            v_label.set_text(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
+
+        if v_type == "special":
+            if v == "clear":
+                v = "清空"
+            if v == "double":
+                v = "加倍"
+            if v == "half":
+                v = "减半"
+
+            gift_img_avatar.set_source(gift_img.get(k, ""))
+            k_label.set_text(k)
+            v_label.set_text(v)
+
+    def short_gift_element():
+        '''
+        将礼物列表处理为简洁模式
+        '''
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+        with open("data/gifts.json", "r", encoding="utf-8") as f:
+            gifts = json.load(f)
+        with open("data/special.json", "r", encoding="utf-8") as f:
+            special = json.load(f)
+
+        gifts.update(special) # 合并加减时和特殊玩法
+        gifts = sort_dict(dictionary=gifts, sort_within_type=True) # 对字典按值的类型排序
+        k = next(iter(gifts)) # 字典第一个礼物名称
+        v = gifts[k] # 字典第一个礼物的值
+        cycle_items = itertools.cycle(gifts.items())
+
+        def change(items):
+            k, v = next(items)
+            if type(v) == list:
+                change_gift_element("list", k, v)
+            elif type(v) == int:
+                change_gift_element("normal", k, v)
+            else:
+                change_gift_element("special", k, v)
+
+        # 初始化第一个礼物元素
+        if type(v) == list:
+            gift_element("list", k, v, True)
+        elif type(v) == int:
+            gift_element("normal", k, v, True)
+        else:
+            gift_element("special", k, v, True)
+
+        ui.timer(config.get("short_time", 5), lambda: change(cycle_items))
+
+    def gift_element(v_type, k, v, short = False):
+        global gift_img_avatar, k_label, v_label
+
+        if v_type == "normal":
+            with ui.row().classes('w-full') as row:
+                if short:
+                    row.style("min-height: 80px;")
+                with ui.avatar(color=None):
+                    gift_img_avatar = ui.image(gift_img.get(k, ""))
+                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                ui.space()
+                v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+
+        if v_type == "list":
+            with ui.row().classes('w-full') as row:
+                if short:
+                    row.style("min-height: 80px;")
+                with ui.avatar(color=None):
+                    gift_img_avatar = ui.image(gift_img.get(k, ""))
+                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                ui.space()
+                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+
+        if v_type == "special":
+            with ui.row().classes('w-full') as row:
+                if short:
+                    row.style("min-height: 80px;")
+                with ui.avatar(color=None):
+                    gift_img_avatar = ui.image(gift_img.get(k, ""))
+                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                ui.space()
+                if v == "clear":
+                    v = "清空"
+                if v == "double":
+                    v = "加倍"
+                if v == "half":
+                    v = "减半"
+                v_label = ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+
+
     capture_cd_is_created = True
 
     if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
@@ -1794,40 +1926,21 @@ async def capture():
         ui.separator() # 分割线
 
         # 创建礼物列表
-        for k,v in gifts.items():
-            if v != 0:
-                with ui.row().classes('w-full'):
-                    with ui.avatar(color=None):
-                        ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                    ui.space()
-                    if v < 0:
-                        ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                    else:
-                        ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+        if not config.get("short_list", False):
+            if gifts != {}:
+                gifts = sort_dict(dictionary=gifts, sort_within_type=True)
+                for k,v in gifts.items():
+                    gift_element("normal", k, v)
 
-        if special != {}:
-            for k,v in special.items():
-                if type(v) == list:
-                    with ui.row().classes('w-full'):
-                        with ui.avatar(color=None):
-                            ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                        ui.space()
-                        ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                else:
-                    with ui.row().classes('w-full'):
-                        with ui.avatar(color=None):
-                            ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
-                        ui.space()
-                        if v == "clear":
-                            v = "清空"
-                        if v == "double":
-                            v = "加倍"
-                        if v == "half":
-                            v = "减半"
-                        ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+            if special != {}:
+                special = sort_dict(dictionary=special, type_order=[str, list], sort_within_type=True)
+                for k,v in special.items():
+                    if type(v) == list:
+                        gift_element("list", k, v)
+                    else:
+                        gift_element("special", k, v)
+        else:
+            short_gift_element()
 
         def capture_cd_gift_list_show(name, gift, num, time, message):
             if not show_capture_gift_list_switch.value:
@@ -1937,15 +2050,17 @@ async def capture():
             ui.label().bind_text_from(app.storage.general, "gift_challenge_count").style(f"color: {config['color']}").classes("text-5xl")
             ui.label().bind_text_from(app.storage.general, "gift_challenge_unit").style(f"color: {config['color']}").classes("text-5xl")
             ui.label().bind_text_from(app.storage.general, "gift_challenge_text").style(f"color: {config['color']}").classes("text-5xl")
+
         ui.separator()
-        for k,v in gifts.items():
-            if v != 0:
+
+        if gifts != {}:
+            for k,v in gifts.items():
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
                     ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     ui.space()
-                    if v <= 0:
+                    if v < 0:
                         ui.label(f"{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                     else:
                         ui.label(f"+{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
@@ -2053,7 +2168,7 @@ def index():
     # 主界面GUI
     # ================================
 
-    global show_capture_gift_list_switch, room_id, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, init_login_dialog, start_button, pause_button, resume_button, add_button, sub_button
+    global show_capture_gift_list_switch, room_id, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, init_login_dialog, start_button, pause_button, resume_button, add_button, sub_button, short_switch
 
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -2222,6 +2337,14 @@ def index():
 
     # 礼物设置弹窗
     with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
+        with ui.row():
+            short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: save_config(config)).bind_value(config, "short_list").props('color="btn"')
+            short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
+            short_time = ui.number("滚动间隔", min=0, on_change=lambda: save_config(config)).bind_value(config, "short_time")
+            if short_switch.value:
+                short_time.set_visibility(True)
+            else:
+                short_time.set_visibility(False)
         with ui.row():
             ui.button("加班设置", on_click=lambda: cd_setting_dialog())
             ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
