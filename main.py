@@ -32,7 +32,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.8-dev"
+version = "0.32.9-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -1801,11 +1801,15 @@ async def capture():
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
             v_label.set_text(format_seconds(v))
+            k_label.classes(replace="text-3xl font-extrabold")
+            v_label.classes(replace="text-3xl font-extrabold")
 
         if v_type == "list":
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
             v_label.set_text(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
+            k_label.classes(replace="text-base font-extrabold")
+            v_label.classes(replace="text-base font-extrabold")
 
         if v_type == "special":
             if v == "clear":
@@ -1818,6 +1822,8 @@ async def capture():
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
             v_label.set_text(v)
+            k_label.classes(replace="text-3xl font-extrabold")
+            v_label.classes(replace="text-3xl font-extrabold")
 
     def short_gift_element():
         '''
@@ -1847,21 +1853,20 @@ async def capture():
 
         # 初始化第一个礼物元素
         if type(v) == list:
-            gift_element("list", k, v, True)
+            gift_element("list", k, v)
         elif type(v) == int:
-            gift_element("normal", k, v, True)
+            gift_element("normal", k, v)
         else:
-            gift_element("special", k, v, True)
+            gift_element("special", k, v)
 
-        ui.timer(config.get("short_time", 5), lambda: change(cycle_items))
+        timer = ui.timer(config.get("short_time", 5), lambda: change(cycle_items))
+        app.on_disconnect(lambda: timer.cancel(with_current_invocation=True))
 
-    def gift_element(v_type, k, v, short = False):
+    def gift_element(v_type, k, v):
         global gift_img_avatar, k_label, v_label
 
         if v_type == "normal":
-            with ui.row().classes('w-full') as row:
-                if short:
-                    row.style("min-height: 80px;")
+            with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
                 k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
@@ -1869,19 +1874,15 @@ async def capture():
                 v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
         if v_type == "list":
-            with ui.row().classes('w-full') as row:
-                if short:
-                    row.style("min-height: 80px;")
+            with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                k_label = ui.label(k).classes("text-base font-extrabold").style(f"color: {config['text_color']}")
                 ui.space()
-                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-base font-extrabold").style(f"color: {config['text_color']}")
 
         if v_type == "special":
-            with ui.row().classes('w-full') as row:
-                if short:
-                    row.style("min-height: 80px;")
+            with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
                 k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
