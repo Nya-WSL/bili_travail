@@ -32,7 +32,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.9-dev"
+version = "0.32.10-dev"
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -1774,7 +1774,10 @@ async def capture():
     # 检查是否需要刷新页面
     def check_cd_refresh():
         global refresh_capture_cd
-        if not show_capture_gift_list_switch.value:
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        if not config.get("show_capture_gift_list", False):
             if scroll_card.visible:
                 scroll_card.set_visibility(False)
         else:
@@ -1859,8 +1862,13 @@ async def capture():
         else:
             gift_element("special", k, v)
 
-        timer = ui.timer(config.get("short_time", 5), lambda: change(cycle_items))
-        app.on_disconnect(lambda: timer.cancel(with_current_invocation=True))
+        # 如果不将timer封装到函数中，在OBS的浏览器源中刷新页面后计时器会失效
+        def timer_handler() -> ui.timer:
+            timer = ui.timer(config.get("short_time", 5), lambda: change(cycle_items))
+            return timer
+
+        timer_handler()
+        app.on_disconnect(lambda: timer_handler().cancel())
 
     def gift_element(v_type, k, v):
         global gift_img_avatar, k_label, v_label
@@ -1944,7 +1952,10 @@ async def capture():
             short_gift_element()
 
         def capture_cd_gift_list_show(name, gift, num, time, message):
-            if not show_capture_gift_list_switch.value:
+            with open("config.json", "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            if not config.get("show_capture_gift_list", False):
                 scroll_card.set_visibility(False)
             else:
                 scroll_card.set_visibility(True)
@@ -2012,7 +2023,10 @@ async def capture():
     global capture_challenge_gift_list_show, capture_gift_is_created
     def check_gift_refresh():
         global refresh_capture_gift
-        if not show_capture_gift_list_switch.value:
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        if not config.get("show_capture_gift_list", False):
             if scroll_card.visible:
                 scroll_card.set_visibility(False)
         else:
@@ -2101,7 +2115,10 @@ async def capture():
                         ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
         def capture_challenge_gift_list_show(name, gift, num, time, message):
-            if not show_capture_gift_list_switch.value:
+            with open("config.json", "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            if not config.get("show_capture_gift_list", False):
                 scroll_card.set_visibility(False)
             else:
                 scroll_card.set_visibility(True)
