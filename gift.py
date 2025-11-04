@@ -121,7 +121,7 @@ class BiliGiftManager:
         获取房间礼物
 
         Args:
-            platform (_str_): web、android
+            platform (_str_): pc、android
         """
 
         await self.get_area_id()
