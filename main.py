@@ -1,4 +1,5 @@
 # Local Packages
+import log
 import ping
 import bili_api
 
@@ -8,7 +9,6 @@ import gift_mapping as gift_map
 import bili_auth_web as bili_auth
 import blivedm.blivedm.models.web as web_models
 
-from log import logger
 from blivedm import blivedm
 from changelog import changelog, get_log
 
@@ -33,6 +33,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 version = "0.32.11-dev"
+logger = log.logger
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
@@ -1521,14 +1522,15 @@ def save_config(data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-async def upload_log(room_id, file_path):
+async def upload_log(room_id):
     '''
     发送日志到服务器
     '''
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
 
-
+    file_path = log.file_name
+    
     url = config.get("server", None)
 
     if url is None or url == "":
@@ -1573,14 +1575,14 @@ async def upload_log(room_id, file_path):
                     logger.error(result)
 
     except aiohttp.ClientError as e:
-        result = f"日志上传失败，发生网络错误: {str(e)}"
-        ui.notify(result, type="negative")
-        logger.error(result)
+        result = "日志上传失败，发生网络错误: "
+        ui.notify(result + str(e), type="negative")
+        logger.error(result + traceback.format_exc())
 
     except Exception as e:
-        result = f"日志上传失败，发生错误: {str(e)}"
-        ui.notify(result, type="negative")
-        logger.error(result)
+        result = "日志上传失败，发生错误: "
+        ui.notify(result + str(e), type="negative")
+        logger.error(result + traceback.format_exc())
 
     finally:
         if "file_obj" in locals() and not file_obj.closed:
@@ -2473,7 +2475,7 @@ def index():
             ui.button("检查更新", on_click=lambda: check_update())
             # Changelog button
             ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
-            ui.button("上传日志", on_click=lambda: upload_log(config.get("room_id", 3), f"logs/bili_travail_{datetime.datetime.now().strftime("%Y%m%d")}.log"))
+            ui.button("上传日志", on_click=lambda: upload_log(config.get("room_id", 3)))
 
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):

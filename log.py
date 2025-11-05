@@ -8,12 +8,14 @@ if not os.path.exists("logs"):
     os.mkdir("logs")
 
 file_time = datetime.datetime.now().strftime("%Y%m%d")
+file_name = os.path.join("logs", f"bili_travail_{file_time}.log")
+
 
 # LEVEL: DEBUG INFO WARNING ERROR CRITICAL
 log.basicConfig(level=log.DEBUG,
                     format='%(asctime)s [%(levelname)s]: %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S',
-                    filename=os.path.join("logs", f"bili_travail_{file_time}.log"),
+                    filename=file_name,
                     encoding="utf-8"
                     )
 
