@@ -12,7 +12,7 @@ class BiliGiftManager:
             config = json.load(f)
 
         if config.get("room_id", "") != "":
-            self.room_id = config.get("room_id", "")
+            self.room_id = config["room_id"]
         else:
             self.room_id = 3
 

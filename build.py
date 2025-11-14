@@ -45,7 +45,26 @@ def main() -> None:
     parser.add_argument('--dry-run', action='store_true', help='Dry run', default=False)
     parser.add_argument('main', default='main.py', help='Main file which calls `ui.run()`.')
     parser.add_argument('--icon', type=str, help='Icon file for the program. Must be a .ico file on Windows.')
+    parser.add_argument('--access_key_id', required=False)
+    parser.add_argument('--access_key_secret', required=False)
+    parser.add_argument('--app_id', required=False)
     args = parser.parse_args()
+
+    if (
+        args.access_key_id != None
+        and args.access_key_secret != None
+        and args.app_id != None
+    ):
+        with open("env.py", "w+", encoding="utf-8") as f:
+            f.write(
+                f"""
+def get_key():
+    return {{
+        "ACCESS_KEY_ID": "{args.access_key_id}",
+        "ACCESS_KEY_SECRET": "{args.access_key_secret}",
+        "APP_ID": {args.app_id}
+    }}
+""")
 
     for directory in ['build', 'dist']:
         if Path(directory).exists():
@@ -69,7 +88,7 @@ def main() -> None:
         return
 
     subprocess.call(command)
-    shutil.copytree("static", os.path.join("dist", "bili_travail", "static"))
+    shutil.copytree("static", os.path.join("dist", "start", "static"))
     guard = {
             "舰长": "guard-level-3.png",
             "提督": "guard-level-2.png",
@@ -77,20 +96,20 @@ def main() -> None:
             "辣条": "latiao.png"
 }
     for i in guard.values():
-        save_path = os.path.join("dist", "bili_travail", "data")
+        save_path = os.path.join("dist", "start", "data")
         save_file = os.path.join(save_path, i)
         if not os.path.exists(save_path):
             os.mkdir(save_path)
         shutil.copy(os.path.join("data", i), save_file)
 
-    # shutil.copytree("data/gifts", os.path.join("dist", "bili_travail", "data", "gifts"))
+    # shutil.copytree("data/gifts", os.path.join("dist", "start", "data", "gifts"))
 
     with open("lines.txt", "w+", encoding="utf-8") as f:
         total_lines = lines.lines()
         print(total_lines)
         f.write(str(total_lines))
 
-    shutil.copy("lines.txt", os.path.join("dist", "bili_travail"))
+    shutil.copy("lines.txt", os.path.join("dist", "start"))
 
 if __name__ == '__main__':
     main()

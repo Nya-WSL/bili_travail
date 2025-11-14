@@ -184,3 +184,6 @@ bili_qrcode.png
 /data/sys_info
 lines.txt
 /bili_travail - 副本
+broadcast_code.py
+env.py
+/.vscode

@@ -1,13 +1,28 @@
 # Local Packages
 import log
+
+try:
+    import env # 该模块在打包时填入密钥后自动生成
+except:
+    with open("env.py", "w+", encoding="utf-8") as f:
+        f.write(f"""
+def get_key():
+    return {{
+        "ACCESS_KEY_ID": "",
+        "ACCESS_KEY_SECRET": "",
+        "APP_ID": 0
+    }}
+""")
+    import env
+
 import ping
 import bili_api
 
 import gift as get_gift
 import update as travail_update
 import gift_mapping as gift_map
-import bili_auth_web as bili_auth
 import blivedm.blivedm.models.web as web_models
+import blivedm.blivedm.models.open_live as open_models
 
 from blivedm import blivedm
 from changelog import changelog, get_log
@@ -26,13 +41,12 @@ import requests
 import datetime
 import traceback
 import itertools
-import http.cookies
 from typing import *
 from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.11-dev"
+version = "0.32.12-dev"
 logger = log.logger
 logger.debug("version: {}", version)
 
@@ -159,6 +173,10 @@ example_config = {
     "port": 65000,
     "server": "http://api.travail.nya-wsl.cn",
     "SESSDATA": "",
+    "auth_code": "",
+    "ACCESS_KEY_ID": "",
+    "ACCESS_KEY_SECRET": "",
+    "APP_ID": 0,
     "background_image": [
         "https://nya-wsl.com/images/image001.png",
         "https://nya-wsl.com/images/image002.png",
@@ -220,6 +238,26 @@ host = config["host"]
 port = config["port"]
 btn_color = config["btn_color"]
 
+# 需申请哔哩哔哩直播开放平台开发者账号并将id、key和app_id填入config.json中，如需开箱即用请在 https://github.com/Nya-WSL/bili_travail/releases 下载
+bili_keys = env.get_key()
+
+if config.get("ACCESS_KEY_ID", "") != "":
+    ACCESS_KEY_ID = config.get("ACCESS_KEY_ID", "")
+else:
+    ACCESS_KEY_ID = bili_keys.get("ACCESS_KEY_ID", "")
+
+if config.get("ACCESS_KEY_SECRET", "") != "":
+    ACCESS_KEY_SECRET = config.get("ACCESS_KEY_SECRET", "")
+else:
+    ACCESS_KEY_SECRET = bili_keys.get("ACCESS_KEY_SECRET", "")
+
+if config.get("APP_ID", 0) != 0:
+    APP_ID = int(config.get("APP_ID", 0))
+else:
+    APP_ID = int(bili_keys.get("APP_ID", 0))
+
+ROOM_ID = 0
+
 ui.add_css(
     f"""
 .text-btn {{
@@ -236,9 +274,6 @@ background: {btn_color};
 ui.button.__init__.__kwdefaults__['color'] = btn_color # 设置所有按钮颜色为配置文件中的btn_color
 
 GiftManager = get_gift.BiliGiftManager()
-
-if config.get("room_id", "") != "":
-    GiftManager.set_room_id(config.get("room_id", 3)) # 启动时初始化礼物api必须的房间号，如果未设置则默认为3号直播间
 
 async def create_blind_box():
     box_id = []
@@ -282,14 +317,15 @@ async def init_config():
 
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    # 初始化gifts.json数据
+
     # 确保礼物数据文件存在，如果不存在，则先初始化礼物数据
     if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
-        # 如果配置文件中包含房间号，则传入；否则会触发 init_gift
+        # 如果配置文件中包含房间号，则传入；否则会直接初始化空数据
         room_id = config.get("room_id", "")
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
+            GiftManager.set_room_id(room_id)
             gift_config = await GiftManager.get_config("data/gift_img.json") # 使用B站api
             # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
             if not gift_config:
@@ -379,73 +415,74 @@ async def index():
 # 程序运行
 # ================================
 
-# 弹幕数据连接
 async def start_handler():
+    await run_client()
+
+@app.on_shutdown
+async def shut_down():
+    await client.stop_and_close()
+    logger.info('ws connect shut down')
+
+async def run_client():
     global client
+    client = blivedm.OpenLiveClient(
+        access_key_id=ACCESS_KEY_ID,
+        access_key_secret=ACCESS_KEY_SECRET,
+        app_id=APP_ID,
+        room_owner_auth_code=config.get("auth_code", None),
+    )
+    handler = BiliHandler()
+    client.set_handler(handler)
+    client.start()
 
-    # 读入配置文件
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-
-    # 直播间ID的取值看直播间URL
-    ROOM_ID = config["room_id"]
-
-    # 这里填一个已登录账号的cookie的SESSDATA字段的值。不填也可以连接，但是收到弹幕的用户名会打码，UID会变成0
-    SESSDATA = config["SESSDATA"]
-
-    session: Optional[aiohttp.ClientSession] = None
-
-    # 创建ws
     try:
-        cookies = http.cookies.SimpleCookie()
-        cookies['SESSDATA'] = SESSDATA
-        cookies['SESSDATA']['domain'] = 'bilibili.com'
-
-        session = aiohttp.ClientSession()
-        session.cookie_jar.update_cookies(cookies)
-
-        client = blivedm.BLiveClient(ROOM_ID, session=session)
-        handler = BiliHandler()
-        client.set_handler(handler)
-        client.start()
-
-        try:
-            await client.join()
-        finally:
-            await client.stop_and_close()
-
+        await client.join()
     finally:
-        await session.close()
-        b_connect_switch.set_value(False)
-
+        await client.stop_and_close()
 
 # 获取礼物信息
 class BiliHandler(blivedm.BaseHandler):
     heart_count = 0
     # 心跳数据
     def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
+        global ROOM_ID
+        ROOM_ID = client.room_id
+
+        if ROOM_ID != None:
+            room_id = ROOM_ID
+        else:
+            room_id = 3
+
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        config["room_id"] = room_id
+
+        with open("config.json", "w+", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=4)
+
         self.heart_count += 1
         logger.info("触发心跳")
-        if self.heart_count < 2:
+        if self.heart_count == 1:
             b_connect_switch.set_value(True)
             b_connect_switch.set_text("已连接弹幕服务器")
-            logger.info(f"已连接至{room_id.value}")
+            logger.info(f"已连接至{room_id}")
 
-            uid = client.uid
-            if uid != 0:
-                login_status.set_text("已登录")
+            uid = client.room_owner_uid
+            if uid != None:
+                login_status.set_text(room_id)
                 login_status.classes("text-green")
             else:
                 login_status.set_text("未登录")
 
     # 礼物数据
-    def _on_gift(self, client: blivedm.BLiveClient, message: web_models.GiftMessage):
+    def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):
         logger.debug("收到礼物")
         gift = message.gift_name
-        num = message.num
+        num = message.gift_num
         uname = message.uname
         price = message.price / 100
-        result = ""
+        is_paid = message.paid
         if len(uname) > 8:
             uname = uname[:5] + "..."
 
@@ -455,12 +492,11 @@ class BiliHandler(blivedm.BaseHandler):
 
 
     # 舰队数据
-    def _on_user_toast_v2(self, client: blivedm.BLiveClient, message: web_models.UserToastV2Message):
+    def _on_open_live_buy_guard(self, client: blivedm.OpenLiveClient, message: open_models.GuardBuyMessage):
         gift = message.guard_level
-        num = message.num
-        uname = message.username
+        num = message.guard_num
+        uname = message.user_info.uname
         price = message.price / 100
-        result = ""
 
         if gift == 1:
             gift = "总督"
@@ -482,12 +518,11 @@ class BiliHandler(blivedm.BaseHandler):
     # 醒目留言
     # 待开发
     # ================================
-    def _on_super_chat(self, client: blivedm.BLiveClient, message: web_models.SuperChatMessage):
-        logger.info(f'[{client.room_id}] 醒目留言 ¥{message.price} {message.uname}：{message.message}')
+    def _on_open_live_super_chat(self, client: blivedm.OpenLiveClient, message: open_models.SuperChatMessage):
+        logger.info(f'[{message.room_id}] 醒目留言 ¥{message.rmb} {message.uname}：{message.message}')
 
-    def _on_interact_word_v2(self, client: blivedm.BLiveClient, message: web_models.InteractWordV2Message):
-        if message.msg_type == 1:
-            logger.info(f'{message.username} 进入房间')
+    def _on_open_live_enter_room(self, client: blivedm.OpenLiveClient, message: open_models.RoomEnterMessage):
+        logger.info(f'{message.uname} 进入 {message.room_id}')
 
     def _on_gift_statistics(self, gift, num, uname, price = 0):
         if not os.path.exists("data/gift_statistics.json"):
@@ -1588,92 +1623,52 @@ async def upload_log(room_id):
         if "file_obj" in locals() and not file_obj.closed:
             file_obj.close()
 
-def check_auth(loginInfo):
-    status = bili_auth.login(loginInfo[0])
 
-    if status == True:
-        ui.notify("登录成功", type="positive")
-        try:
-            os.remove(loginInfo[1])
-        except:
-            logger.warning(f"删除{loginInfo[1]}失败")
-
-    else:
-        ui.notify(status, type="negative")
-
-
-def bili_login(init = False):
-    global qrcode_ui
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-    if config["room_id"] == "":
-        ui.notify("请先填入房间号", type="negative")
-        return
-
-    loginInfo = bili_auth.get_qrcode("bili_qrcode")
-
-    with ui.dialog() as auth_dialog, ui.card(align_items="center"):
-        qrcode_ui = ui.image(loginInfo[1])
-        ui.label("请使用B站APP扫描二维码登录")
-        qr_button = ui.button("已扫码", on_click=lambda: check_auth(loginInfo))
-        qr_button.on_click(lambda: auth_dialog.close()).on_click(lambda: os.remove(loginInfo[1])) # 因为太长了所以换一行写
-        if init:
-            qr_button.on_click(lambda: init_login_dialog.close())
-
-    auth_dialog.open()
-    auth_dialog.on("hide", lambda: os.remove(loginInfo[1]))
-
-
-# 检查弹幕服务器连接状态
 async def check_b_connect_status():
     global b_connect_status
+    switch_value = b_connect_switch.value
 
-    # 如果连接弹幕服务器开关为关且房间号不为空
-    if b_connect_switch.value == False:
-        if room_id.value == "":
-            if not b_connect_status:
-                b_connect_switch.set_value(False)
-                return
-            else:
-                start_button.disable()
-                gift_challenge_switch.disable()
-                b_connect_status = False
-                await client.stop_and_close() # 断开弹幕服务器ws连接并关闭blivedm客户端
-                ui.notify("已断开连接，这通常是因为手动关闭了连接或房间号不正确")
-                b_connect_switch.set_value(False)
-                b_connect_switch.set_text("连接至弹幕服务器")
-        else:
-            start_button.disable()
-            gift_challenge_switch.disable()
-            b_connect_status = False
-            await client.stop_and_close() # 断开弹幕服务器ws连接并关闭blivedm客户端
-            ui.notify("已断开连接，这通常是因为手动关闭了连接或房间号不正确")
-            b_connect_switch.set_value(False)
-            b_connect_switch.set_text("连接至弹幕服务器")
-
-    # 尝试连接弹幕服务器
-    if b_connect_switch.value == "null":
-        if room_id.value == "":
+    # 开关关闭状态：断开连接
+    if switch_value == False:
+        # 无身份码且未连接
+        if auth_code.value == "" and not b_connect_status:
             b_connect_switch.set_value(False)
             return
 
+        # 断开连接
+        start_button.disable()
+        gift_challenge_switch.disable()
+        b_connect_status = False
+        client.stop() # 断开弹幕服务器ws连接
+        logger.info("弹幕服务器ws连接已断开")
+        ui.notify("已断开连接，这通常是因为手动关闭了连接或身份码不正确")
+        b_connect_switch.set_value(False)
+        b_connect_switch.set_text("连接至弹幕服务器")
+        login_status.set_text("未登录")
+
+    # 开关为"null"状态：尝试连接
+    if switch_value == "null":
+        # 检查身份码
+        if not auth_code.value:
+            ui.notify("未填入身份码，无法连接弹幕服务器", type="negative")
+            b_connect_switch.set_value(False)
+            return
+
+        # 启动连接
         if not b_connect_status:
-            with open("config.json", "r", encoding="utf-8") as f:
-                config = json.load(f)
-            if config["SESSDATA"] == "":
-                ui.notify("未登录B站账号，历史礼物功能可能无法显示用户名且无法获取最新的盲盒数据", type="warning")
-            asyncio.create_task(start_handler()) # 创建连接弹幕服务器协程
+            asyncio.create_task(start_handler())
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
-            b_connect_status = True # 设置弹幕服务器连接状态
+            login_status.set_text("未登录")
+            b_connect_status = True
         else:
             b_connect_switch.set_value(True)
 
-    # 如果连接弹幕服务器开关为开
-    if b_connect_switch.value == True:
-        if room_id.value == "": # 如果房间号为空
-            ui.notify("请输入房间号", type="negative")
-            b_connect_switch.set_value(False) # 重置开关为关
+    # 开关打开状态：已连接
+    if switch_value == True:
+        if not auth_code.value:
+            ui.notify("请输入身份码", type="negative")
+            b_connect_switch.set_value(False)
             return
 
         if b_connect_status:
@@ -1681,6 +1676,7 @@ async def check_b_connect_status():
             gift_challenge_switch.enable()
         else:
             b_connect_switch.set_value("null")
+
 
 # 打开界面预览弹窗
 def open_capture():
@@ -1695,8 +1691,8 @@ def open_capture():
     dialog.open()
 
 async def refresh_gift_loop():
-    if room_id.value == "":
-        logger.warning("房间号为空，跳过礼物更新")
+    if auth_code.value == "":
+        logger.warning("身份码为空，跳过礼物更新")
         return
 
     gift_config = await GiftManager.get_config("data/gift_img.json")
@@ -1718,8 +1714,8 @@ async def refresh_gift_loop():
 # 更新礼物数据
 async def refresh_gift():
     async def check_refresh():
-        if room_id.value == "":
-            ui.notify("请输入房间号", type="negative")
+        if auth_code.value == "":
+            ui.notify("请输入身份码", type="negative")
             return
 
         check_dialog.close()
@@ -1909,7 +1905,8 @@ async def capture():
     capture_cd_is_created = True
 
     if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
-        await init_config()
+        if auth_code.value != None:
+            await init_config()
 
 
     # 初始化礼物列表
@@ -2042,7 +2039,8 @@ async def capture():
     capture_gift_is_created = True
 
     if not os.path.exists("data/gifts_count.json") or not os.path.exists("data/gift_img.json"):
-        await init_config()
+        if auth_code.value != None:
+            await init_config()
 
     # 礼物列表
     with open("config.json", "r", encoding="utf-8") as f:
@@ -2188,7 +2186,7 @@ def index():
     # 主界面GUI
     # ================================
 
-    global show_capture_gift_list_switch, room_id, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, init_login_dialog, start_button, pause_button, resume_button, add_button, sub_button, short_switch
+    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
 
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -2434,10 +2432,10 @@ def index():
 
         ui.separator()
 
-        # 房间号
         with ui.row(align_items="center"):
-            room_id = ui.input("房间号", on_change=lambda: save_config(config)).style("width: 120px")
-            room_id.bind_value(config, "room_id").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入房间号到配置文件
+            # 身份码
+            auth_code = ui.input("身份码", on_change=lambda: save_config(config), password=True, password_toggle_button=True).style("width: 120px")
+            auth_code.bind_value(config, "auth_code").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入身份码到配置文件
 
             with ui.column(align_items="center").classes("gap-0"):
                 b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
@@ -2470,7 +2468,7 @@ def index():
 
         with ui.row():
             # Login bilibili button
-            ui.button("登录账号", on_click=lambda: bili_login())
+            ui.button("登录账号", on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
             # Update version button
             ui.button("检查更新", on_click=lambda: check_update())
             # Changelog button
@@ -2485,19 +2483,6 @@ def index():
 
         init_task()
         countdown_timer.inherit_time(int(app.storage.general["countdown_time"]))
-
-        if not app.storage.general["startup_check_bili_auth"]:
-            with ui.dialog() as init_login_dialog, ui.card(align_items="center"):
-                ui.label("您似乎未登录B站账号，是否需要登录？")
-                ui.label("未登录历史礼物功能可能无法显示用户名且无法获取最新的盲盒数据")
-                ui.label("建议使用小号登录，以免账号被风控")
-                with ui.row():
-                    ui.button("扫码登录", on_click=lambda: bili_login(True))
-                    ui.button("取消", on_click=lambda: init_login_dialog.close())
-
-            if config["room_id"] != "":
-                app.storage.general["startup_check_bili_auth"] = True
-                init_login_dialog.open()
 
     # about按钮
     with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
