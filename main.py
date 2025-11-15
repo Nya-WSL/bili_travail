@@ -46,7 +46,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.12-dev"
+version = "0.32.13-dev"
 logger = log.logger
 logger.debug("version: {}", version)
 
