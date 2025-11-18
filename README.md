@@ -1,4 +1,4 @@
-# Bili Travail - B站加班姬
+# Bili_travail | B站加班姬
 
 基于blivedm和NiceGUI的B站直播加班姬
 

@@ -1,12 +1,19 @@
 '''
-该模块为服务器模块，用于接收加班姬发送的调试数据
+该模块为服务器模块，用于接收加班姬发送的数据
 '''
 
 import os
 import json
 import uvicorn
+import aiohttp
+
+from typing import List
 from pathlib import Path
+from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
+
+class GiftIdsRequest(BaseModel):
+    gift_ids: List[int]
 
 def bytes_to_kb(bytes_size: int) -> float:
     """将字节大小转换为 KB"""
@@ -14,34 +21,96 @@ def bytes_to_kb(bytes_size: int) -> float:
 
 app = FastAPI()
 
+blind_box = {}
+
 example_config = {
     "host": "0.0.0.0",
     "port": 65200,
-    "save_path": os.getcwd() + "/logs/"
+    "save_path": os.getcwd() + "/logs/",
+    "SESSDATA": ""
 }
 
-if not os.path.exists("config.json"):
+def init_config():
+    if not os.path.exists("config.json"):
+        with open("config.json", "w", encoding="utf-8") as f:
+            json.dump(example_config, f, ensure_ascii=False, indent=4)
+
+    # 加载配置文件
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    # 检查配置文件缺失项
+    diff = example_config.keys() - config.keys()
+
+    for key in diff:
+        config[key] = example_config[key]
+
+    # 检查配置文件多余项
+    diff = config.keys() - example_config.keys()
+
+    for key in diff:
+        config.pop(key, None)
+
     with open("config.json", "w", encoding="utf-8") as f:
-        json.dump(example_config, f, ensure_ascii=False, indent=4)
+        json.dump(config, f, ensure_ascii=False, indent=4)
 
-# 加载配置文件
-with open("config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
+async def get_blind_box(gift_ids: list) -> dict:
+    """
+    获取盲盒礼物列表
+    
+    :param gift_ids (_list_) : 盲盒礼物ID
+    :return dict: 盲盒礼物列表
+    """
 
-# 检查配置文件缺失项
-diff = example_config.keys() - config.keys()
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
 
-for key in diff:
-    config[key] = example_config[key]
+    blind_box = {}
 
-# 检查配置文件多余项
-diff = config.keys() - example_config.keys()
+    for gift_id in gift_ids:
+        url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
+        params = {
+            "gift_id": gift_id
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+            "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
+        }
 
-for key in diff:
-    config.pop(key, None)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data['code'] == 0:
+                        for gift in data['data']['gifts']:
+                            if data['data']['blind_gift_name'] not in blind_box:
+                                blind_box[data['data']['blind_gift_name']] = []
+                            blind_box[data['data']['blind_gift_name']].append({
+                                'gift': gift['gift_name'], 
+                                "gift_img": gift['gift_img']
+                            })
+                    else:
+                        print(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
+                else:
+                    print(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
 
-with open("config.json", "w", encoding="utf-8") as f:
-    json.dump(config, f, ensure_ascii=False, indent=4)
+    return blind_box
+
+@app.post("/gift/get_blind_boxes", status_code=status.HTTP_200_OK)
+async def index(request: GiftIdsRequest):
+    try:
+        blind_box = await get_blind_box(request.gift_ids)
+
+        if blind_box == {}:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="盲盒数据为空")
+
+        return blind_box
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/log/{room_id}", status_code=status.HTTP_201_CREATED)
 async def hook(room_id, file: UploadFile = File(...)):
@@ -83,6 +152,8 @@ async def hook(room_id, file: UploadFile = File(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 if __name__ == "__main__":
+    init_config()
+
     with open("config.json", "r") as f:
         config = json.load(f)
 

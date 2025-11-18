@@ -158,32 +158,30 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
-test.json
+
+# bili_travail
+*test*
+*.html
+*.png
+*.zip
+
+/logs
+/.vscode
+/.nicegui
+/bili_travail - 副本
+
+data/*.json
+
+/data/history
+/data/sys_info
+/data/blind_box
+/data/statistics
+
 config.json
-test.htm
-save_test.html
-/data/*.json
-test*.*
+passwd.json
+users.json
 crawler.py
 version
 version.txt
-packages/*
-/driver
-*.html
-/.nicegui
-passwd.json
-users.json
-update.zip
-/data/history
-bili_qrcode.png
-/data/statistics
-/logs
-*.png
-*.zip
-/data/blind_box
-/data/sys_info
-lines.txt
-/bili_travail - 副本
 broadcast_code.py
 env.py
-/.vscode

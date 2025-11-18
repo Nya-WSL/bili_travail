@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 
 import nicegui
-import lines
 
 DESCRIPTION = '''
 Build a package of your NiceGUI app
@@ -57,14 +56,12 @@ def main() -> None:
     ):
         with open("env.py", "w+", encoding="utf-8") as f:
             f.write(
-                f"""
-def get_key():
+                f"""def get_key():
     return {{
         "ACCESS_KEY_ID": "{args.access_key_id}",
         "ACCESS_KEY_SECRET": "{args.access_key_secret}",
         "APP_ID": {args.app_id}
-    }}
-""")
+    }}""")
 
     for directory in ['build', 'dist']:
         if Path(directory).exists():
@@ -103,13 +100,6 @@ def get_key():
         shutil.copy(os.path.join("data", i), save_file)
 
     # shutil.copytree("data/gifts", os.path.join("dist", "start", "data", "gifts"))
-
-    with open("lines.txt", "w+", encoding="utf-8") as f:
-        total_lines = lines.lines()
-        print(total_lines)
-        f.write(str(total_lines))
-
-    shutil.copy("lines.txt", os.path.join("dist", "start"))
 
 if __name__ == '__main__':
     main()

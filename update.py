@@ -59,13 +59,14 @@ async def update(server, version):
 @chcp 65001
 cd /d {os.getcwd()}
 taskkill /f /im bili_travail.exe
+taskkill /f /im start.exe
 timeout /t 3 /nobreak
 rmdir /s /q _internal
 timeout /t 1 /nobreak
 robocopy update ./ /E /UNILOG:logs\update.log /NP /NS /V /TEE
 rmdir /s /q update
 rmdir /s /q cache
-start bili_travail.exe
+start start.exe
 timeout /t 1 /nobreak
 """)
         os.system("update.bat")

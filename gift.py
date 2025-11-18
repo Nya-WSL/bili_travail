@@ -58,37 +58,33 @@ class BiliGiftManager:
 
         self.room_id = room_id
 
-    async def get_blind_box(self, gift_id) -> dict:
+    async def get_blind_box(self, gift_ids: list) -> dict:
         """
         获取盲盒礼物列表
         
-        :param gift_id: 盲盒礼物ID
+        :param gift_ids (_list_): 盲盒礼物ID
         :return dict: 盲盒礼物列表
         """
 
         with open("config.json", "r", encoding="utf-8") as f:
             config = json.load(f)
 
-        url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
-        params = {
-            "gift_id": gift_id
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
-            "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
+        url = f"{config.get('server', '')}/gift/get_blind_boxes"
+        data = {
+            "gift_ids": gift_ids
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, headers=headers) as response:
+            async with session.post(url, json=data) as response:
                 if response.status == 200:
                     data = await response.json()
-                    if data['code'] == 0:
-                        return data['data']
+                    if data != {}:
+                        return data
                     else:
-                        logger.error(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
+                        logger.error(f"获取盲盒礼物列表失败: {data['message']}")
                         return {}
                 else:
-                    logger.error(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
+                    logger.error(f"请求盲盒礼物列表失败: {response.status}")
                     return {}
 
     async def get_area_id(self):
@@ -166,18 +162,14 @@ class BiliGiftManager:
             if box_id == []:
                 logger.error("初始化礼物时未获取到盲盒数据")
             else:
-                for id in box_id:
-                    blind_box = await self.get_blind_box(id)
+                blind_box = await self.get_blind_box(box_id)
 
-                    if blind_box != {}:
-                        box_gifts_list = blind_box.get("gifts", {})
-                        if box_gifts_list != {}:
-                            for gift in box_gifts_list:
-                                gift_mapping[gift["gift_name"]] = gift["gift_img"]
-                        else:
-                            logger.error(f"盲盒({id})数据为空，可能是因为未登录账号")
-                    else:
-                        logger.error(f"盲盒({id})数据为空")
+                if blind_box != {}:
+                    for gifts in blind_box.values():
+                        for gift in gifts:
+                            gift_mapping[gift['gift']] = gift['gift_img']
+                else:
+                    logger.error(f"盲盒数据为空")
 
             # 更新舰队数据
             guard = {

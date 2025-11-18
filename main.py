@@ -2,7 +2,8 @@
 import log
 
 try:
-    import env # 该模块在打包时填入密钥后自动生成
+    # 该模块在打包时填入密钥后自动生成
+    import env # type: ignore
 except:
     with open("env.py", "w+", encoding="utf-8") as f:
         f.write(f"""
@@ -13,7 +14,7 @@ def get_key():
         "APP_ID": 0
     }}
 """)
-    import env
+    import env # type: ignore
 
 import ping
 import bili_api
@@ -51,13 +52,6 @@ logger = log.logger
 logger.debug("version: {}", version)
 
 scheduler = AsyncIOScheduler() # 创建调度器
-
-if os.path.exists("lines.txt"):
-    with open("lines.txt", "r", encoding="utf-8") as f:
-        app.storage.general["lines"] = f.read()
-
-if app.storage.general.get("lines", 0) == 0:
-    app.storage.general["lines"] = 0
 
 # ================================
 # 检查环境状态
@@ -172,7 +166,6 @@ example_config = {
     "host": "127.0.0.1",
     "port": 65000,
     "server": "http://api.travail.nya-wsl.cn",
-    "SESSDATA": "",
     "auth_code": "",
     "ACCESS_KEY_ID": "",
     "ACCESS_KEY_SECRET": "",
@@ -287,25 +280,14 @@ async def create_blind_box():
         logger.error("未获取到盲盒数据")
         return
 
-    for id in box_id:
-        gifts = []
-        box_gifts = await GiftManager.get_blind_box(id)
+    blind_boxes = await GiftManager.get_blind_box(box_id)
 
-        if box_gifts != {}:
-            try:
-                box_gifts_list = box_gifts["gifts"]
-            except Exception as e:
-                if config.get("SESSDATA", "") == "":
-                    logger.error(f"获取盲盒数据失败：{e}，未登录账号")
-                else:
-                    logger.error(f"获取盲盒数据失败：{e}")
-                return blind_box
-
-            for gift in box_gifts_list:
-                gifts.append(gift["gift_name"])
-            blind_box[box_gifts["blind_gift_name"]] = gifts
-        else:
-            logger.error("盲盒数据为空")
+    # 忽略盲盒礼物图标，图标在gift.get_config()中已经处理了，这个字典不能存图标
+    for box, box_gifts in blind_boxes.items():
+        if not box in blind_box:
+            blind_box[box] = []
+        for gift in box_gifts:
+            blind_box[box].append(gift['gift'])
 
     with open("data/blinx_box_data.json", "w+", encoding="utf-8") as f:
         json.dump(blind_box, f, ensure_ascii=False, indent=4)
@@ -473,7 +455,8 @@ class BiliHandler(blivedm.BaseHandler):
                 login_status.set_text(room_id)
                 login_status.classes("text-green")
             else:
-                login_status.set_text("未登录")
+                login_status.set_text("未连接")
+                login_status.classes(replace="text-red")
 
     # 礼物数据
     def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):
@@ -1644,7 +1627,8 @@ async def check_b_connect_status():
         ui.notify("已断开连接，这通常是因为手动关闭了连接或身份码不正确")
         b_connect_switch.set_value(False)
         b_connect_switch.set_text("连接至弹幕服务器")
-        login_status.set_text("未登录")
+        login_status.set_text("未连接")
+        login_status.classes(replace="text-red")
 
     # 开关为"null"状态：尝试连接
     if switch_value == "null":
@@ -1659,7 +1643,8 @@ async def check_b_connect_status():
             asyncio.create_task(start_handler())
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
-            login_status.set_text("未登录")
+            login_status.set_text("未连接")
+            login_status.classes(replace="text-red")
             b_connect_status = True
         else:
             b_connect_switch.set_value(True)
@@ -2433,17 +2418,18 @@ def index():
         ui.separator()
 
         with ui.row(align_items="center"):
-            # 身份码
-            auth_code = ui.input("身份码", on_change=lambda: save_config(config), password=True, password_toggle_button=True).style("width: 120px")
-            auth_code.bind_value(config, "auth_code").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入身份码到配置文件
+            with ui.column(align_items="center").classes("gap-0"):
+                # 身份码
+                auth_code = ui.input("身份码", on_change=lambda: save_config(config), password=True, password_toggle_button=True).style("width: 120px")
+                auth_code.bind_value(config, "auth_code").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入身份码到配置文件
+                with ui.row().classes("gap-0"):
+                    ui.label("房间号：")
+                    login_status = ui.label("未连接").classes("text-red")
 
             with ui.column(align_items="center").classes("gap-0"):
                 b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
                 show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config(config))
                 show_capture_gift_list_switch.bind_value(config, "show_capture_gift_list").props('color="btn"')
-                with ui.row().classes("gap-0"):
-                    ui.label("登录状态：")
-                    login_status = ui.label("未连接").classes("text-red")
 
             with ui.column(align_items="center").classes("gap-0"):
                 with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
@@ -2451,10 +2437,6 @@ def index():
 
                 gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config(config)).props('color="btn"')
                 gift_challenge_switch.disable()
-
-                with ui.row().classes("gap-0"):
-                    ui.label("当前行数：")
-                    ui.label().bind_text_from(app.storage.general, "lines")
 
         ui.separator()
 
@@ -2717,6 +2699,6 @@ def shutdown():
 
 # 运行NiceGUI
 try:
-    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 720], reconnect_timeout=30, language="zh-CN")
+    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 700], reconnect_timeout=30, language="zh-CN")
 except:
     logger.error(f"run error: {traceback.format_exc()}")
