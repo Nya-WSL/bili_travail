@@ -407,6 +407,10 @@ async def shut_down():
 
 async def run_client():
     global client
+
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+
     client = blivedm.OpenLiveClient(
         access_key_id=ACCESS_KEY_ID,
         access_key_secret=ACCESS_KEY_SECRET,
@@ -439,6 +443,7 @@ class BiliHandler(blivedm.BaseHandler):
             config = json.load(f)
 
         config["room_id"] = room_id
+        GiftManager.set_room_id(room_id)
 
         with open("config.json", "w+", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=4)
@@ -2421,7 +2426,7 @@ def index():
             with ui.column(align_items="center").classes("gap-0"):
                 # 身份码
                 auth_code = ui.input("身份码", on_change=lambda: save_config(config), password=True, password_toggle_button=True).style("width: 120px")
-                auth_code.bind_value(config, "auth_code").on_value_change(lambda e: GiftManager.set_room_id(e.value)) # 实时写入身份码到配置文件
+                auth_code.bind_value(config, "auth_code") # 实时写入身份码到配置文件
                 with ui.row().classes("gap-0"):
                     ui.label("房间号：")
                     login_status = ui.label("未连接").classes("text-red")

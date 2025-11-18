@@ -108,7 +108,7 @@ class BiliGiftManager:
                         self.area_parent_id = data["data"]["parent_area_id"]
                         self.area_id = data["data"]["area_id"]
                     else:
-                        logger.error(f"获取直播分区失败：{data['message']}")
+                        logger.error(f"获取{self.room_id}直播分区失败：{data}")
                 else:
                     logger.error(f"请求直播分区失败：{response.status}")
 
@@ -149,7 +149,6 @@ class BiliGiftManager:
             # 获取房间礼物
             gifts_data = await self.get_room_gift("android")
 
-            box_gifts_list = {}
             gift_mapping = {}
             box_id = []
 
@@ -190,7 +189,7 @@ class BiliGiftManager:
             with open(img_path, "w", encoding="utf-8") as file:
                 json.dump(gift_mapping, file, ensure_ascii=False, indent=4)
 
-            if box_gifts_list == {}:
+            if blind_box == {}:
                 return "blind_box_none"
             else:
                 return True
