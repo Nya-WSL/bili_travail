@@ -47,7 +47,7 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.13-dev"
+version = "0.32.14-dev"
 logger = log.logger
 logger.debug("version: {}", version)
 
@@ -1873,9 +1873,9 @@ async def capture():
             with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-base font-extrabold").style(f"color: {config['text_color']}")
+                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
                 ui.space()
-                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-base font-extrabold").style(f"color: {config['text_color']}")
+                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
 
         if v_type == "special":
             with ui.row().classes('w-full'):
