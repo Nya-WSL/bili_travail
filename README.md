@@ -4,19 +4,18 @@
 
 ## Feature
 
-- 支持倒计时玩法
-- 支持投喂挑战玩法
 - 支持身份码连接
-- 支持显示投喂记录
 - 支持自定义颜色
 - 支持暂停倒计时
 - 支持忽略倒计时
+- 支持倒计时玩法
+- 支持投喂挑战玩法
+- 支持显示投喂记录
+- 支持统计礼物、盲盒数据
 - 支持 `保存/读取` 倒计时
 - 支持 `增加/减少` 倒计时
-- 支持统计礼物、盲盒数据
-- 支持根据直播间更新B站礼物数据
-- 成功连接后会显示房间号
-- 支持自定义api服务器（目前只支持上传日志，需服务器运行 `bili_travail_api.py`，依赖文件：`pyproject_server.toml`）
+- 支持根据直播间获取B站礼物数据
+- 支持自定义api服务器（目前只支持 `上传日志和获取盲盒数据`，需服务器运行 `bili_travail_api.py`，依赖文件：`pyproject_server.toml`）
 
 ## Usage
 
@@ -34,7 +33,7 @@ git clone https://github.com/Nya-WSL/bili_travail.git
 cd bili_travail
 pip install poetry
 poetry install
-build.bat
+python build.py
 
 # https://open-live.bilibili.com/open-manage
 input your access_key_id、access_key_secred、app_id

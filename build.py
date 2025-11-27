@@ -1,105 +1,53 @@
-import argparse
 import os
+import time
 import shutil
-import platform
-import subprocess
-from pathlib import Path
 
-import nicegui
-
-DESCRIPTION = '''
-Build a package of your NiceGUI app
------------------------------------
-
-NiceGUI apps can be bundled into an executable with PyInstaller.
-This allows you to distribute your app as a single file that can be executed on any computer.
-Use this script as a starting point to create a package for your app.
-
-Important: Make sure to run your main script with
-
-    ui.run(reload=False, port=native.find_open_port(), ...)
-
-to disable the reload server and to automatically find an open port.
-
-For more information and packaging tips, have a look into the NiceGUI documentation:
-https://nicegui.io/documentation/section_configuration_deployment#package_for_installation.
-'''.strip()
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('--name', type=str, default='Your App Name', help='Name of your app.')
-    parser.add_argument('--windowed', action='store_true', default=False, help=(
-        'Prevent a terminal console from appearing.\n'
-        'Only use with `ui.run(native=True, ...)`.\n'
-        'It will create an `.app` file on Mac which runs without showing any console output.'
-    ))
-    parser.add_argument('--onefile', action='store_true', default=False, help=(
-        'Create a single executable file.\n'
-        'Whilst convenient for distribution, it will be slower to start up.'
-    ))
-    parser.add_argument('--add-data', type=str, action='append', default=[
-        f'{Path(nicegui.__file__).parent}{os.pathsep}nicegui',
-    ], help='Include additional data.')
-    parser.add_argument('--dry-run', action='store_true', help='Dry run', default=False)
-    parser.add_argument('main', default='main.py', help='Main file which calls `ui.run()`.')
-    parser.add_argument('--icon', type=str, help='Icon file for the program. Must be a .ico file on Windows.')
-    parser.add_argument('--access_key_id', required=False)
-    parser.add_argument('--access_key_secret', required=False)
-    parser.add_argument('--app_id', required=False)
-    args = parser.parse_args()
-
-    if (
-        args.access_key_id != None
-        and args.access_key_secret != None
-        and args.app_id != None
-    ):
-        with open("env.py", "w+", encoding="utf-8") as f:
-            f.write(
-                f"""def get_key():
-    return {{
-        "ACCESS_KEY_ID": "{args.access_key_id}",
-        "ACCESS_KEY_SECRET": "{args.access_key_secret}",
-        "APP_ID": {args.app_id}
-    }}""")
-
-    for directory in ['build', 'dist']:
-        if Path(directory).exists():
-            shutil.rmtree(Path(directory))
-
-    command = ['pyinstaller'] if platform.system() == 'Windows' else ['python', '-m', 'PyInstaller']
-    command.extend(['--name', args.name])
-    if args.windowed:
-        command.append('--windowed')
-    if args.onefile:
-        command.append('--onefile')
-    if args.icon:
-        command.extend(['-i', args.icon])
-    for data in args.add_data:
-        command.extend(['--add-data', data])
-    command.extend([args.main])
-
-    print('PyInstaller command:')
-    print(' ', ' '.join(command))
-    if args.dry_run:
-        return
-
-    subprocess.call(command)
+def build():
+    os.system("poetry run python package.py --name start --windowed --icon static/logo.ico main.py")
     shutil.copytree("static", os.path.join("dist", "start", "static"))
-    guard = {
-            "舰长": "guard-level-3.png",
-            "提督": "guard-level-2.png",
-            "总督": "guard-level-1.png",
-            "辣条": "latiao.png"
-}
-    for i in guard.values():
+
+    data = ["guard-level-3.png", "guard-level-2.png", "guard-level-1.png", "latiao.png"]
+
+    for i in data:
         save_path = os.path.join("dist", "start", "data")
         save_file = os.path.join(save_path, i)
         if not os.path.exists(save_path):
             os.mkdir(save_path)
         shutil.copy(os.path.join("data", i), save_file)
 
-    # shutil.copytree("data/gifts", os.path.join("dist", "start", "data", "gifts"))
+def create_env_file(key_id, key_secret, app_id):
+    with open("env.py", "w+", encoding="utf-8") as f:
+        f.write(
+            f"""def get_key():
+    return {{
+        "ACCESS_KEY_ID": "{key_id}",
+        "ACCESS_KEY_SECRET": "{key_secret}",
+        "APP_ID": {app_id}
+    }}"""
+        )
 
-if __name__ == '__main__':
-    main()
+def no_env():
+    key_id = input("请输入开放平台ACCESS_KEY_ID：")
+    key_secret = input("请输入开放平台ACCESS_KEY_SECRET：")
+    app_id = input("请输入开放平台APP_ID：")
+
+    create_env_file(key_id, key_secret, app_id)
+
+    build()
+
+def run():
+    if os.path.exists("env.py"):
+        status = input("检测到已有env.py文件，是否使用？(y/n)：")
+        if status.lower() == 'n':
+            no_env()
+        elif status.lower() == 'y':
+            build()
+        else:
+            print("参数错误")
+            time.sleep(3)
+            run()
+    else:
+        no_env()
+
+if __name__ == "__main__":
+    run()
