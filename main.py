@@ -47,7 +47,10 @@ from nicegui import ui, app
 from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-version = "0.32.14-dev"
+ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
+base_version = "1.33.0"
+version = f"{base_version}-{ver_strftime}"
+
 logger = log.logger
 logger.debug("version: {}", version)
 
@@ -2703,7 +2706,8 @@ def shutdown():
     scheduler.shutdown()
 
 # 运行NiceGUI
-try:
-    ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 700], reconnect_timeout=30, language="zh-CN")
-except:
-    logger.error(f"run error: {traceback.format_exc()}")
+if __name__ == "__main__":
+    try:
+        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 700], reconnect_timeout=30, language="zh-CN")
+    except:
+        logger.error(f"run error: {traceback.format_exc()}")

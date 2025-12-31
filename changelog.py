@@ -42,7 +42,7 @@ def changelog():
         if logs != {}:
             with ui.timeline(side="right", layout="comfortable", color="btn"):
                 for k, v in logs.items():
-                    with ui.timeline_entry(title=f"Release of {k}", subtitle=v["date"]):
+                    with ui.timeline_entry(title=f"{k}", subtitle=v["date"]):
                         with ui.column().classes("gap-3"):
                             for item in v["content"]:
                                 ui.label(f"● {item}")

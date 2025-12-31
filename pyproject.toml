@@ -1,6 +1,6 @@
 [project]
 name = "bili-travail"
-version = "0.31.6-alpha"
+version = "1.33.0"
 description = "基于blivedm的B站直播加班姬"
 authors = [
     {name = "Nya-WSL"}
@@ -9,7 +9,7 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 dependencies = [
-    "nicegui (>=3.4.0,<4.0.0)",
+    "nicegui (>=3.4.1,<4.0.0)",
     "pywebview (>=6.1,<7.0)",
     "pyinstaller (>=6.16.0,<7.0.0)",
     "brotli (>=1.1.0,<2.0.0)",
