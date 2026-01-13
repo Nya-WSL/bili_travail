@@ -21,7 +21,8 @@ dependencies = [
     "py-cpuinfo (>=9.0.0,<10.0.0)",
     "aioping (>=0.4.0,<0.5.0)",
     "pure-protobuf (~=3.1.2)",
-    "apscheduler (>=3.11.0,<4.0.0)"
+    "apscheduler (>=3.11.0,<4.0.0)",
+    "tomlkit (>=0.13.3,<0.14.0)",
 ]
 
 [tool.poetry]

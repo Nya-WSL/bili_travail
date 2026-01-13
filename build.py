@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import json
 import shutil
@@ -7,6 +8,7 @@ import datetime
 from main import base_version
 
 def build():
+    create_version()
     os.system("poetry run python package.py --name start --windowed --icon static/logo.ico main.py")
     shutil.copytree("static", os.path.join("dist", "start", "static"))
 
@@ -19,8 +21,29 @@ def build():
             os.mkdir(save_path)
         shutil.copy(os.path.join("data", i), save_file)
 
-def create_env_file(key_id, key_secret, app_id):
+def create_version():
     version = datetime.datetime.now().strftime("%y%m%d%H%M")
+    version_info = {}
+    version_info["version"] = f"{base_version}-{version}"
+
+    with open("version.json", "w", encoding="utf-8") as f:
+        json.dump(version_info, f, ensure_ascii=False, indent=4)
+    with open("env.py", 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # 使用正则表达式替换版本
+    pattern = r'"version":\s*(\d+)'
+    replacement = f'"version": {version}'
+    new_content = re.sub(pattern, replacement, content)
+
+    with open("env.py", 'w', encoding='utf-8') as f:
+        f.write(new_content)
+
+    return version
+
+
+def create_env_file(key_id, key_secret, app_id):
+    version = create_version()
     with open("env.py", "w+", encoding="utf-8") as f:
         f.write(
             f"""def get_key():
@@ -31,12 +54,6 @@ def create_env_file(key_id, key_secret, app_id):
         "version": {version}
     }}"""
         )
-
-    version_info = {}
-    version_info["version"] = f"{base_version}-{version}"
-
-    with open("version.json", "w", encoding="utf-8") as f:
-        json.dump(version_info, f, ensure_ascii=False, indent=4)
 
 def no_env():
     key_id = input("请输入开放平台ACCESS_KEY_ID：")

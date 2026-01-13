@@ -3,6 +3,7 @@ import requests
 
 from nicegui import ui
 
+import config as travail_config
 
 def get_log() -> dict:
     url = "http://version.nya-wsl.cn/bili_travail/changelog.json"
@@ -14,8 +15,8 @@ def get_log() -> dict:
 
 
 def changelog():
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
+    base_config = travail_config.Config()
+    config = base_config.load()
 
     logs = get_log()
 
@@ -28,7 +29,7 @@ def changelog():
             ui.button(
                 "返回主页",
                 on_click=lambda: ui.navigate.to("/"),
-                color=config["btn_color"],
+                color=config["color"]["btn_color"],
             ).style("right: -15%")
 
             ui.button(
@@ -36,7 +37,7 @@ def changelog():
                 on_click=lambda: ui.navigate.to(
                     "https://github.com/Nya-WSL/bili_travail", new_tab=True
                 ),
-                color=config["btn_color"],
+                color=config["color"]["btn_color"],
             ).style("right: -15%")
 
         if logs != {}:

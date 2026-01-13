@@ -4,15 +4,15 @@ import json
 import aiohttp
 import gift_mapping as gift_map
 
+import config as travail_config
 from log import logger
+
+base_config = travail_config.Config()
 
 class BiliGiftManager:
     def __init__(self):
-        with open("config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-
-        if config.get("room_id", "") != "":
-            self.room_id = config["room_id"]
+        if base_config.get("general", "room_id", "") != "":
+            self.room_id = base_config.get("general", "room_id", "")
         else:
             self.room_id = 3
 
@@ -66,10 +66,9 @@ class BiliGiftManager:
         :return dict: 盲盒礼物列表
         """
 
-        with open("config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
+        base_config = travail_config.Config()
 
-        url = f"{config.get('server', '')}/gift/get_blind_boxes"
+        url = f"{base_config.get('api', 'server', 'http://api.travail.nya-wsl.cn')}/gift/get_blind_boxes"
         data = {
             "gift_ids": gift_ids
         }

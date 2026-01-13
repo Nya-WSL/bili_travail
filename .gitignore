@@ -185,3 +185,4 @@ version
 version.txt
 broadcast_code.py
 env.py
+config.toml

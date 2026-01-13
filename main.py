@@ -17,6 +17,7 @@ def get_key():
     import env # type: ignore
 
 import ping
+import config as travail_config
 import bili_api
 
 import gift as get_gift
@@ -48,7 +49,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
-base_version = "1.33.0"
+base_version = "1.33.1"
 version = f"{base_version}-{ver_strftime}"
 
 logger = log.logger
@@ -164,38 +165,6 @@ def format_cd(seconds):
     hour, minute = divmod(minute, 60)
     return ("%02d:%02d:%02d" % (hour, minute, second))
 
-example_config = {
-    "room_id": "",
-    "host": "127.0.0.1",
-    "port": 65000,
-    "server": "http://api.travail.nya-wsl.cn",
-    "auth_code": "",
-    "ACCESS_KEY_ID": "",
-    "ACCESS_KEY_SECRET": "",
-    "APP_ID": 0,
-    "background_image": [
-        "https://nya-wsl.com/images/image001.png",
-        "https://nya-wsl.com/images/image002.png",
-        "https://nya-wsl.com/images/image003.png",
-        "static/sample1.png",
-        "static/sample2.png"
-    ],
-    "color": "#fcefe8",
-    "btn_color": "#fcefe8",
-    "text_color": "#000000",
-    "remote_text": True,
-    "show_capture_gift_list": False,
-    "short_list": False,
-    "short_time": 5,
-    "capture_gift_list_number": 3
-}
-
-# 检查配置文件状态
-# 如配置文件不存在，则注入内置预设
-if not os.path.exists("config.json"):
-    with open("config.json", "w+", encoding="utf-8") as f:
-        json.dump(example_config, f, indent=4, ensure_ascii=False)
-
 # 检查storage状态
 app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
 app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
@@ -209,50 +178,31 @@ app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
 # 初始化配置文件
 # ================================
 
-# 加载配置文件
-with open("config.json", "r", encoding="utf-8") as f:
-    config = json.load(f)
+base_config = travail_config.Config()
+base_config.sync_config(base_config.load(), base_config.default_data)
+config = base_config.load()
 
-# 检查配置文件缺失项
-diff = example_config.keys() - config.keys()
-
-for key in diff:
-    config[key] = example_config[key]
-
-# 检查配置文件多余项
-diff = config.keys() - example_config.keys()
-
-for key in diff:
-    config.pop(key, None)
-
-config["cwd"] = os.getcwd() # 保存工作目录用于debug
-
-with open("config.json", "w", encoding="utf-8") as f:
-    json.dump(config, f, ensure_ascii=False, indent=4)
-
-host = config["host"]
-port = config["port"]
-btn_color = config["btn_color"]
+host = config["general"]["host"]
+port = config["general"]["port"]
+btn_color = config["color"]["btn_color"]
 
 # 需申请哔哩哔哩直播开放平台开发者账号并将id、key和app_id填入config.json中，如需开箱即用请在 https://github.com/Nya-WSL/bili_travail/releases 下载
 bili_keys = env.get_key()
 
-if config.get("ACCESS_KEY_ID", "") != "":
-    ACCESS_KEY_ID = config.get("ACCESS_KEY_ID", "")
+if base_config.get("open_live", "ACCESS_KEY_ID", "") != "":
+    ACCESS_KEY_ID = base_config.get("open_live", "ACCESS_KEY_ID", "")
 else:
     ACCESS_KEY_ID = bili_keys.get("ACCESS_KEY_ID", "")
 
-if config.get("ACCESS_KEY_SECRET", "") != "":
-    ACCESS_KEY_SECRET = config.get("ACCESS_KEY_SECRET", "")
+if base_config.get("open_live", "ACCESS_KEY_SECRET", "") != "":
+    ACCESS_KEY_SECRET = base_config.get("open_live", "ACCESS_KEY_SECRET", "")
 else:
     ACCESS_KEY_SECRET = bili_keys.get("ACCESS_KEY_SECRET", "")
 
-if config.get("APP_ID", 0) != 0:
-    APP_ID = int(config.get("APP_ID", 0))
+if base_config.get("open_live", "APP_ID", 0) != 0:
+    APP_ID = int(base_config.get("open_live", "APP_ID", 0))
 else:
     APP_ID = int(bili_keys.get("APP_ID", 0))
-
-ROOM_ID = 0
 
 ui.add_css(
     f"""
@@ -299,14 +249,10 @@ async def init_config():
     """
     初始化礼物数据
     """
-
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-
     # 确保礼物数据文件存在，如果不存在，则先初始化礼物数据
     if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
         # 如果配置文件中包含房间号，则传入；否则会直接初始化空数据
-        room_id = config.get("room_id", "")
+        room_id = base_config.get("general", "room_id", "")
 
         # 如果配置文件中有room_id，则使用该房间号
         if room_id:
@@ -411,14 +357,11 @@ async def shut_down():
 async def run_client():
     global client
 
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-
     client = blivedm.OpenLiveClient(
         access_key_id=ACCESS_KEY_ID,
         access_key_secret=ACCESS_KEY_SECRET,
         app_id=APP_ID,
-        room_owner_auth_code=config.get("auth_code", None),
+        room_owner_auth_code=base_config.get("general", "auth_code", None),
     )
     handler = BiliHandler()
     client.set_handler(handler)
@@ -434,26 +377,20 @@ class BiliHandler(blivedm.BaseHandler):
     heart_count = 0
     # 心跳数据
     def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
-        global ROOM_ID
-        ROOM_ID = client.room_id
-
-        if ROOM_ID != None:
-            room_id = ROOM_ID
-        else:
-            room_id = 3
-
-        with open("config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-
-        config["room_id"] = room_id
-        GiftManager.set_room_id(room_id)
-
-        with open("config.json", "w+", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=4)
-
         self.heart_count += 1
         logger.info("触发心跳")
         if self.heart_count == 1:
+            room_id = client.room_id
+            if room_id != None:
+                room_id = room_id
+            else:
+                room_id = 3
+
+            config = base_config.load()
+            config["general"]["room_id"] = room_id
+            base_config.save(config)
+            GiftManager.set_room_id(room_id)
+
             b_connect_switch.set_value(True)
             b_connect_switch.set_text("已连接弹幕服务器")
             logger.info(f"已连接至{room_id}")
@@ -1542,22 +1479,13 @@ def sub_time():
         ui.notify("请先开始计时", type="negative")
 
 
-# 保存配置
-def save_config(data):
-    with open("config.json", "w+", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-
-
 async def upload_log(room_id):
     '''
     发送日志到服务器
     '''
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
 
     file_path = log.file_name
-    
-    url = config.get("server", None)
+    url = base_config.get("api", "server", None)
 
     if url is None or url == "":
         result = "未配置服务器地址，上传日志失败"
@@ -1765,10 +1693,8 @@ async def capture():
     # 检查是否需要刷新页面
     def check_cd_refresh():
         global refresh_capture_cd
-        with open("config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
 
-        if not config.get("show_capture_gift_list", False):
+        if not base_config.get("bool", "show_capture_gift_list", False):
             if scroll_card.visible:
                 scroll_card.set_visibility(False)
         else:
@@ -1823,8 +1749,6 @@ async def capture():
         '''
         将礼物列表处理为简洁模式
         '''
-        with open("config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
         with open("data/gifts.json", "r", encoding="utf-8") as f:
             gifts = json.load(f)
         with open("data/special.json", "r", encoding="utf-8") as f:
@@ -1855,7 +1779,7 @@ async def capture():
 
         # 如果不将timer封装到函数中，在OBS的浏览器源中刷新页面后计时器会失效
         def timer_handler() -> ui.timer:
-            timer = ui.timer(config.get("short_time", 5), lambda: change(cycle_items))
+            timer = ui.timer(base_config.get("num", "short_time", 5), lambda: change(cycle_items))
             return timer
 
         timer_handler()
@@ -1868,23 +1792,23 @@ async def capture():
             with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                 ui.space()
-                v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
         if v_type == "list":
             with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                 ui.space()
-                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
         if v_type == "special":
             with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                 ui.space()
                 if v == "clear":
                     v = "清空"
@@ -1892,7 +1816,7 @@ async def capture():
                     v = "加倍"
                 if v == "half":
                     v = "减半"
-                v_label = ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                v_label = ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
 
     capture_cd_is_created = True
@@ -1900,11 +1824,6 @@ async def capture():
     if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
         if auth_code.value != None:
             await init_config()
-
-
-    # 初始化礼物列表
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
 
     with open("data/gifts.json", "r", encoding="utf-8") as f:
         gifts = json.load(f)
@@ -1918,16 +1837,16 @@ async def capture():
             special = json.load(f)
     else:
         special = {}
-    # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
+    # ui.query('body').style(f'background: url("{random.choice(config["general"]["background_image"])}") 0px 0px/cover')
 
     # 创建预览界面
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"): # 居中、背景透明、取消卡片阴影、置顶居中
-        ui.badge(outline=True, color="", text_color=config["color"]).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl") # 创建时钟
+        ui.badge(outline=True, color="", text_color=config["color"]["time_color"]).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl") # 创建时钟
 
         ui.separator() # 分割线
 
         # 创建礼物列表
-        if not config.get("short_list", False):
+        if not base_config.get("bool", "short_list", False):
             if gifts != {}:
                 gifts = sort_dict(dictionary=gifts, sort_within_type=True)
                 for k,v in gifts.items():
@@ -1944,10 +1863,7 @@ async def capture():
             short_gift_element()
 
         def capture_cd_gift_list_show(name, gift, num, time, message):
-            with open("config.json", "r", encoding="utf-8") as f:
-                config = json.load(f)
-
-            if not config.get("show_capture_gift_list", False):
+            if not base_config.get("bool", "show_capture_gift_list", False):
                 scroll_card.set_visibility(False)
             else:
                 scroll_card.set_visibility(True)
@@ -1965,8 +1881,6 @@ async def capture():
                     gift_history = json.load(f)
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
-                with open("config.json", "r", encoding="utf-8") as f:
-                    config = json.load(f)
 
                 gift_history["cd"].append({
                     "name": name,
@@ -1981,7 +1895,7 @@ async def capture():
                     json.dump(gift_history, f, ensure_ascii=False, indent=4)
 
                 with capture_gift_scroll:
-                    for data in gift_history["cd"][-int(config["capture_gift_list_number"]):]:
+                    for data in gift_history["cd"][-int(config["num"]["capture_gift_list_number"]):]:
                         with ui.row().classes("w-full"):
                             gift_user = data["name"]
                             gift_num = data["num"]
@@ -1989,7 +1903,7 @@ async def capture():
                             gift_name = data["gift"]
                             gift_img = data["url"]
 
-                            ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
@@ -1998,8 +1912,8 @@ async def capture():
                                         ui.image(gifts.get(gift_name, ""))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
-                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
-                            ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config["color"]['text_color']}")
+                            ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
                 capture_gift_scroll.scroll_to(percent=1, duration=0.5)
 
@@ -2015,10 +1929,8 @@ async def capture():
     global capture_challenge_gift_list_show, capture_gift_is_created
     def check_gift_refresh():
         global refresh_capture_gift
-        with open("config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
 
-        if not config.get("show_capture_gift_list", False):
+        if not base_config.get("bool", "show_capture_gift_list", False):
             if scroll_card.visible:
                 scroll_card.set_visibility(False)
         else:
@@ -2035,16 +1947,11 @@ async def capture():
         if auth_code.value != None:
             await init_config()
 
-    # 礼物列表
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-
     with open("data/gifts_count.json", "r", encoding="utf-8") as f:
         gifts = json.load(f)
 
     with open("data/gift_img.json", "r", encoding="utf-8") as f:
         gift_img = json.load(f)
-
 
     if os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "r", encoding="utf-8") as f:
@@ -2054,10 +1961,10 @@ async def capture():
     # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
         with ui.row():
-            ui.label("总计").classes("text-4xl").style(f"color: {config['color']}").classes("text-5xl")
-            ui.label().bind_text_from(app.storage.general, "gift_challenge_count").style(f"color: {config['color']}").classes("text-5xl")
-            ui.label().bind_text_from(app.storage.general, "gift_challenge_unit").style(f"color: {config['color']}").classes("text-5xl")
-            ui.label().bind_text_from(app.storage.general, "gift_challenge_text").style(f"color: {config['color']}").classes("text-5xl")
+            ui.label("总计").classes("text-4xl").style(f"color: {config["color"]['text_color']}").classes("text-5xl")
+            ui.label().bind_text_from(app.storage.general, "gift_challenge_count").style(f"color: {config["color"]['text_color']}").classes("text-5xl")
+            ui.label().bind_text_from(app.storage.general, "gift_challenge_unit").style(f"color: {config["color"]['text_color']}").classes("text-5xl")
+            ui.label().bind_text_from(app.storage.general, "gift_challenge_text").style(f"color: {config["color"]['text_color']}").classes("text-5xl")
 
         ui.separator()
 
@@ -2066,12 +1973,12 @@ async def capture():
                 with ui.row().classes('w-full'):
                     with ui.avatar(color=None):
                         ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                    ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                     ui.space()
                     if v < 0:
-                        ui.label(f"{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                        ui.label(f"{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                     else:
-                        ui.label(f"+{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                        ui.label(f"+{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
         if special != {}:
             for k,v in special.items():
@@ -2079,25 +1986,25 @@ async def capture():
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                         ui.space()
                         if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                         elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                         elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{int(v[0])} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                         elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{v[0]} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                         elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                         else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                            ui.label(f"+{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                 else:
                     with ui.row().classes('w-full'):
                         with ui.avatar(color=None):
                             ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                         ui.space()
                         if v == "clear":
                             v = "清空"
@@ -2105,13 +2012,10 @@ async def capture():
                             v = "加倍"
                         if v == "half":
                             v = "减半"
-                        ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['text_color']}")
+                        ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
         def capture_challenge_gift_list_show(name, gift, num, time, message):
-            with open("config.json", "r", encoding="utf-8") as f:
-                config = json.load(f)
-
-            if not config.get("show_capture_gift_list", False):
+            if not base_config.get("bool", "show_capture_gift_list", False):
                 scroll_card.set_visibility(False)
             else:
                 scroll_card.set_visibility(True)
@@ -2129,8 +2033,6 @@ async def capture():
                     gift_history = json.load(f)
                 with open("data/gift_img.json", "r", encoding="utf-8") as f:
                     gifts = json.load(f)
-                with open("config.json", "r", encoding="utf-8") as f:
-                    config = json.load(f)
 
                 gift_history["challenge"].append({
                     "name": name,
@@ -2145,7 +2047,7 @@ async def capture():
                     json.dump(gift_history, f, ensure_ascii=False, indent=4)
 
                 with capture_gift_scroll:
-                    for data in gift_history["challenge"][-int(config["capture_gift_list_number"]):]:
+                    for data in gift_history["challenge"][-int(config["num"]["capture_gift_list_number"]):]:
                         with ui.row().classes("w-full"):
                             gift_user = data["name"]
                             gift_num = data["num"]
@@ -2180,9 +2082,6 @@ def index():
     # ================================
 
     global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
-
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
 
     async def ping_server():
         servers = {
@@ -2349,9 +2248,9 @@ def index():
     # 礼物设置弹窗
     with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
         with ui.row():
-            short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: save_config(config)).bind_value(config, "short_list").props('color="btn"')
+            short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"')
             short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
-            short_time = ui.number("滚动间隔", min=0, on_change=lambda: save_config(config)).bind_value(config, "short_time")
+            short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
             if short_switch.value:
                 short_time.set_visibility(True)
             else:
@@ -2372,9 +2271,9 @@ def index():
     with ui.dialog() as color_dialog, ui.card(align_items="center"):
         # 颜色输入框
         with ui.row():
-            ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: save_config(config), preview=config["color"]).style(f"width: 120px").bind_value(config, "color")
-            ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: save_config(config), preview=config["btn_color"]).style(f"width: 120px").bind_value(config, "btn_color")
-            ui.color_input(label="文字颜色", value="#000000", on_change=lambda: save_config(config), preview=config["text_color"]).style(f"width: 120px").bind_value(config, "text_color")
+            ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")
+            ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")
+            ui.color_input(label="文字颜色", value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 120px").bind_value(config["color"], "text_color")
         ui.button("关闭", on_click=lambda: color_dialog.close())
 
 
@@ -2428,22 +2327,22 @@ def index():
         with ui.row(align_items="center"):
             with ui.column(align_items="center").classes("gap-0"):
                 # 身份码
-                auth_code = ui.input("身份码", on_change=lambda: save_config(config), password=True, password_toggle_button=True).style("width: 120px")
-                auth_code.bind_value(config, "auth_code") # 实时写入身份码到配置文件
+                auth_code = ui.input("身份码", on_change=lambda: base_config.save(config), password=True, password_toggle_button=True).style("width: 120px")
+                auth_code.bind_value(config["general"], "auth_code") # 实时写入身份码到配置文件
                 with ui.row().classes("gap-0"):
                     ui.label("房间号：")
                     login_status = ui.label("未连接").classes("text-red")
 
             with ui.column(align_items="center").classes("gap-0"):
                 b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
-                show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: save_config(config))
-                show_capture_gift_list_switch.bind_value(config, "show_capture_gift_list").props('color="btn"')
+                show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: base_config.save(config))
+                show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
 
             with ui.column(align_items="center").classes("gap-0"):
                 with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
                     ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
 
-                gift_challenge_switch = ui.switch("启用投喂挑战", value=False, on_change=lambda: save_config(config)).props('color="btn"')
+                gift_challenge_switch = ui.switch("启用投喂挑战", value=False).props('color="btn"')
                 gift_challenge_switch.disable()
 
         ui.separator()
@@ -2463,7 +2362,7 @@ def index():
             ui.button("检查更新", on_click=lambda: check_update())
             # Changelog button
             ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
-            ui.button("上传日志", on_click=lambda: upload_log(config.get("room_id", 3)))
+            ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
 
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
@@ -2514,13 +2413,12 @@ def _():
 # about页面
 @ui.page('/about')
 async def _():
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
-    ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover') # 设置背景图片
+    config = base_config.load()
+    ui.query('body').style(f'background: url("{random.choice(config["general"]["background_image"])}") 0px 0px/cover') # 设置背景图片
 
     # Card框
     with ui.card(align_items="center").classes("absolute-center"):
-        ui.label(f"B站加班姬").classes("text-3xl").style(f"color: {config['text_color']}")
+        ui.label(f"B站加班姬").classes("text-3xl").style(f"color: {config["color"]['text_color']}")
         ui.badge(f"{version}", outline=True)
 
         # 私货
@@ -2637,7 +2535,7 @@ async def _():
                 sanitize=False
             )
 
-        if config.get("remote_text", True):
+        if base_config.get("bool", "remote_text", True):
             await display_chat_messages(config, bili_api)
 
         # 项目介绍
@@ -2689,7 +2587,7 @@ async def _():
         ui.separator()
 
         # 联系我们
-        ui.label(f"联系我们").classes("text-2xl").style(f"color: {config['text_color']}")
+        ui.label(f"联系我们").classes("text-2xl").style(f"color: {config["color"]['text_color']}")
         ui.link("GitHub Issues", "https://github.com/Nya-WSL/bili_travail/issues", True)
         ui.link("support@nya-wsl.com", "mailto:support@nya-wsl.com", True)
         ui.link("Nya-WSL服务与反馈群", "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
