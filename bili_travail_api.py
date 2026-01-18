@@ -3,9 +3,9 @@
 '''
 
 import os
-import json
 import uvicorn
 import aiohttp
+import orjson as json
 
 from typing import List
 from pathlib import Path
@@ -32,12 +32,12 @@ example_config = {
 
 def init_config():
     if not os.path.exists("config.json"):
-        with open("config.json", "w", encoding="utf-8") as f:
-            json.dump(example_config, f, ensure_ascii=False, indent=4)
+        with open("config.json", "wb") as f:
+            json.dumps(example_config, f, option=json.OPT_INDENT_2)
 
     # 加载配置文件
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
+    with open("config.json", "r") as f:
+        config = json.loads(f.read().decode("utf-8").encode("utf-8"))
 
     # 检查配置文件缺失项
     diff = example_config.keys() - config.keys()
@@ -51,8 +51,8 @@ def init_config():
     for key in diff:
         config.pop(key, None)
 
-    with open("config.json", "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=4)
+    with open("config.json", "wb") as f:
+        json.dumps(config, f, option=json.OPT_INDENT_2)
 
 async def get_blind_box(gift_ids: list) -> dict:
     """
@@ -62,8 +62,8 @@ async def get_blind_box(gift_ids: list) -> dict:
     :return dict: 盲盒礼物列表
     """
 
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
+    with open("config.json", "r") as f:
+        config = json.loads(f.read().decode("utf-8").encode("utf-8"))
 
     blind_box = {}
 
@@ -115,8 +115,8 @@ async def index(request: GiftIdsRequest):
 @app.post("/log/{room_id}", status_code=status.HTTP_201_CREATED)
 async def hook(room_id, file: UploadFile = File(...)):
     try:
-        with open("config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
+        with open("config.json", "r") as f:
+            config = json.loads(f.read().decode("utf-8").encode("utf-8"))
 
         save_path = config.get("save_path", os.getcwd() + "/logs/")
 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     init_config()
 
     with open("config.json", "r") as f:
-        config = json.load(f)
+        config = json.loads(f.read().decode("utf-8").encode("utf-8"))
 
     uvicorn.run(
         app=app,

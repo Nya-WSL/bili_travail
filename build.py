@@ -24,7 +24,7 @@ def build():
 def create_version():
     version = datetime.datetime.now().strftime("%y%m%d%H%M")
     version_info = {}
-    version_info["version"] = f"{base_version}-{version}"
+    version_info["version"] = f"{base_version}.{version}"
 
     with open("version.json", "w", encoding="utf-8") as f:
         json.dump(version_info, f, ensure_ascii=False, indent=4)
