@@ -19,6 +19,7 @@ def get_key():
 import ping
 import styles
 import bili_api
+import travail_stat
 
 import gift as get_gift
 import config as travail_config
@@ -387,7 +388,7 @@ async def run_client():
 class BiliHandler(blivedm.BaseHandler):
     heart_count = 0
     # 心跳数据
-    def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
+    async def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
         self.heart_count += 1
         logger.info("触发心跳")
         if self.heart_count == 1:
@@ -408,6 +409,8 @@ class BiliHandler(blivedm.BaseHandler):
 
             uid = client.room_owner_uid
             if uid != None:
+                now_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                await travail_stat.stat(room_id, uid, version, now_time)
                 login_status.set_text(room_id)
                 login_status.classes("text-green")
             else:
