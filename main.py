@@ -17,10 +17,11 @@ def get_key():
     import env # type: ignore
 
 import ping
-import config as travail_config
+import styles
 import bili_api
 
 import gift as get_gift
+import config as travail_config
 import update as travail_update
 import gift_mapping as gift_map
 import blivedm.blivedm.models.web as web_models
@@ -52,7 +53,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
-base_version = "1.33"
+base_version = "1.34"
 version = f"{base_version}.{ver_strftime}"
 
 logger = log.logger
@@ -1700,6 +1701,7 @@ async def refresh_gift():
 async def capture():
     global capture_cd_gift_list_show, capture_cd_is_created
 
+    styles.page_styles() # 加载自定义样式
     # 检查是否需要刷新页面
     def check_cd_refresh():
         global refresh_capture_cd
@@ -1937,6 +1939,7 @@ async def capture():
 @ui.page("/capture_gift", title="投喂挑战 | bili_travail")
 async def capture():
     global capture_challenge_gift_list_show, capture_gift_is_created
+    styles.page_styles() # 加载自定义样式
     def check_gift_refresh():
         global refresh_capture_gift
 
@@ -2093,6 +2096,7 @@ def index():
 
     global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
 
+    styles.page_styles() # 加载自定义样式
     async def ping_server():
         servers = {
             "GitHub": "github.com",
@@ -2292,7 +2296,7 @@ def index():
         ui.navigate.to("/changelog") # 跳转到更新日志页面
 
     # 创建主界面
-    with ui.card(align_items="center").classes("absolute-center") as main_card:
+    with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
         asyncio.create_task(check_update())
         time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
 
@@ -2384,15 +2388,17 @@ def index():
         countdown_timer.inherit_time(int(app.storage.general["countdown_time"]))
 
     # about按钮
-    with ui.page_sticky(position='bottom-right', x_offset=10, y_offset=10):
+    with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @ui.page('/changelog')
 def _():
+    styles.page_styles() # 加载自定义样式
     changelog()
 
 @ui.page('/count')
 def _():
+    styles.page_styles() # 加载自定义样式
     ui.query('body').style(f'background: url("static/bg_vita.png") fixed')
     try:
         with open("data/gift_statistics.json", "rb") as f:
@@ -2423,6 +2429,7 @@ def _():
 # about页面
 @ui.page('/about')
 async def _():
+    styles.page_styles() # 加载自定义样式
     config = base_config.load()
     ui.query('body').style(f'background: url("{random.choice(config["general"]["background_image"])}") 0px 0px/cover') # 设置背景图片
 
@@ -2616,6 +2623,6 @@ def shutdown():
 # 运行NiceGUI
 if __name__ == "__main__":
     try:
-        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[560, 700], reconnect_timeout=30, language="zh-CN")
+        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 700], reconnect_timeout=30, language="zh-CN")
     except:
         logger.error(f"run error: {traceback.format_exc()}")

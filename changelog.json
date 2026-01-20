@@ -1,4 +1,10 @@
 {
+    "1.34.2601201615": {
+        "date": "2026-01-20",
+        "content": [
+            "- 支持自定义字体，替换static/fonts目录下custom-font.ttf文件即可，文件名需为custom-font（注：支持woff2、woff、ttf，如自定义字体不是.ttf格式需删除默认的.ttf文件）"
+        ]
+    },
     "1.33.2601190140": {
         "date": "2026-01-19",
         "content": [
