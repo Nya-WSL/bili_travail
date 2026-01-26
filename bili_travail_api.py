@@ -5,15 +5,22 @@
 import os
 import uvicorn
 import aiohttp
-import orjson as json
+import orjson
 
 from typing import List
 from pathlib import Path
 from pydantic import BaseModel
-from fastapi import FastAPI, UploadFile, File, HTTPException, status
+from aiohttp.resolver import AsyncResolver
+from fastapi import FastAPI, UploadFile, File, HTTPException, status, Request
 
 class GiftIdsRequest(BaseModel):
     gift_ids: List[int]
+
+class StatRequest(BaseModel):
+    room_id: int
+    uid: int
+    version: str
+    time: str
 
 def bytes_to_kb(bytes_size: int) -> float:
     """将字节大小转换为 KB"""
@@ -33,11 +40,11 @@ example_config = {
 def init_config():
     if not os.path.exists("config.json"):
         with open("config.json", "wb") as f:
-            json.dumps(example_config, f, option=json.OPT_INDENT_2)
+            f.write(orjson.dumps(example_config, f, option=orjson.OPT_INDENT_2))
 
     # 加载配置文件
-    with open("config.json", "r") as f:
-        config = json.loads(f.read().decode("utf-8").encode("utf-8"))
+    with open("config.json", "rb") as f:
+        config = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
     # 检查配置文件缺失项
     diff = example_config.keys() - config.keys()
@@ -52,7 +59,7 @@ def init_config():
         config.pop(key, None)
 
     with open("config.json", "wb") as f:
-        json.dumps(config, f, option=json.OPT_INDENT_2)
+        f.write(orjson.dumps(config, f, option=orjson.OPT_INDENT_2))
 
 async def get_blind_box(gift_ids: list) -> dict:
     """
@@ -62,10 +69,18 @@ async def get_blind_box(gift_ids: list) -> dict:
     :return dict: 盲盒礼物列表
     """
 
-    with open("config.json", "r") as f:
-        config = json.loads(f.read().decode("utf-8").encode("utf-8"))
+    with open("config.json", "rb") as f:
+        config = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
     blind_box = {}
+
+    # 创建自定义解析器
+    resolver = AsyncResolver(
+        nameservers=["8.8.8.8", "114.114.114.114"]
+    )
+
+    # 创建连接器并设置解析器
+    connector = aiohttp.TCPConnector(resolver=resolver)
 
     for gift_id in gift_ids:
         url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
@@ -77,7 +92,7 @@ async def get_blind_box(gift_ids: list) -> dict:
             "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url, params=params, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -115,8 +130,8 @@ async def index(request: GiftIdsRequest):
 @app.post("/log/{room_id}", status_code=status.HTTP_201_CREATED)
 async def hook(room_id, file: UploadFile = File(...)):
     try:
-        with open("config.json", "r") as f:
-            config = json.loads(f.read().decode("utf-8").encode("utf-8"))
+        with open("config.json", "rb") as f:
+            config = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         save_path = config.get("save_path", os.getcwd() + "/logs/")
 
@@ -133,7 +148,7 @@ async def hook(room_id, file: UploadFile = File(...)):
         file_path = room_dir / file.filename
 
         # 处理文件
-        with open(file_path, "wb") as f:
+        with open(file_path, "w") as f:
             f.write(contents)
 
         return {
@@ -151,11 +166,34 @@ async def hook(room_id, file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+@app.post("/stat", status_code=status.HTTP_200_OK)
+async def index(request: StatRequest):
+    try:
+        if not Path("stat.json").exists():
+            with open("stat.json", "wb+") as f:
+                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+
+        with open("stat.json", "rb") as f:
+            stat_data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
+        stat_data[f"{request.room_id}"] = {"uid": request.uid, "time": request.time, "version": request.version}
+
+        with open("stat.json", "wb+") as f:
+            f.write(orjson.dumps(stat_data, f, option=orjson.OPT_INDENT_2))
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 if __name__ == "__main__":
     init_config()
 
-    with open("config.json", "r") as f:
-        config = json.loads(f.read().decode("utf-8").encode("utf-8"))
+    with open("config.json", "rb") as f:
+        config = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
     uvicorn.run(
         app=app,

@@ -19,6 +19,8 @@ def get_key():
 import ping
 import styles
 import bili_api
+import travail_stat
+import dns_resolver
 
 import gift as get_gift
 import config as travail_config
@@ -33,6 +35,7 @@ from changelog import changelog, get_log
 # Third Party Packages
 import os
 import re
+import orjson
 import shutil
 import random
 import psutil
@@ -43,7 +46,6 @@ import requests
 import datetime
 import traceback
 import itertools
-import orjson as json
 
 from typing import *
 from nicegui import ui, app
@@ -53,7 +55,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
-base_version = "1.34"
+base_version = "1.35"
 version = f"{base_version}.{ver_strftime}"
 
 logger = log.logger
@@ -84,11 +86,11 @@ if not os.path.exists("data"):
 
 if not os.path.exists("data/blinx_box_data.json"):
     with open("data/blinx_box_data.json", "wb+") as f:
-        f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+        f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
 if not os.path.exists("data/time.json"):
     with open("data/time.json", "wb+") as f:
-        f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+        f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
 # 移除残留的更新包
 if os.path.exists("update.bat"):
@@ -116,7 +118,7 @@ def clear_old_data(paths: list):
         modified = False
         try:
             with open(file_path, "rb") as f:
-                data = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
             old_key = [k for k, v in data.items() if v == 0] # 记录需要删除的key，防止破坏迭代器
 
@@ -128,7 +130,7 @@ def clear_old_data(paths: list):
 
             if modified:
                 with open(file_path, "wb") as f:
-                    f.write(json.dumps(data, f, option=json.OPT_INDENT_2))
+                    f.write(orjson.dumps(data, f, option=orjson.OPT_INDENT_2))
                 logger.debug(f"已清理与新版本冲突的礼物数据：{file_path}")
 
         except Exception as e:
@@ -254,7 +256,7 @@ async def create_blind_box():
             blind_box[box].append(gift['gift'])
 
     with open("data/blinx_box_data.json", "wb+") as f:
-        f.write(json.dumps(blind_box, f, option=json.OPT_INDENT_2))
+        f.write(orjson.dumps(blind_box, f, option=orjson.OPT_INDENT_2))
 
 async def init_config():
     """
@@ -276,23 +278,23 @@ async def init_config():
     # 初始化数据
     if not os.path.exists("data/gift_img.json"):
         with open("data/gift_img.json", "wb+") as f:
-            f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
     if not os.path.exists("data/gifts.json"):
         with open("data/gifts.json", "wb+") as f:
-            f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
     if not os.path.exists("data/gifts_count.json"):
         with open("data/gifts_count.json", "wb+") as f:
-            f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
     if not os.path.exists("data/special.json"):
         with open("data/special.json", "wb+") as f:
-            f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
     if not os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "wb+") as f:
-            f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
 asyncio.run(init_config())
 
@@ -335,7 +337,7 @@ def check_sys():
         os.mkdir("data/sys_info")
 
     with open(f"data/sys_info/{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "wb+") as f:
-        f.write(json.dumps(sys_info, f, option=json.OPT_INDENT_2))
+        f.write(orjson.dumps(sys_info, f, option=orjson.OPT_INDENT_2))
 
     return sys_info
 
@@ -387,7 +389,7 @@ async def run_client():
 class BiliHandler(blivedm.BaseHandler):
     heart_count = 0
     # 心跳数据
-    def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
+    async def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
         self.heart_count += 1
         logger.info("触发心跳")
         if self.heart_count == 1:
@@ -408,6 +410,8 @@ class BiliHandler(blivedm.BaseHandler):
 
             uid = client.room_owner_uid
             if uid != None:
+                now_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                await travail_stat.stat(room_id, uid, version, now_time)
                 login_status.set_text(room_id)
                 login_status.classes("text-green")
             else:
@@ -466,10 +470,10 @@ class BiliHandler(blivedm.BaseHandler):
     def _on_gift_statistics(self, gift, num, uname, price = 0):
         if not os.path.exists("data/gift_statistics.json"):
             with open("data/gift_statistics.json", "wb+") as f:
-                f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
         with open("data/gift_statistics.json", "rb") as f:
-            count = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            count = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         count.setdefault(gift, {"num": 0, "price": 0, "user": []})
         users = count[gift]["user"]
@@ -485,7 +489,7 @@ class BiliHandler(blivedm.BaseHandler):
         count[gift] = {"num": num, "price": price, "user": users}
 
         with open("data/gift_statistics.json", "wb+") as f:
-            f.write(json.dumps(count, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps(count, f, option=orjson.OPT_INDENT_2))
 
     # 收到礼物后执行函数
     def _on_gift_play(self, gift, num, uname, message, price = 0):
@@ -494,10 +498,10 @@ class BiliHandler(blivedm.BaseHandler):
         def blind_box_value(gift, num : int, price : int, box_name):
             if not os.path.exists("data/blind_box_value.json"):
                 with open("data/blind_box_value.json", "wb+") as f:
-                    f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+                    f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
             with open("data/blind_box_value.json", "rb") as f:
-                box_value = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
             if box_value.get(box_name, None) == None:
                 box_value[box_name] = {}
@@ -508,28 +512,28 @@ class BiliHandler(blivedm.BaseHandler):
             box_value[box_name][gift] = {"num": box_value[box_name][gift]["num"] + num, "price": price}
 
             with open("data/blind_box_value.json", "wb+") as f:
-                f.write(json.dumps(box_value, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(box_value, f, option=orjson.OPT_INDENT_2))
 
         if b_connect_status:  # True则已连接至弹幕服务器
             if gift_challenge_switch.value:  # True则为投喂挑战开关为开状态
                 # 检查投喂挑战数据文件是否存在
                 if os.path.exists("data/gifts_count.json"):
                     with open("data/gifts_count.json", "rb") as f:
-                        gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
                     with open("data/special_count.json", "rb") as f:
-                        special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                        special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                     # 如果礼物数据没有该礼物则写入
                     if gift not in gifts and gift not in special:
                         with open("data/gift_img.json", "rb") as f:
-                            gift_img = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                            gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
                         gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
                         with open("data/gift_img.json", "wb+") as f:
-                            f.write(json.dumps(gift_img, f, option=json.OPT_INDENT_2))
+                            f.write(orjson.dumps(gift_img, f, option=orjson.OPT_INDENT_2))
 
                     # 初始化盲盒数据
                     with open("data/blinx_box_data.json", "rb") as f:
-                        blind_box = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                        blind_box = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                     blind_box_gifts = []
 
@@ -620,22 +624,22 @@ class BiliHandler(blivedm.BaseHandler):
             if cd_status or app.storage.general.get("ignore_cd", False):  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
                     with open("data/gifts.json", "rb") as f:
-                        gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
                     with open("data/special.json", "rb") as f:
-                        special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                        special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                     tmp_time = countdown_timer.get_tmp_time() # 获取当前倒计时
 
                     if gift not in gifts and gift not in special:
                         with open("data/gift_img.json", "rb") as f:
-                            gift_img = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                            gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
                         gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
                         with open("data/gift_img.json", "wb+") as f:
-                            f.write(json.dumps(gift_img, f, option=json.OPT_INDENT_2))
+                            f.write(orjson.dumps(gift_img, f, option=orjson.OPT_INDENT_2))
 
                     # 初始化盲盒数据
                     with open("data/blinx_box_data.json", "rb") as f:
-                        blind_box = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                        blind_box = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                     blind_box_gifts = []
 
@@ -932,9 +936,9 @@ def cd_setting_dialog():
     def run():
         global refresh_capture_cd
         with open("data/gifts.json", "rb+") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if gift_name.value == None or time.value < 0:
             if gift_name.value == None:
@@ -977,9 +981,9 @@ def cd_setting_dialog():
             gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
             with open("data/gifts.json", "wb+") as f:
-                f.write(json.dumps(gifts, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(gifts, f, option=orjson.OPT_INDENT_2))
             with open("data/special.json", "wb+") as f:
-                f.write(json.dumps(special, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(special, f, option=orjson.OPT_INDENT_2))
 
             refresh_capture_cd = True # 设置capture刷新状态
             refresh_card()
@@ -989,9 +993,9 @@ def cd_setting_dialog():
         def double_check():
             global refresh_capture_cd
             with open("data/gifts.json", "wb+") as f:
-                f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
             with open("data/special.json", "wb+") as f:
-                f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
             refresh_capture_cd = True
             double_check_dialog.close()
             refresh_card()
@@ -1008,9 +1012,9 @@ def cd_setting_dialog():
     def delete():
         global refresh_capture_cd
         with open("data/gifts.json", "rb+") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb+") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if gift_name.value in gifts:
             gifts.pop(gift_name.value)
@@ -1020,9 +1024,9 @@ def cd_setting_dialog():
         gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
         with open("data/gifts.json", "wb+") as f:
-            f.write(json.dumps(gifts, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps(gifts, f, option=orjson.OPT_INDENT_2))
         with open("data/special.json", "wb+") as f:
-            f.write(json.dumps(special, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps(special, f, option=orjson.OPT_INDENT_2))
 
         refresh_capture_cd = True # 设置capture刷新状态
         refresh_card()
@@ -1030,28 +1034,28 @@ def cd_setting_dialog():
     def del_gift(is_special, k):
         global refresh_capture_cd
         with open("data/gifts.json", "rb") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if is_special:
             special.pop(k)
             with open("data/special.json", "wb+") as f:
-                f.write(json.dumps(special, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(special, f, option=orjson.OPT_INDENT_2))
         else:
             gifts.pop(k)
             gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
             with open("data/gifts.json", "wb+") as f:
-                f.write(json.dumps(gifts, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(gifts, f, option=orjson.OPT_INDENT_2))
 
         refresh_capture_cd = True
         refresh_card()
 
     def create_card():
         with open("data/gifts.json", "rb") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if gifts != {}:
             for k,v in gifts.items():
@@ -1092,7 +1096,7 @@ def cd_setting_dialog():
     # 弹窗
     with ui.dialog() as cd_dialog, ui.card(align_items="center"):
         with open("data/gift_img.json", "rb") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
 
@@ -1130,9 +1134,9 @@ def blind_box_value_dialog():
     def get_box_value():
         if not os.path.exists("data/blind_box_value.json"):
             with open("data/blind_box_value.json", "wb+") as f:
-                f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
         with open("data/blind_box_value.json", "rb") as f:
-            box_value = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         box_price_list = {"星月盲盒": 50, "心动盲盒": 150, "奇遇盲盒": 330, "闪耀盲盒": 500, "至尊盲盒": 1000, "百花盲盒": 250} # 盲盒基础价值
         value_list = {}
         price_list = {}
@@ -1176,7 +1180,7 @@ def blind_box_value_dialog():
 
     if not os.path.exists("data/blind_box_value.json"):
         with open("data/blind_box_value.json", "wb+") as f:
-            f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
 
     with ui.dialog() as value_dialog, ui.card(align_items="center") as value_card:
         ui.label().set_visibility(False)
@@ -1211,9 +1215,9 @@ def gift_count_setting_dialog():
     def run():
         global refresh_capture_gift
         with open("data/gifts_count.json", "rb+") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         if gift_name.value == None or number.value < 0:
             if gift_name.value == None:
                 ui.notify("请选择礼物", type="negative")
@@ -1255,9 +1259,9 @@ def gift_count_setting_dialog():
             gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
             with open("data/gifts_count.json", "wb+") as f:
-                f.write(json.dumps(gifts, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(gifts, f, option=orjson.OPT_INDENT_2))
             with open("data/special_count.json", "wb+") as f:
-                f.write(json.dumps(special, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(special, f, option=orjson.OPT_INDENT_2))
 
             refresh_capture_gift = True
             refresh_card()
@@ -1266,9 +1270,9 @@ def gift_count_setting_dialog():
         def double_check():
             global refresh_capture_gift
             with open("data/gifts_count.json", "wb+") as f:
-                f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
             with open("data/special_count.json", "wb+") as f:
-                f.write(json.dumps({}, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps({}, f, option=orjson.OPT_INDENT_2))
             refresh_capture_gift = True
             double_check_dialog.close()
             refresh_card()
@@ -1285,9 +1289,9 @@ def gift_count_setting_dialog():
     def delete():
         global refresh_capture_gift
         with open("data/gifts_count.json", "rb+") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb+") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if gift_name.value in gifts:
             gifts.pop(gift_name.value)
@@ -1297,9 +1301,9 @@ def gift_count_setting_dialog():
         gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
         with open("data/gifts_count.json", "wb+") as f:
-            f.write(json.dumps(gifts, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps(gifts, f, option=orjson.OPT_INDENT_2))
         with open("data/special_count.json", "wb+") as f:
-            f.write(json.dumps(special, f, option=json.OPT_INDENT_2))
+            f.write(orjson.dumps(special, f, option=orjson.OPT_INDENT_2))
 
         refresh_capture_gift = True # 设置capture刷新状态
         refresh_card()
@@ -1307,27 +1311,27 @@ def gift_count_setting_dialog():
     def del_gift(is_special, k):
         global refresh_capture_gift
         with open("data/gifts_count.json", "rb") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if is_special:
             special.pop(k)
             with open("data/special_count.json", "wb+") as f:
-                f.write(json.dumps(special, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(special, f, option=orjson.OPT_INDENT_2))
         else:
             gifts.pop(k)
             with open("data/gifts_count.json", "wb+") as f:
-                f.write(json.dumps(gifts, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(gifts, f, option=orjson.OPT_INDENT_2))
 
         refresh_capture_gift = True
         refresh_card()
 
     def create_card():
         with open("data/gifts_count.json", "rb") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if gifts != {}:
             for k,v in gifts.items():
@@ -1379,7 +1383,7 @@ def gift_count_setting_dialog():
 
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
         with open("data/gift_img.json", "rb") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
 
@@ -1527,7 +1531,7 @@ async def upload_log(room_id):
 
         timeout = aiohttp.ClientTimeout(total=60)  # 60秒超时
 
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
             async with session.post(url, data=data) as response:
                 if response.status == 201:
                     result = await response.json()
@@ -1727,7 +1731,7 @@ async def capture():
         '''
 
         with open("data/gift_img.json", "rb") as f:
-            gift_img = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         if v_type == "normal":
             gift_img_avatar.set_source(gift_img.get(k, ""))
@@ -1762,9 +1766,9 @@ async def capture():
         将礼物列表处理为简洁模式
         '''
         with open("data/gifts.json", "rb") as f:
-            gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         gifts.update(special) # 合并加减时和特殊玩法
         gifts = sort_dict(dictionary=gifts, sort_within_type=True) # 对字典按值的类型排序
@@ -1838,15 +1842,15 @@ async def capture():
             await init_config()
 
     with open("data/gifts.json", "rb") as f:
-        gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
     with open("data/gift_img.json", "rb") as f:
-        gift_img = json.loads(f.read().decode("utf-8").encode("utf-8"))
+        gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
 
     if os.path.exists("data/special.json"):
         with open("data/special.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
     else:
         special = {}
     # ui.query('body').style(f'background: url("{random.choice(config["general"]["background_image"])}") 0px 0px/cover')
@@ -1887,12 +1891,12 @@ async def capture():
                         "challenge": []
                     }
                     with open("data/gift_history.json", "wb+") as f:
-                        f.write(json.dumps(gift_history, f, option=json.OPT_INDENT_2))
+                        f.write(orjson.dumps(gift_history, f, option=orjson.OPT_INDENT_2))
 
                 with open("data/gift_history.json", "rb") as f:
-                    gift_history = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                    gift_history = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
                 with open("data/gift_img.json", "rb") as f:
-                    gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                    gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                 gift_history["cd"].append({
                     "name": name,
@@ -1904,7 +1908,7 @@ async def capture():
                 })
 
                 with open("data/gift_history.json", "wb+") as f:
-                    f.write(json.dumps(gift_history, f, option=json.OPT_INDENT_2))
+                    f.write(orjson.dumps(gift_history, f, option=orjson.OPT_INDENT_2))
 
                 with capture_gift_scroll:
                     for data in gift_history["cd"][-int(config["num"]["capture_gift_list_number"]):]:
@@ -1961,14 +1965,14 @@ async def capture():
             await init_config()
 
     with open("data/gifts_count.json", "rb") as f:
-        gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
     with open("data/gift_img.json", "rb") as f:
-        gift_img = json.loads(f.read().decode("utf-8").encode("utf-8"))
+        gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
     if os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "rb") as f:
-            special = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
     else:
         special = {}
     # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
@@ -2040,12 +2044,12 @@ async def capture():
                         "challenge": []
                     }
                     with open("data/gift_history.json", "wb+") as f:
-                        f.write(json.dumps(gift_history, f, option=json.OPT_INDENT_2))
+                        f.write(orjson.dumps(gift_history, f, option=orjson.OPT_INDENT_2))
 
                 with open("data/gift_history.json", "rb") as f:
-                    gift_history = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                    gift_history = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
                 with open("data/gift_img.json", "rb") as f:
-                    gifts = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                    gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                 gift_history["challenge"].append({
                     "name": name,
@@ -2057,7 +2061,7 @@ async def capture():
                 })
 
                 with open("data/gift_history.json", "wb+") as f:
-                    f.write(json.dumps(gift_history, f, option=json.OPT_INDENT_2))
+                    f.write(orjson.dumps(gift_history, f, option=orjson.OPT_INDENT_2))
 
                 with capture_gift_scroll:
                     for data in gift_history["challenge"][-int(config["num"]["capture_gift_list_number"]):]:
@@ -2193,10 +2197,10 @@ def index():
     def save_time():
         def do_save(key):
             with open("data/time.json", "rb") as f:
-                data = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
             data[key] = int(app.storage.general["countdown_time"])
             with open("data/time.json", "wb+") as f:
-                f.write(json.dumps(data, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(data, f, option=orjson.OPT_INDENT_2))
             ui.notify("保存成功", type="positive")
 
         def save(key):
@@ -2204,7 +2208,7 @@ def index():
                 ui.notify("名称不能为空", type="negative")
                 return
             with open("data/time.json", "rb") as f:
-                data = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
             if data.get(key, None) != None:
                 with ui.dialog() as overwrite_dialog, ui.card(align_items="center"):
                     ui.label("该名称已存在，是否覆盖？")
@@ -2228,7 +2232,7 @@ def index():
     def load_time():
         def load(key):
             with open("data/time.json", "rb") as f:
-                data = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
             app.storage.general["countdown_time"] = int(data[key])
             countdown_timer._remaining_time = int(data[key])
             load_dialog.close()
@@ -2236,19 +2240,19 @@ def index():
 
         def delete(key):
             with open("data/time.json", "rb") as f:
-                data = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
             data.pop(key)
             with open("data/time.json", "wb+") as f:
-                f.write(json.dumps(data, f, option=json.OPT_INDENT_2))
+                f.write(orjson.dumps(data, f, option=orjson.OPT_INDENT_2))
             ui.notify("删除成功", type="positive")
 
         def reload() -> dict:
             with open("data/time.json", "rb") as f:
-                data = json.loads(f.read().decode("utf-8").encode("utf-8"))
+                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
             return data
 
         with open("data/time.json", "rb") as f:
-            data = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         with ui.dialog() as load_dialog, ui.card(align_items="center"):
             name_select = ui.select(options=list(data.keys()), label="选择名称").style("width: 200px")
@@ -2402,7 +2406,7 @@ def _():
     ui.query('body').style(f'background: url("static/bg_vita.png") fixed')
     try:
         with open("data/gift_statistics.json", "rb") as f:
-            count = json.loads(f.read().decode("utf-8").encode("utf-8"))
+            count = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         if count == {}:
             raise Exception("No data")
     except:
@@ -2486,7 +2490,7 @@ async def _():
         async def display_chat_messages(config, bili_api):
             """异步获取并显示聊天消息"""
             try:
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
                     # 获取远程文本
                     text = await get_remote_text(session)
 

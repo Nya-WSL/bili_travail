@@ -3,6 +3,8 @@ import aiohttp
 import zipfile
 import asyncio
 
+import dns_resolver
+
 from log import logger
 from nicegui import ui, app
 
@@ -24,7 +26,7 @@ async def update(server, version):
         if not os.path.exists("cache"):
             os.mkdir("cache")
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
             async with session.get(url) as response:
                 cancelButton.on_click(lambda: close_session())
                 if response.status != 200:

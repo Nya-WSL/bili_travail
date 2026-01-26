@@ -1,9 +1,10 @@
 import os
 import re
 import aiohttp
-import orjson as json
+import orjson
 import gift_mapping as gift_map
 
+import dns_resolver
 import config as travail_config
 from log import logger
 
@@ -32,12 +33,12 @@ class BiliGiftManager:
 
         # 尝试从服务器获取数据
         try:
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
                         with open(img_path, "wb+", encoding="utf-8") as f:
-                            json.dumps(data, f, option=json.OPT_INDENT_2)
+                            f.write(orjson.dumps(data, f, option=orjson.OPT_INDENT_2))
                     else:
                         raise ValueError("无法获取Nya-WSL服务器存档数据...")
 
@@ -47,7 +48,7 @@ class BiliGiftManager:
             blind_box = gift_map.blind_box
 
             with open(img_path, "wb+", encoding="utf-8") as f:
-                json.dumps(gift_mapping + blind_box, f, option=json.OPT_INDENT_2)
+                f.write(orjson.dumps(gift_mapping + blind_box, f, option=orjson.OPT_INDENT_2))
 
     def set_room_id(self, room_id):
         """
@@ -73,7 +74,7 @@ class BiliGiftManager:
             "gift_ids": gift_ids
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
             async with session.post(url, json=data) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -99,7 +100,7 @@ class BiliGiftManager:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
             async with session.get(url, params=params, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -132,7 +133,7 @@ class BiliGiftManager:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
             async with session.get(url, params=params, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -186,7 +187,7 @@ class BiliGiftManager:
                     gift_mapping[k] = f"data/{v}"
 
             with open(img_path, "wb", encoding="utf-8") as f:
-                json.dumps(gift_mapping, f, option=json.OPT_INDENT_2)
+                f.write(orjson.dumps(gift_mapping, f, option=orjson.OPT_INDENT_2))
 
             if blind_box == {}:
                 return "blind_box_none"
