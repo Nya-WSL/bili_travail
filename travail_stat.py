@@ -1,5 +1,6 @@
 from log import logger
 import aiohttp
+import dns_resolver
 import config as travail_config
 
 async def stat(room_id: int, uid: int, version: str, time: str) -> bool:
@@ -13,7 +14,7 @@ async def stat(room_id: int, uid: int, version: str, time: str) -> bool:
         "time": time
     }
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
         async with session.post(url, json=data) as response:
             if response.status != 200:
                 logger.error(f"请求上传统计信息失败: {response.status}")
