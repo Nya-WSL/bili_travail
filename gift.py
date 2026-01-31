@@ -37,8 +37,8 @@ class BiliGiftManager:
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
-                        with open(img_path, "wb+", encoding="utf-8") as f:
-                            f.write(orjson.dumps(data, f, option=orjson.OPT_INDENT_2))
+                        with open(img_path, "wb+") as f:
+                            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
                     else:
                         raise ValueError("无法获取Nya-WSL服务器存档数据...")
 
@@ -47,8 +47,8 @@ class BiliGiftManager:
             gift_mapping = gift_map.gift_mapping
             blind_box = gift_map.blind_box
 
-            with open(img_path, "wb+", encoding="utf-8") as f:
-                f.write(orjson.dumps(gift_mapping + blind_box, f, option=orjson.OPT_INDENT_2))
+            with open(img_path, "wb+") as f:
+                f.write(orjson.dumps(gift_mapping + blind_box, option=orjson.OPT_INDENT_2))
 
     def set_room_id(self, room_id):
         """
@@ -186,8 +186,8 @@ class BiliGiftManager:
                 else:
                     gift_mapping[k] = f"data/{v}"
 
-            with open(img_path, "wb", encoding="utf-8") as f:
-                f.write(orjson.dumps(gift_mapping, f, option=orjson.OPT_INDENT_2))
+            with open(img_path, "wb") as f:
+                f.write(orjson.dumps(gift_mapping, option=orjson.OPT_INDENT_2))
 
             if blind_box == {}:
                 return "blind_box_none"

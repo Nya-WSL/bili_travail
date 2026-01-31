@@ -6,6 +6,7 @@ import os
 import uvicorn
 import aiohttp
 import orjson
+import traceback
 
 from typing import List
 from pathlib import Path
@@ -40,7 +41,7 @@ example_config = {
 def init_config():
     if not os.path.exists("config.json"):
         with open("config.json", "wb") as f:
-            f.write(orjson.dumps(example_config, f, option=orjson.OPT_INDENT_2))
+            f.write(orjson.dumps(example_config, option=orjson.OPT_INDENT_2))
 
     # 加载配置文件
     with open("config.json", "rb") as f:
@@ -59,7 +60,7 @@ def init_config():
         config.pop(key, None)
 
     with open("config.json", "wb") as f:
-        f.write(orjson.dumps(config, f, option=orjson.OPT_INDENT_2))
+        f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
 
 async def get_blind_box(gift_ids: list) -> dict:
     """
@@ -74,14 +75,6 @@ async def get_blind_box(gift_ids: list) -> dict:
 
     blind_box = {}
 
-    # 创建自定义解析器
-    resolver = AsyncResolver(
-        nameservers=["8.8.8.8", "114.114.114.114"]
-    )
-
-    # 创建连接器并设置解析器
-    connector = aiohttp.TCPConnector(resolver=resolver)
-
     for gift_id in gift_ids:
         url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
         params = {
@@ -91,6 +84,14 @@ async def get_blind_box(gift_ids: list) -> dict:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
             "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
         }
+
+        # 创建自定义解析器
+        resolver = AsyncResolver(
+            nameservers=["8.8.8.8", "114.114.114.114"]
+        )
+
+        # 创建连接器并设置解析器
+        connector = aiohttp.TCPConnector(resolver=resolver)
 
         async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url, params=params, headers=headers) as response:
@@ -125,6 +126,7 @@ async def index(request: GiftIdsRequest):
         raise he
 
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/log/{room_id}", status_code=status.HTTP_201_CREATED)
@@ -164,6 +166,7 @@ async def hook(room_id, file: UploadFile = File(...)):
         raise he
 
     except Exception as e:
+        print(traceback.format_exc())
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/stat", status_code=status.HTTP_200_OK)
@@ -179,13 +182,12 @@ async def index(request: StatRequest):
         stat_data[f"{request.room_id}"] = {"uid": request.uid, "time": request.time, "version": request.version}
 
         with open("stat.json", "wb+") as f:
-            f.write(orjson.dumps(stat_data, f, option=orjson.OPT_INDENT_2))
+            f.write(orjson.dumps(stat_data, option=orjson.OPT_INDENT_2))
 
     except HTTPException as he:
         raise he
 
     except Exception as e:
-        import traceback
         print(traceback.format_exc())
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

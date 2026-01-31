@@ -1,6 +1,6 @@
 [project]
 name = "bili-travail-server"
-version = "0.31.6-alpha"
+version = "1.35"
 description = "加班姬服务端"
 authors = [
     {name = "Nya-WSL"}
@@ -13,7 +13,8 @@ dependencies = [
     "fastapi (>=0.115.11,<1.0.0)",
     "python-multipart (>=0.0.20,<0.0.21)",
     "aiohttp (>=3.13.2,<4.0.0)",
-    "orjson (>=3.11.5,<4.0.0)"
+    "orjson (>=3.11.5,<4.0.0)",
+    "aiodns (==3.6.1)"
 ]
 
 [tool.poetry]
