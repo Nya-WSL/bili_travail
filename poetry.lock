@@ -183,22 +183,6 @@ yarl = ">=1.17.0,<2.0"
 speedups = ["Brotli (>=1.2) ; platform_python_implementation == \"CPython\"", "aiodns (>=3.3.0)", "backports.zstd ; platform_python_implementation == \"CPython\" and python_version < \"3.14\"", "brotlicffi (>=1.2) ; platform_python_implementation != \"CPython\""]
 
 [[package]]
-name = "aioping"
-version = "0.4.0"
-description = "Asyncio ping implementation"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "aioping-0.4.0-py3-none-any.whl", hash = "sha256:7d577df103edf6110d007a6c69100fcbdd4e31b620fb4b1a69812e49506c71f2"},
-    {file = "aioping-0.4.0.tar.gz", hash = "sha256:00257705b64811334b65c7346fa8cdb7156d4ba6af712c13c02c4f74418d5050"},
-]
-
-[package.dependencies]
-aiodns = "*"
-async-timeout = "*"
-
-[[package]]
 name = "aiosignal"
 version = "1.4.0"
 description = "aiosignal: a list of registered asynchronous callbacks"
@@ -305,6 +289,7 @@ description = "Timeout context manager for asyncio programs"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "python_version == \"3.10\""
 files = [
     {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
     {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
@@ -1037,6 +1022,18 @@ cli = ["click (==8.*)", "pygments (==2.*)", "rich (>=10,<14)"]
 http2 = ["h2 (>=3,<5)"]
 socks = ["socksio (==1.*)"]
 zstd = ["zstandard (>=0.18.0)"]
+
+[[package]]
+name = "icmplib"
+version = "3.0.4"
+description = "Easily forge ICMP packets and make your own ping and traceroute."
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "icmplib-3.0.4-py3-none-any.whl", hash = "sha256:336b75c6c23c5ce99ddec33f718fab09661f6ad698e35b6f1fc7cc0ecf809398"},
+    {file = "icmplib-3.0.4.tar.gz", hash = "sha256:57868f2cdb011418c0e1d5586b16d1fabd206569fe9652654c27b6b2d6a316de"},
+]
 
 [[package]]
 name = "idna"
@@ -3243,4 +3240,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "db9958be95cca40574ca443543db7536869a874454a382e24db6d72866a010b9"
+content-hash = "c4584b101b9ba01dd779fdffd0cf846ae20c73f96e8d20149ad3a67e0742c2c6"

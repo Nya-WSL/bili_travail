@@ -2108,10 +2108,9 @@ def index():
             "CN-QN": "qn.nya-wsl.cn"
         }
         server = await ping.ping(servers.values())
-        if server != False:
-            for k, v in servers.items():
-                if v == server:
-                    return k
+        if server:
+            server_name = {v: k for k, v in servers.items()}.get(server, server)
+            return server_name
         else:
             return False
 
