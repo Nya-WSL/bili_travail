@@ -55,7 +55,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
-base_version = "1.35"
+base_version = "1.36"
 version = f"{base_version}.{ver_strftime}"
 
 logger = log.logger
@@ -628,7 +628,7 @@ class BiliHandler(blivedm.BaseHandler):
                     with open("data/special.json", "rb") as f:
                         special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-                    tmp_time = countdown_timer.get_tmp_time() # 获取当前倒计时
+                    tmp_time = countdown_timer.target_time
 
                     if gift not in gifts and gift not in special:
                         with open("data/gift_img.json", "rb") as f:
@@ -666,7 +666,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                     if gift in special:
                         if special[gift] == "double":
-                            changed_time = int(tmp_time) << int(num)
+                            changed_time = (tmp_time - datetime.datetime.now()) * (2 ** num)
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -675,7 +675,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "half":
-                            changed_time = int(tmp_time) >> int(num)
+                            changed_time = (tmp_time - datetime.datetime.now()) * (2 ** -num)
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -684,7 +684,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "clear":
-                            changed_time = 3
+                            changed_time = datetime.timedelta(seconds=3)
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -698,7 +698,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 random_time = random.randint(special[gift][0], special[gift][1] + 1)
                                 total_changed_time += random_time
 
-                            changed_time = tmp_time + total_changed_time
+                            changed_time = tmp_time + datetime.timedelta(seconds=total_changed_time) - datetime.datetime.now()
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -706,10 +706,10 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
-                        countdown_timer.set_time(changed_time) # 重设倒计时数据
+                        countdown_timer.set_time(datetime.datetime.now() + changed_time) # 重设倒计时数据
 
                     elif gift in gifts:
-                        changed_time = (gifts[gift] * int(num)) + tmp_time
+                        changed_time =  tmp_time + datetime.timedelta(seconds=gifts[gift] * int(num))
                         gift_list_show_time = gifts[gift] * int(num)
 
                         if is_blind_box:
@@ -723,81 +723,96 @@ class BiliHandler(blivedm.BaseHandler):
                 else:
                     logger.error("计时失败，未找到礼物数据文件")
 
+def update_btn_state(state: str):
+    if state == "start":
+        # 重置时间输入框
+        input_hour.set_value(0)
+        input_minute.set_value(0)
+        input_second.set_value(0)
+        # 设置按钮状态
+        start_button.disable()
+        cancel_button.enable()
+        pause_button.enable()
+        add_button.enable()
+        sub_button.enable()
+        cancel_button.set_text("停止")
+    elif state == "pause":
+        resume_button.enable()
+        pause_button.disable()
+        add_button.disable()
+        sub_button.disable()
+    elif state == "resume":
+        pause_button.enable()
+        resume_button.disable()
+        add_button.enable()
+        sub_button.enable()
+    elif state == "stop":
+        start_button.enable()
+        cancel_button.disable()
+        pause_button.disable()
+        resume_button.disable()
+        add_button.disable()
+        sub_button.disable()
+        # 重置时间输入框
+        input_hour.set_value(0)
+        input_minute.set_value(0)
+        input_second.set_value(0)
+
 # 倒计时类
 class CountdownTimer:
-    def __init__(self, start_time):
-        self._start_time = start_time # 初始化开始时间
-        self._remaining_time = start_time # 初始化剩余时间
+    def __init__(self):
+        self.remaining_time = datetime.timedelta(0) # 初始化剩余时间
+        self.target_time = None # 初始化目标时间
         self._paused = False # 初始化暂停状态
         self._running = False # 初始化运行状态
         self._paused_event = asyncio.Event() # 初始化event
         self._paused_event.set()  # 最开始没有暂停
         self._task = None # 初始化task
 
-    # 获取当前倒计时
-    def get_tmp_time(self):
-        return float(self._remaining_time)
-
     # 倒计时运行函数
-    async def _run(self):
+    async def update(self):
         global cd_status
-        while self._running and self._remaining_time > 0:
+        while self._running and self.target_time:
             if self._paused:
-                await self._paused_event.wait()  # Wait until unpaused
-            # 设置按钮状态
-            start_button.disable()
-            cancel_button.enable()
-            pause_button.enable()
+                await self._paused_event.wait()  # 暂停时等待
 
-            self._remaining_time -= 1 # 倒计时减1s
-            app.storage.general["countdown_time"] = self._remaining_time
+            now = datetime.datetime.now()
+            if now >= self.target_time:
+                self._running = False
+                self.remaining_time = datetime.timedelta(0)
+                self.stop()
+                break
+            else:
+                cd_status = True
+
+            self.remaining_time = self.target_time - now
+            app.storage.general["countdown_time"] = self.remaining_time.total_seconds()
 
             await asyncio.sleep(1) # 异步阻塞1s
-
-        # 判断倒计时状态
-        if self._remaining_time <= 0:
-            await self.stop()
-
-            # 倒计时结束后重置时间输入框
-            input_hour.set_value(0)
-            input_minute.set_value(0)
-            input_second.set_value(0)
-
-        elif self._remaining_time > 0:
-            cd_status = True
 
     # 运行倒计时
     def start(self):
         global cd_status
         # 如果倒计时未在运行
-        if not self._running:
-            self._running = True # 修改运行状态
-            self._remaining_time = self._start_time  # 设置开始时间
-            if self._remaining_time != 0: # 防止写入0时开始倒计时
-                self._task = asyncio.create_task(self._run()) # 创建倒计时协程
-                # 重置时间输入框
-                input_hour.set_value(0)
-                input_minute.set_value(0)
-                input_second.set_value(0)
-                # 设置按钮状态
-                add_button.enable()
-                sub_button.enable()
-                cancel_button.set_text("停止")
-                cd_status = True # 设置倒计时运行状态
-            else:
-                ui.notify("请输入时间", type="negative")
-                self._running = False
+        if self._running:
+            return
+
+        self._running = True # 修改运行状态
+        if self.target_time - datetime.datetime.now() != datetime.timedelta(0): # 防止写入0时开始倒计时
+            self._task = asyncio.create_task(self.update()) # 创建倒计时协程
+            update_btn_state("start") # 更新按钮状态
+            cd_status = True # 设置倒计时运行状态
+        else:
+            ui.notify("请输入时间", type="negative")
+            self._running = False
 
     # 暂停倒计时
     async def pause(self):
         global cd_status
         if self._running and not self._paused: # 如果倒计时在运行且没有暂停
             self._paused = True
-            self._paused_event.clear()  # Pause the timer
-            resume_button.enable()
-            pause_button.disable()
-            add_button.disable()
-            sub_button.disable()
+            self._paused_event.clear()  # 暂停计时器
+            update_btn_state("pause") # 更新按钮状态
             cd_status = False
 
     # 继续倒计时
@@ -805,15 +820,12 @@ class CountdownTimer:
         global cd_status
         if self._running and self._paused:
             self._paused = False
-            self._paused_event.set()  # Resume the timer
-            pause_button.enable()
-            resume_button.disable()
-            add_button.enable()
-            sub_button.enable()
+            self._paused_event.set()  # 恢复计时器
+            update_btn_state("resume") # 更新按钮状态
             cd_status = True
 
     # 停止倒计时
-    async def stop(self):
+    def stop(self):
         global cd_status
         if self._running:
             self._running = False
@@ -821,23 +833,13 @@ class CountdownTimer:
             if self._task:
                 self._task.cancel() # 结束协程
             app.storage.general["countdown_time"] = 0
-            self._start_time = int(app.storage.general["countdown_time"])
-            self._remaining_time = self._start_time  # Reset the timer
-            start_button.enable()
-            cancel_button.disable()
-            pause_button.disable()
-            resume_button.disable()
-            add_button.disable()
-            sub_button.disable()
-            input_hour.set_value(0)
-            input_minute.set_value(0)
-            input_second.set_value(0)
+            self.remaining_time = datetime.timedelta(0)
+            update_btn_state("stop") # 更新按钮状态
             cd_status = False
         else:
             if reset_inherit_status:
                 app.storage.general["countdown_time"] = 0
-                self._start_time = int(app.storage.general["countdown_time"])
-                self._remaining_time = self._start_time  # Reset the timer
+                self.remaining_time = datetime.timedelta(0)
                 cancel_button.set_text("停止")
                 cancel_button.disable()
 
@@ -850,26 +852,14 @@ class CountdownTimer:
                 self._task.cancel()
 
         # 更新起始时间和剩余时间
-        self._start_time = time
-        self._remaining_time = time
-        app.storage.general["countdown_time"] = time
+        self.target_time = time
+        self.remaining_time = time - datetime.datetime.now()
+        app.storage.general["countdown_time"] = self.remaining_time.total_seconds()
 
         # 如果计时器没有运行，则重新启动计时器
         if not self._running:
             self._running = True
-            self._task = asyncio.create_task(self._run())
-
-    # 继承倒计时
-    def inherit_time(self, time):
-        # 如果计时器正在运行，首先停止它
-        if self._running:
-            self._running = False
-            if self._task:
-                self._task.cancel()
-
-        # 更新起始时间和剩余时间
-        self._start_time = time
-        self._remaining_time = time
+            self._task = asyncio.create_task(self.update())
 
 def sort_dict(dictionary, type_order=None, sort_within_type=False):
     """
@@ -1451,7 +1441,7 @@ def gift_count_setting_dialog():
 def init_task():
     global countdown_timer
     global reset_inherit_status
-    countdown_timer = CountdownTimer(int(app.storage.general["countdown_time"]))
+    countdown_timer = CountdownTimer()
     if app.storage.general.get("countdown_time", 0) != 0: # 如果存在可继承的倒计时
         cancel_button.set_text("重置")
         cancel_button.enable()
@@ -1460,9 +1450,10 @@ def init_task():
 
 # 运行倒计时
 def start_task():
-    if countdown_timer._start_time == 0:
-        countdown_timer._start_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
-        countdown_timer._remaining_time = countdown_timer._start_time
+    if app.storage.general.get("countdown_time", 0) == 0:
+        countdown_timer.target_time = datetime.datetime.now() + datetime.timedelta(seconds=(input_hour.value * 3600) + (input_minute.value * 60) + input_second.value)
+    else:
+        countdown_timer.target_time = datetime.datetime.now() + datetime.timedelta(seconds=app.storage.general["countdown_time"])
     countdown_timer.start()
 
 
@@ -1470,12 +1461,13 @@ def start_task():
 def add_time():
     try:
         if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
-            tmp_time = countdown_timer.get_tmp_time()
             try:
-                changed_time = tmp_time + ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1 # 在视觉效果上倒计时被正确反馈，实际上多加了1s
+                remaining_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
+                changed_time = countdown_timer.target_time + datetime.timedelta(seconds=remaining_time)
+                countdown_timer.set_time(changed_time)
             except TypeError as e:
+                logger.error(traceback.format_exc())
                 ui.notify(e, type="negative")
-            countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
 
@@ -1484,12 +1476,13 @@ def add_time():
 def sub_time():
     try:
         if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
-            tmp_time = countdown_timer.get_tmp_time()
             try:
-                changed_time = tmp_time - ((input_hour.value * 3600) + (input_minute.value * 60) + input_second.value) + 1  # 在视觉效果上倒计时被正确反馈，实际上少减了1s
+                remaining_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
+                changed_time = countdown_timer.target_time - datetime.timedelta(seconds=remaining_time)
+                countdown_timer.set_time(changed_time)
             except TypeError as e:
+                logger.error(traceback.format_exc())
                 ui.notify(e, type="negative")
-            countdown_timer.set_time(changed_time)
     except NameError:
         ui.notify("请先开始计时", type="negative")
 
@@ -1903,7 +1896,7 @@ async def capture():
                     "gift": gift,
                     "num": num,
                     "rule": time,
-                    "url": message.gift_img_basic if message else gifts.get(gift, ""),
+                    "url": message.gift_icon if message else gifts.get(gift, ""),
                     "time": datetime.datetime.now().strftime('%H:%M:%S')
                 })
 
@@ -2056,7 +2049,7 @@ async def capture():
                     "gift": gift,
                     "num": num,
                     "rule": time,
-                    "url": message.gift_img_basic if message else gifts.get(gift, ""),
+                    "url": message.gift_icon if message else gifts.get(gift, ""),
                     "time": datetime.datetime.now().strftime('%H:%M:%S')
                 })
 
@@ -2226,14 +2219,14 @@ def index():
             ui.button("保存", on_click=lambda: save(name.value))
 
         save_dialog.open()
-        save_dialog.on("hide", lambda: save_dialog.clear())
+        save_dialog.on("hide", lambda: save_dialog.delete())
 
     def load_time():
         def load(key):
             with open("data/time.json", "rb") as f:
                 data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
             app.storage.general["countdown_time"] = int(data[key])
-            countdown_timer._remaining_time = int(data[key])
+            countdown_timer.remaining_time = int(data[key])
             load_dialog.close()
             ui.notify("加载成功", type="positive")
 
@@ -2260,7 +2253,7 @@ def index():
                 ui.button("删除", on_click=lambda: delete(name_select.value)).on_click(lambda: name_select.set_options(list(reload().keys())))
 
         load_dialog.open()
-        load_dialog.on("hide", lambda: load_dialog.clear())
+        load_dialog.on("hide", lambda: load_dialog.delete())
 
     # 礼物设置弹窗
     with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
@@ -2388,7 +2381,6 @@ def index():
             ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
 
         init_task()
-        countdown_timer.inherit_time(int(app.storage.general["countdown_time"]))
 
     # about按钮
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
