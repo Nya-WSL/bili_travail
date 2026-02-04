@@ -2190,7 +2190,7 @@ def index():
         def do_save(key):
             with open("data/time.json", "rb") as f:
                 data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-            data[key] = int(app.storage.general["countdown_time"])
+            data[key] = app.storage.general["countdown_time"]
             with open("data/time.json", "wb+") as f:
                 f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
             ui.notify("保存成功", type="positive")
@@ -2208,11 +2208,11 @@ def index():
                         ui.button("是", on_click=lambda: do_save(key)).on_click(lambda: overwrite_dialog.close()).on_click(lambda: save_dialog.close())
                         ui.button("否", on_click=lambda: overwrite_dialog.close())
                 overwrite_dialog.open()
-                overwrite_dialog.on("hide", lambda: overwrite_dialog.clear())
+                overwrite_dialog.on("hide", lambda: overwrite_dialog.delete())
             else:
                 do_save(key)
                 save_dialog.close()
-                save_dialog.on("hide", lambda: save_dialog.clear())
+                save_dialog.on("hide", lambda: save_dialog.delete())
 
         with ui.dialog() as save_dialog, ui.card(align_items="center"):
             name = ui.input("保存名称").style("width: 200px")
@@ -2225,8 +2225,8 @@ def index():
         def load(key):
             with open("data/time.json", "rb") as f:
                 data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-            app.storage.general["countdown_time"] = int(data[key])
-            countdown_timer.remaining_time = int(data[key])
+            app.storage.general["countdown_time"] = float(data[key])
+            countdown_timer.target_time = datetime.datetime.now() + datetime.timedelta(seconds=float(data[key]))
             load_dialog.close()
             ui.notify("加载成功", type="positive")
 
