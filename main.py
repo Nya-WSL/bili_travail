@@ -628,7 +628,7 @@ class BiliHandler(blivedm.BaseHandler):
                     with open("data/special.json", "rb") as f:
                         special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-                    tmp_time = countdown_timer.target_time
+                    current_seconds = countdown_timer.remaining_seconds
 
                     if gift not in gifts and gift not in special:
                         with open("data/gift_img.json", "rb") as f:
@@ -666,7 +666,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                     if gift in special:
                         if special[gift] == "double":
-                            changed_time = (tmp_time - datetime.datetime.now()) * (2 ** num)
+                            new_seconds = current_seconds * (2 ** num)
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -675,7 +675,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "half":
-                            changed_time = (tmp_time - datetime.datetime.now()) * (2 ** -num)
+                            new_seconds = current_seconds / (2 ** num)
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -684,7 +684,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "clear":
-                            changed_time = datetime.timedelta(seconds=3)
+                            new_seconds = 3
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -693,12 +693,11 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, "清空", message)
 
                         if type(special[gift]) == list:
-                            total_changed_time = 0
-                            for i in range(num):
-                                random_time = random.randint(special[gift][0], special[gift][1] + 1)
-                                total_changed_time += random_time
-
-                            changed_time = tmp_time + datetime.timedelta(seconds=total_changed_time) - datetime.datetime.now()
+                            total_changed_time = sum(
+                        random.randint(special[gift][0], special[gift][1] + 1)
+                                for _ in range(num)
+                            )
+                            new_seconds = current_seconds + total_changed_time
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -706,11 +705,12 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
-                        countdown_timer.set_time(datetime.datetime.now() + changed_time) # 重设倒计时数据
+                        countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
 
                     elif gift in gifts:
-                        changed_time =  tmp_time + datetime.timedelta(seconds=gifts[gift] * int(num))
-                        gift_list_show_time = gifts[gift] * int(num)
+                        delta_seconds = gifts[gift] * int(num)
+                        new_seconds = countdown_timer.remaining_seconds + delta_seconds
+                        gift_list_show_time = delta_seconds
 
                         if is_blind_box:
                             gift = origin_gift
@@ -719,7 +719,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
                                 capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
-                        countdown_timer.set_time(changed_time) # 重设倒计时数据
+                        countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
                 else:
                     logger.error("计时失败，未找到礼物数据文件")
 
@@ -762,12 +762,26 @@ def update_btn_state(state: str):
 class CountdownTimer:
     def __init__(self):
         self.remaining_time = datetime.timedelta(0) # 初始化剩余时间
-        self.target_time = None # 初始化目标时间
+        self.target_time: datetime.datetime | None = None # 初始化目标时间
         self._paused = False # 初始化暂停状态
         self._running = False # 初始化运行状态
         self._paused_event = asyncio.Event() # 初始化event
         self._paused_event.set()  # 最开始没有暂停
         self._task = None # 初始化task
+
+    @property
+    def remaining_seconds(self) -> float:
+        if not self.target_time:
+            return 0.0
+        return max((self.target_time - datetime.datetime.now()).total_seconds(), 0.0)
+
+    def set_remaining_seconds(self, seconds: float) -> None:
+        if seconds < 0:
+            seconds = 0
+        now = datetime.datetime.now()
+        self.target_time = now + datetime.timedelta(seconds=seconds)
+        self.remaining_time = datetime.timedelta(seconds=seconds)
+        app.storage.general["countdown_time"] = seconds
 
     # 倒计时运行函数
     async def update(self):
@@ -776,19 +790,14 @@ class CountdownTimer:
             if self._paused:
                 await self._paused_event.wait()  # 暂停时等待
 
-            now = datetime.datetime.now()
-            if now >= self.target_time:
-                self._running = False
-                self.remaining_time = datetime.timedelta(0)
+            if self.remaining_seconds <= 0:
                 self.stop()
                 break
-            else:
-                cd_status = True
 
-            self.remaining_time = self.target_time - now
-            app.storage.general["countdown_time"] = self.remaining_time.total_seconds()
-
-            await asyncio.sleep(1) # 异步阻塞1s
+            self.remaining_time = datetime.timedelta(seconds=self.remaining_seconds)
+            app.storage.general["countdown_time"] = self.remaining_seconds
+            cd_status = True
+            await asyncio.sleep(1)
 
     # 运行倒计时
     def start(self):
@@ -844,22 +853,18 @@ class CountdownTimer:
                 cancel_button.disable()
 
     # 设置倒计时
-    def set_time(self, time):
+    def set_time(self, time: datetime.datetime):
         # 如果计时器正在运行，首先停止它
-        if self._running:
+        if self._running and self._task:
             self._running = False
-            if self._task:
-                self._task.cancel()
+            self._task.cancel() # 结束协程
 
-        # 更新起始时间和剩余时间
-        self.target_time = time
-        self.remaining_time = time - datetime.datetime.now()
-        app.storage.general["countdown_time"] = self.remaining_time.total_seconds()
+        # 设置倒计时
+        seconds = (time - datetime.datetime.now()).total_seconds()
+        self.set_remaining_seconds(seconds)
 
-        # 如果计时器没有运行，则重新启动计时器
-        if not self._running:
-            self._running = True
-            self._task = asyncio.create_task(self.update())
+        self._running = True
+        self._task = asyncio.create_task(self.update())
 
 def sort_dict(dictionary, type_order=None, sort_within_type=False):
     """
@@ -1451,23 +1456,21 @@ def init_task():
 # 运行倒计时
 def start_task():
     if app.storage.general.get("countdown_time", 0) == 0:
-        countdown_timer.target_time = datetime.datetime.now() + datetime.timedelta(seconds=(input_hour.value * 3600) + (input_minute.value * 60) + input_second.value)
+        base_seconds = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
     else:
-        countdown_timer.target_time = datetime.datetime.now() + datetime.timedelta(seconds=app.storage.general["countdown_time"])
+        base_seconds = app.storage.general["countdown_time"]
+
+    countdown_timer.set_remaining_seconds(base_seconds)
     countdown_timer.start()
 
 
 # 手动加时
 def add_time():
     try:
-        if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
-            try:
-                remaining_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
-                changed_time = countdown_timer.target_time + datetime.timedelta(seconds=remaining_time)
-                countdown_timer.set_time(changed_time)
-            except TypeError as e:
-                logger.error(traceback.format_exc())
-                ui.notify(e, type="negative")
+        if input_hour.value or input_minute.value or input_second.value:
+            delta = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
+            new_seconds = countdown_timer.remaining_seconds + delta
+            countdown_timer.set_remaining_seconds(new_seconds)
     except NameError:
         ui.notify("请先开始计时", type="negative")
 
@@ -1475,14 +1478,10 @@ def add_time():
 # 手动减时
 def sub_time():
     try:
-        if input_hour.value != 0 or input_minute.value != 0 or input_second.value != 0:
-            try:
-                remaining_time = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
-                changed_time = countdown_timer.target_time - datetime.timedelta(seconds=remaining_time)
-                countdown_timer.set_time(changed_time)
-            except TypeError as e:
-                logger.error(traceback.format_exc())
-                ui.notify(e, type="negative")
+        if input_hour.value or input_minute.value or input_second.value:
+            delta = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
+            new_seconds = countdown_timer.remaining_seconds - delta
+            countdown_timer.set_remaining_seconds(new_seconds)
     except NameError:
         ui.notify("请先开始计时", type="negative")
 
@@ -2225,8 +2224,9 @@ def index():
         def load(key):
             with open("data/time.json", "rb") as f:
                 data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-            app.storage.general["countdown_time"] = float(data[key])
-            countdown_timer.target_time = datetime.datetime.now() + datetime.timedelta(seconds=float(data[key]))
+            seconds = float(data[key])
+            app.storage.general["countdown_time"] = seconds
+            countdown_timer.set_remaining_seconds(seconds)
             load_dialog.close()
             ui.notify("加载成功", type="positive")
 
