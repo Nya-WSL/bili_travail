@@ -55,7 +55,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
-base_version = "1.36"
+base_version = "1.37"
 version = f"{base_version}.{ver_strftime}"
 
 logger = log.logger
@@ -404,6 +404,11 @@ class BiliHandler(blivedm.BaseHandler):
             base_config.save(config)
             GiftManager.set_room_id(room_id)
 
+            with main_card:
+                ui.notify("正在等待B站下发自定义礼物数据，请稍候...", type="info")
+                await asyncio.sleep(5) # 等待5秒B站发送自定义礼物数据
+                await refresh_gift(True) # 刷新礼物数据
+
             b_connect_switch.set_value(True)
             b_connect_switch.set_text("已连接弹幕服务器")
             logger.info(f"已连接至{room_id}")
@@ -419,7 +424,7 @@ class BiliHandler(blivedm.BaseHandler):
                 login_status.classes(replace="text-red")
 
     # 礼物数据
-    def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):
+    async def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):
         logger.debug("收到礼物")
         gift = message.gift_name
         num = message.gift_num
@@ -429,13 +434,13 @@ class BiliHandler(blivedm.BaseHandler):
         if len(uname) > 8:
             uname = uname[:5] + "..."
 
-        self._on_gift_play(gift, num, uname, message, price)
+        await self._on_gift_play(gift, num, uname, message, price)
         self._on_gift_statistics(gift, num, uname, price)
         logger.debug(message)
 
 
     # 舰队数据
-    def _on_open_live_buy_guard(self, client: blivedm.OpenLiveClient, message: open_models.GuardBuyMessage):
+    async def _on_open_live_buy_guard(self, client: blivedm.OpenLiveClient, message: open_models.GuardBuyMessage):
         gift = message.guard_level
         num = message.guard_num
         uname = message.user_info.uname
@@ -453,7 +458,7 @@ class BiliHandler(blivedm.BaseHandler):
         if len(uname) > 8:
             uname = uname[:5] + "..."
 
-        self._on_gift_play(gift, num, uname, False)
+        await self._on_gift_play(gift, num, uname, False)
         self._on_gift_statistics(gift, num, uname, price)
         logger.debug(message)
 
@@ -492,7 +497,7 @@ class BiliHandler(blivedm.BaseHandler):
             f.write(orjson.dumps(count, option=orjson.OPT_INDENT_2))
 
     # 收到礼物后执行函数
-    def _on_gift_play(self, gift, num, uname, message, price = 0):
+    async def _on_gift_play(self, gift, num, uname, message, price = 0):
         is_blind_box = False
 
         def blind_box_value(gift, num : int, price : int, box_name):
@@ -628,6 +633,7 @@ class BiliHandler(blivedm.BaseHandler):
                     with open("data/special.json", "rb") as f:
                         special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
+                    custom_gifts = await GiftManager.get_custom_gifts()
                     current_seconds = countdown_timer.remaining_seconds
 
                     if gift not in gifts and gift not in special:
@@ -693,10 +699,17 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, "清空", message)
 
                         if type(special[gift]) == list:
-                            total_changed_time = sum(
-                        random.randint(special[gift][0], special[gift][1] + 1)
-                                for _ in range(num)
-                            )
+                            if gift in custom_gifts:
+                                total_changed_time = sum(
+                            random.randint(special[gift][0], special[gift][1] + 1) * float(custom_gift_rate.value)
+                                    for _ in range(num)
+                                )
+                            else:
+                                total_changed_time = sum(
+                                    random.randint(special[gift][0], special[gift][1] + 1)
+                                    for _ in range(num)
+                                )
+
                             new_seconds = current_seconds + total_changed_time
 
                             if is_blind_box:
@@ -709,6 +722,10 @@ class BiliHandler(blivedm.BaseHandler):
 
                     elif gift in gifts:
                         delta_seconds = gifts[gift] * int(num)
+
+                        if gift in custom_gifts:
+                            delta_seconds = delta_seconds * float(custom_gift_rate.value)
+
                         new_seconds = countdown_timer.remaining_seconds + delta_seconds
                         gift_list_show_time = delta_seconds
 
@@ -830,6 +847,7 @@ class CountdownTimer:
         if self._running and self._paused:
             self._paused = False
             self._paused_event.set()  # 恢复计时器
+            self.set_remaining_seconds(app.storage.general["countdown_time"])
             update_btn_state("resume") # 更新按钮状态
             cd_status = True
 
@@ -851,20 +869,6 @@ class CountdownTimer:
                 self.remaining_time = datetime.timedelta(0)
                 cancel_button.set_text("停止")
                 cancel_button.disable()
-
-    # 设置倒计时
-    def set_time(self, time: datetime.datetime):
-        # 如果计时器正在运行，首先停止它
-        if self._running and self._task:
-            self._running = False
-            self._task.cancel() # 结束协程
-
-        # 设置倒计时
-        seconds = (time - datetime.datetime.now()).total_seconds()
-        self.set_remaining_seconds(seconds)
-
-        self._running = True
-        self._task = asyncio.create_task(self.update())
 
 def sort_dict(dictionary, type_order=None, sort_within_type=False):
     """
@@ -1640,13 +1644,14 @@ async def refresh_gift_loop():
         logger.error(result)
 
 # 更新礼物数据
-async def refresh_gift():
+async def refresh_gift(heartbeat=False):
     async def check_refresh():
         if auth_code.value == "":
             ui.notify("请输入身份码", type="negative")
             return
 
-        check_dialog.close()
+        if not heartbeat:
+            check_dialog.close()
 
         ui.notify("正在更新礼物数据，请稍后...", type="info")
 
@@ -1679,6 +1684,10 @@ async def refresh_gift():
         except Exception as e:
             logger.exception(f"使用本地数据重置失败：{e}")
             ui.notify("重置失败", type="negative")
+
+    if heartbeat:
+        await check_refresh()
+        return
 
     with ui.dialog() as check_dialog, ui.card(align_items="center"):
         ui.label("请不要在倒计时和投喂挑战功能运行时更新。")
@@ -2090,7 +2099,7 @@ def index():
     # 主界面GUI
     # ================================
 
-    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
+    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch, custom_gift_rate
 
     styles.page_styles() # 加载自定义样式
     async def ping_server():
@@ -2257,6 +2266,8 @@ def index():
 
     # 礼物设置弹窗
     with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
+        with ui.row():
+            custom_gift_rate = ui.number("自定义礼物暴击倍率", min=1, on_change=lambda: base_config.save(config), step=0.01).bind_value(config["num"], "custom_gift_rate")
         with ui.row():
             short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"')
             short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))

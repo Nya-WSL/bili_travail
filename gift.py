@@ -138,11 +138,31 @@ class BiliGiftManager:
                 if response.status == 200:
                     data = await response.json()
                     if data["code"] == 0:
-                        return data["data"]["gift_config"]["base_config"]["list"]
+                        return data["data"]["gift_config"]["base_config"]["list"] + data["data"]["gift_config"]["room_config"]
                     else:
                         logger.error(f"获取房间礼物失败：{data['message']}")
                 else:
                     logger.error(f"请求房间礼物失败：{response.status}")
+
+    async def get_custom_gifts(self):
+        """
+        获取自定义礼物列表
+        """
+
+        url = f"{base_config.get('api', 'server', 'http://api.travail.nya-wsl.cn')}/gift/custom_gifts"
+
+        async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data["code"] == 0:
+                        return data["data"]
+                    else:
+                        logger.error(f"获取自定义礼物列表失败: {data['message']}")
+                        return {}
+                else:
+                    logger.error(f"请求自定义礼物列表失败: {response.status} - {await response.text()}")
+                    return {}
 
     async def get_config(self, img_path = "data/gift_img.json"):
         try:
