@@ -22,7 +22,7 @@ def build():
         shutil.copy(os.path.join("data", i), save_file)
 
 def create_version():
-    version = datetime.datetime.now().strftime("%y%m%d%H%M")
+    version = datetime.datetime.now().strftime("%m%d%H")
     version_info = {}
     version_info["version"] = f"{base_version}.{version}"
 
