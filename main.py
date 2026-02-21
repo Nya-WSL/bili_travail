@@ -1610,6 +1610,58 @@ async def check_b_connect_status():
             b_connect_switch.set_value("null")
 
 
+async def get_notes():
+    '''
+    获取公告信息
+    '''
+    async def fetch_notes() -> list:
+        url = base_config.get("api", "server", None)
+
+        if url is None or url == "":
+            result = "未配置服务器地址，获取公告失败"
+            logger.error(result)
+            return
+
+        url = f"{url}/notes"
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)  # 10秒超时
+
+            async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result.get("data", [])
+                    else:
+                        error = await response.text()
+                        result = f"获取公告失败:{error}，状态码: {response.status}"
+                        logger.error(result)
+                        return []
+
+        except aiohttp.ClientError as e:
+            result = f"获取公告失败，发生网络错误: {e}"
+            logger.error(result + "\n" + traceback.format_exc())
+
+        except Exception as e:
+            result = f"获取公告失败，发生错误: {e}"
+            logger.error(result + "\n" + traceback.format_exc())
+
+    async def random_notes():
+        result = await fetch_notes()
+        local_notes = [
+            f'赠送自定义礼物可触发{base_config.get("num", "custom_gift_rate", None)}倍暴击！'
+        ]
+        if not result or result == [""]:
+            result = local_notes
+        else:
+            result.extend(local_notes)
+        note = random.choice(result)
+        notes_label.set_text(f"Tips: {note}")
+
+    notes_label = ui.label().classes("text-2xl font-extrabold").style(f"color: {config["color"]['text_color']}")
+    app.timer(5, random_notes) # 每5秒随机切换公告内容
+
+
 # 打开界面预览弹窗
 def open_capture():
     with ui.dialog() as dialog, ui.card(align_items="center"):
@@ -1621,6 +1673,7 @@ def open_capture():
             ui.button("关闭", on_click=lambda: dialog.close())
 
     dialog.open()
+
 
 async def refresh_gift_loop():
     if auth_code.value == "":
@@ -1642,6 +1695,7 @@ async def refresh_gift_loop():
         with main_card:
             ui.notify(result, type="negative")
         logger.error(result)
+
 
 # 更新礼物数据
 async def refresh_gift(heartbeat=False):
@@ -1700,6 +1754,7 @@ async def refresh_gift(heartbeat=False):
             ui.button("使用本地数据重置", on_click=lambda: reset_local_gift())
 
     check_dialog.open()
+
 
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail")
@@ -1862,6 +1917,8 @@ async def capture():
 
         ui.separator() # 分割线
 
+        await get_notes() # 获取公告信息
+
         # 创建礼物列表
         if not base_config.get("bool", "short_list", False):
             if gifts != {}:
@@ -1985,6 +2042,8 @@ async def capture():
             ui.label().bind_text_from(app.storage.general, "gift_challenge_text").style(f"color: {config["color"]['text_color']}").classes("text-5xl")
 
         ui.separator()
+
+        await get_notes() # 获取公告信息
 
         if gifts != {}:
             for k,v in gifts.items():
