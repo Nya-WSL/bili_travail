@@ -38,7 +38,8 @@ short_list = false # 是否启用简洁模式
 
 [num]
 short_time = 5 # 简洁模式滚动时间
-capture_gift_list_number = 3 # 收到礼物列表显示数量'''
+capture_gift_list_number = 3 # 收到礼物列表显示数量
+custom_gift_rate = 1.5 # 自定义礼物暴击倍率'''
         self.visited = set()  # 用于检测循环引用
         if not os.path.exists(self.file):
             self.default()
