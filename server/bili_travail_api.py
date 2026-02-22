@@ -191,27 +191,6 @@ async def index(request: StatRequest):
         print(traceback.format_exc())
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@app.get("/gift/custom_gifts", status_code=status.HTTP_200_OK)
-async def index():
-    try:
-        if not Path("custom_gifts.json").exists():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="自定义礼物不存在")
-
-        try:
-            with open("custom_gifts.json", "rb") as f:
-                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        except Exception as e:
-            return {"code": 1, "message": str(e)}
-
-        return {"code": 0, "data": data}
-
-    except HTTPException as he:
-        raise he
-
-    except Exception as e:
-        print(traceback.format_exc())
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
 @app.get("/notes", status_code=status.HTTP_200_OK)
 async def index():
     try:

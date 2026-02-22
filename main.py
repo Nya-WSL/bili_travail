@@ -633,7 +633,7 @@ class BiliHandler(blivedm.BaseHandler):
                     with open("data/special.json", "rb") as f:
                         special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-                    custom_gifts = await GiftManager.get_custom_gifts()
+                    custom_gifts = GiftManager.custom_gifts
                     current_seconds = countdown_timer.remaining_seconds
 
                     if gift not in gifts and gift not in special:
