@@ -1651,8 +1651,9 @@ async def get_notes():
         result = await fetch_notes()
         local_notes = []
         for i in GiftManager.custom_gifts:
-            if not re.search(i, str(local_notes)):
-                local_notes.append(f'赠送{i}可触发{app.storage.general["custom_gift_rate"][i]}倍暴击！')
+            for note in local_notes:
+                if not i in note:
+                    local_notes.append(f'赠送{i}可触发{app.storage.general["custom_gift_rate"][i]}倍暴击！')
         if not result or result == [""]:
             result = local_notes
         else:
@@ -1797,7 +1798,7 @@ async def capture():
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
             if k in GiftManager.custom_gifts:
-                v_label.set_text(f"{format_seconds(v)} 暴击{format_seconds(v * ( 1 - app.storage.general['custom_gift_rate'][k]))}")
+                v_label.set_text(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]))}")
             else:
                 v_label.set_text(format_seconds(v))
             k_label.classes(replace="text-3xl font-extrabold")
@@ -2338,7 +2339,7 @@ def index():
         with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
             ui.label("自定义礼物暴击倍率")
             for custom_gift in GiftManager.custom_gifts:
-                ui.number(custom_gift, min=1, step=0.01, value=1.5, on_change=lambda x: app.storage.general["custom_gift_rate"].update({custom_gift: x.value})).style("width: 150px").bind_value(app.storage.general["custom_gift_rate"], custom_gift)
+                ui.number(custom_gift, min=1, step=0.01, value=1.5).style("width: 150px").bind_value(app.storage.general["custom_gift_rate"], custom_gift)
 
             ui.separator()
 
