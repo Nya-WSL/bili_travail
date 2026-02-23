@@ -179,6 +179,7 @@ app.storage.general["countdown_time"] = app.storage.general.get("countdown_time"
 app.storage.general["version"] = app.storage.general.get("version", version)
 app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
 app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
+app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
 
 # ================================
 # 初始化配置文件
@@ -633,7 +634,7 @@ class BiliHandler(blivedm.BaseHandler):
                     with open("data/special.json", "rb") as f:
                         special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-                    custom_gifts = await GiftManager.get_custom_gifts()
+                    custom_gifts = GiftManager.custom_gifts
                     current_seconds = countdown_timer.remaining_seconds
 
                     if gift not in gifts and gift not in special:
@@ -701,7 +702,7 @@ class BiliHandler(blivedm.BaseHandler):
                         if type(special[gift]) == list:
                             if gift in custom_gifts:
                                 total_changed_time = sum(
-                            random.randint(special[gift][0], special[gift][1] + 1) * float(custom_gift_rate.value)
+                            random.randint(special[gift][0], special[gift][1] + 1) * float(app.storage.general["custom_gift_rate"][gift])
                                     for _ in range(num)
                                 )
                             else:
@@ -724,7 +725,7 @@ class BiliHandler(blivedm.BaseHandler):
                         delta_seconds = gifts[gift] * int(num)
 
                         if gift in custom_gifts:
-                            delta_seconds = delta_seconds * float(custom_gift_rate.value)
+                            delta_seconds = delta_seconds * float(app.storage.general["custom_gift_rate"][gift])
 
                         new_seconds = countdown_timer.remaining_seconds + delta_seconds
                         gift_list_show_time = delta_seconds
@@ -1610,6 +1611,67 @@ async def check_b_connect_status():
             b_connect_switch.set_value("null")
 
 
+async def get_notes():
+    '''
+    获取公告信息
+    '''
+    async def fetch_notes() -> list:
+        url = base_config.get("api", "server", None)
+
+        if url is None or url == "":
+            result = "未配置服务器地址，获取公告失败"
+            logger.error(result)
+            return
+
+        url = f"{url}/notes"
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)  # 10秒超时
+
+            async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return result.get("data", [])
+                    else:
+                        error = await response.text()
+                        result = f"获取公告失败:{error}，状态码: {response.status}"
+                        logger.error(result)
+                        return []
+
+        except aiohttp.ClientError as e:
+            result = f"获取公告失败，发生网络错误: {e}"
+            logger.error(result + "\n" + traceback.format_exc())
+
+        except Exception as e:
+            result = f"获取公告失败，发生错误: {e}"
+            logger.error(result + "\n" + traceback.format_exc())
+
+    async def random_notes():
+        result = await fetch_notes()
+        local_notes = result.copy()
+        for note in local_notes:
+            for i in GiftManager.custom_gifts:
+                if i in note:
+                    local_notes.pop(local_notes.index(note))
+                local_notes.append(
+                    f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
+                )
+
+        if local_notes:
+            if "" in local_notes:
+                local_notes.remove("")
+            note = random.choice(local_notes)
+            notes_label.set_text(f"Tips: {note}")
+
+    notes_label = (
+        ui.label()
+        .classes("text-2xl font-extrabold")
+        .style(f"color: {config['color']['text_color']}")
+    )
+    app.timer(5, random_notes)  # 每5秒随机切换公告内容
+
+
 # 打开界面预览弹窗
 def open_capture():
     with ui.dialog() as dialog, ui.card(align_items="center"):
@@ -1621,6 +1683,7 @@ def open_capture():
             ui.button("关闭", on_click=lambda: dialog.close())
 
     dialog.open()
+
 
 async def refresh_gift_loop():
     if auth_code.value == "":
@@ -1642,6 +1705,7 @@ async def refresh_gift_loop():
         with main_card:
             ui.notify(result, type="negative")
         logger.error(result)
+
 
 # 更新礼物数据
 async def refresh_gift(heartbeat=False):
@@ -1701,6 +1765,7 @@ async def refresh_gift(heartbeat=False):
 
     check_dialog.open()
 
+
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail")
 async def capture():
@@ -1737,7 +1802,10 @@ async def capture():
         if v_type == "normal":
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
-            v_label.set_text(format_seconds(v))
+            if k in GiftManager.custom_gifts:
+                v_label.set_text(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]))}")
+            else:
+                v_label.set_text(format_seconds(v))
             k_label.classes(replace="text-3xl font-extrabold")
             v_label.classes(replace="text-3xl font-extrabold")
 
@@ -1811,7 +1879,10 @@ async def capture():
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
                 k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                 ui.space()
-                v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
+                if k in GiftManager.custom_gifts:
+                    v_label = ui.label(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]))}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
+                else:
+                    v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
         if v_type == "list":
             with ui.row().classes('w-full'):
@@ -1861,6 +1932,8 @@ async def capture():
         ui.badge(outline=True, color="", text_color=config["color"]["time_color"]).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl") # 创建时钟
 
         ui.separator() # 分割线
+
+        await get_notes() # 获取公告信息
 
         # 创建礼物列表
         if not base_config.get("bool", "short_list", False):
@@ -1985,6 +2058,8 @@ async def capture():
             ui.label().bind_text_from(app.storage.general, "gift_challenge_text").style(f"color: {config["color"]['text_color']}").classes("text-5xl")
 
         ui.separator()
+
+        await get_notes() # 获取公告信息
 
         if gifts != {}:
             for k,v in gifts.items():
@@ -2265,22 +2340,29 @@ def index():
         load_dialog.on("hide", lambda: load_dialog.delete())
 
     # 礼物设置弹窗
-    with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
-        with ui.row():
-            custom_gift_rate = ui.number("自定义礼物暴击倍率", min=1, on_change=lambda: base_config.save(config), step=0.01).bind_value(config["num"], "custom_gift_rate")
-        with ui.row():
-            short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"')
-            short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
-            short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
-            if short_switch.value:
-                short_time.set_visibility(True)
-            else:
-                short_time.set_visibility(False)
-        with ui.row():
-            ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-            ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
-            ui.button("更新礼物", on_click=lambda: refresh_gift())
-        ui.button("关闭", on_click=lambda: gift_setting_dialog.close())
+    def gift_setting_dialog() -> ui.dialog:
+        with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
+            ui.label("自定义礼物暴击倍率")
+            for custom_gift in GiftManager.custom_gifts:
+                ui.number(custom_gift, min=1, step=0.01, value=1.5).style("width: 150px").bind_value(app.storage.general["custom_gift_rate"], custom_gift)
+
+            ui.separator()
+
+            with ui.row():
+                short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"')
+                short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
+                short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
+                if short_switch.value:
+                    short_time.set_visibility(True)
+                else:
+                    short_time.set_visibility(False)
+            with ui.row():
+                ui.button("加班设置", on_click=lambda: cd_setting_dialog())
+                ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
+                ui.button("更新礼物", on_click=lambda: refresh_gift())
+            ui.button("关闭", on_click=lambda: gift_setting_dialog.close())
+
+        return gift_setting_dialog
 
     # 统计相关弹窗
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
@@ -2370,7 +2452,7 @@ def index():
 
         # 按钮组
         with ui.row():
-            ui.button("礼物设置", on_click=lambda: gift_setting_dialog.open())
+            ui.button("礼物设置", on_click=lambda: gift_setting_dialog().open())
             ui.button("颜色设置", on_click=lambda: color_dialog.open())
             ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
             # Preview page button

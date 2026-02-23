@@ -22,7 +22,7 @@ def build():
         shutil.copy(os.path.join("data", i), save_file)
 
 def create_version():
-    version = datetime.datetime.now().strftime("%y%m%d%H%M")
+    version = datetime.datetime.now().strftime("%m%d%H")
     version_info = {}
     version_info["version"] = f"{base_version}.{version}"
 
@@ -33,7 +33,7 @@ def create_version():
 
     # 使用正则表达式替换版本
     pattern = r'"version":\s*(\d+)'
-    replacement = f'"version": {version}'
+    replacement = f'"version": "{version}"'
     new_content = re.sub(pattern, replacement, content)
 
     with open("env.py", 'w', encoding='utf-8') as f:
