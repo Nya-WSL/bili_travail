@@ -5,7 +5,7 @@ import json
 import shutil
 import datetime
 
-from main import base_version
+from version import base_version
 
 def build():
     create_version()
@@ -32,7 +32,7 @@ def create_version():
         content = f.read()
 
     # 使用正则表达式替换版本
-    pattern = r'"version":\s*(\d+)'
+    pattern = r'"version": *"[^"]*"'
     replacement = f'"version": "{version}"'
     new_content = re.sub(pattern, replacement, content)
 

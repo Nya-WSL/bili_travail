@@ -18,6 +18,7 @@ def get_key():
 
 import ping
 import styles
+import version
 import bili_api
 import travail_stat
 import dns_resolver
@@ -55,8 +56,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
-base_version = "1.37"
-version = f"{base_version}.{ver_strftime}"
+version = f"{version.base_version}.{ver_strftime}"
 
 logger = log.logger
 logger.debug("version: {}", version)
