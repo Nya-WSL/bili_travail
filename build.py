@@ -8,6 +8,45 @@ import datetime
 
 from pathlib import Path
 from version import base_version
+from qiniu import Auth, put_file, etag
+
+def upload(localfile, file_path, version="v1"):
+    '''
+    localfile: 本地文件路径
+
+    file_path: 上传到七牛云的文件路径
+
+    version: 版本号，默认为"v1", v2需分片
+    '''
+    try:
+        import env
+        data = env.get_key()
+
+        access_key = data["qiniu_access_key"]
+        secret_key = data["qiniu_secret_key"]
+
+        # 构建鉴权对象
+        q = Auth(access_key, secret_key)
+
+        # 要上传的空间
+        bucket_name = data["bucket_name"]
+
+        # 上传后保存的文件名
+        key = file_path
+
+        # 生成上传 Token，可以指定过期时间等
+        token = q.upload_token(bucket_name, key, 3600)
+
+        # 要上传文件的本地路径
+        localfile = localfile
+
+        res = put_file(token, key, localfile, version=version) # version参数指定上传版本，默认为v1，v2需分片上传
+        assert res['key'] == key, f"返回key不匹配: {res['key']} != {key}"
+        assert res['hash'] == etag(localfile), f"返回hash不匹配: {res['hash']} != {etag(localfile)}"
+        print("上传七牛云成功！")
+
+    except Exception as e:
+        print(f"上传七牛云失败: {e}")
 
 def compress(folder, output=None, parent=False):
     """
@@ -42,7 +81,14 @@ def compress(folder, output=None, parent=False):
     print(f"成功压缩到 '{output}'")
     return True
 
-def build():
+def build(qiniu_status: str ='y'):
+    '''
+    qiniu_status: 是否上传到七牛云，y=True, n=False, 留空为y
+    '''
+
+    import env
+    env_data = env.get_key()
+
     version = create_version(True)
     os.system("poetry run python package.py --name start --windowed --icon static/logo.ico main.py")
     shutil.copytree("static", Path("dist", "start", "static"))
@@ -68,6 +114,12 @@ def build():
     if compress(Path("dist", "update"), Path("dist", f"{version}.zip"), True):
         shutil.copy(Path("dist", f"{version}.zip"), Path("dist", f"update.zip"))
     shutil.rmtree(Path("dist", "update"))
+
+    if qiniu_status == 'y' or qiniu_status == '':
+        upload(Path("dist", f"{version}.zip"), f"bili_travail/update/{version}.zip", "v1")
+
+    if env_data.get("scp_url", ""): # 如果有scp_url，则上传到服务器
+        os.system(f'scp {Path("dist", "update.zip")} {env_data["scp_url"]}')
 
 def create_version(full: bool = False):
     '''
@@ -98,6 +150,11 @@ def create_version(full: bool = False):
 
 def create_env_file(key_id, key_secret, app_id):
     version = create_version()
+
+    access_key = input("请输入七牛云ACCESS_KEY：")
+    secret_key = input("请输入七牛云SECRET_KEY：")
+    scp_url = input("请输入SCP服务器URL（例：user@host:/path/），留空为无需上传：")
+
     with open("env.py", "w+", encoding="utf-8") as f:
         f.write(
             f"""def get_key():
@@ -105,7 +162,10 @@ def create_env_file(key_id, key_secret, app_id):
         "ACCESS_KEY_ID": "{key_id}",
         "ACCESS_KEY_SECRET": "{key_secret}",
         "APP_ID": {app_id},
-        "version": {version}
+        "qiniu_access_key": "{access_key}",
+        "qiniu_secret_key": "{secret_key}",
+        "scp_url": "{scp_url}",
+        "version": "{version}"
     }}"""
         )
 
@@ -116,15 +176,17 @@ def no_env():
 
     create_env_file(key_id, key_secret, app_id)
 
-    build()
+    build(qiniu_status.lower())
 
 def run():
+    global qiniu_status
     if os.path.exists("env.py"):
-        status = input("检测到已有env.py文件，是否使用？(y/n)：")
+        status = input("检测到已有env.py文件，是否使用？(y/n), 默认为y：")
+        qiniu_status = input("是否需要上传到七牛云？(y/n), 默认为y：")
         if status.lower() == 'n':
             no_env()
-        elif status.lower() == 'y':
-            build()
+        elif status.lower() == 'y' or status.lower() == '':
+            build(qiniu_status.lower())
         else:
             print("参数错误")
             time.sleep(3)
