@@ -21,19 +21,63 @@
 
 - 运行加班姬
 - 输入身份码
-- 更新礼物数据（初次运行时因为无法获取房间号，默认创建空的礼物数据）
+- 更新礼物数据
 - 设置礼物和玩法
 - OBS或哔哩哔哩直播姬添加浏览器源（url在控制面板最下方）
 - 开始倒计时（注：不连接弹幕服务器无法开始倒计时）
 
 ## Build
 
+### 环境
+
+- python 3.13.5
+
+#### clone project
+
 ```
 git clone https://github.com/Nya-WSL/bili_travail.git
 cd bili_travail
+```
+
+#### install depend
+
+- poetry
+
+```
 pip install poetry
+poetry config virtualenvs.in-project true # if need create virtualenv in project
 poetry install
-python build.py
+```
+
+- uv
+
+```
+# use uv
+
+# windows
+winget install --id=astral-sh.uv -e
+
+# macos
+# Note: maybe not support
+brew install uv
+
+# linux desktop
+# Note: maybe not support
+pipx install uv
+
+uv sync
+```
+
+#### build
+
+```
+# 如果使用mac，构建需要苹果开发者账号
+
+# poetry
+poetry run python build.py
+
+# uv
+uv run build.py
 
 # https://open-live.bilibili.com/open-manage
 input your access_key_id、access_key_secred、app_id
@@ -41,9 +85,9 @@ input your access_key_id、access_key_secred、app_id
 
 ## Known Issues
 
-- 获取房间礼物时可能会缺少部分礼物
+- 因为B站API数据不全，获取房间礼物时可能会缺少部分特殊礼物
 - 在极特殊的情况下可能会同时存在两个倒计时
 
-## Change Log
+## Changelog
 
 [changelog](https://github.com/Nya-WSL/bili_travail/blob/open_live/changelog.json)
