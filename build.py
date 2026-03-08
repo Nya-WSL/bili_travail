@@ -1,10 +1,12 @@
 import os
 import re
+import sys
 import time
 import json
 import shutil
 import zipfile
 import datetime
+import traceback
 
 from pathlib import Path
 from version import base_version
@@ -40,13 +42,14 @@ def upload(localfile, file_path, version="v1"):
         # 要上传文件的本地路径
         localfile = localfile
 
-        res = put_file(token, key, localfile, version=version) # version参数指定上传版本，默认为v1，v2需分片上传
-        assert res['key'] == key, f"返回key不匹配: {res['key']} != {key}"
-        assert res['hash'] == etag(localfile), f"返回hash不匹配: {res['hash']} != {etag(localfile)}"
+        ret, info = put_file(token, key, localfile, version=version)
+        assert ret['key'] == key, f"返回key不匹配: {ret['key']} != {key}"
+        assert ret['hash'] == etag(localfile), f"返回hash不匹配: {ret['hash']} != {etag(localfile)}"
         print("上传七牛云成功！")
 
     except Exception as e:
         print(f"上传七牛云失败: {e}")
+        print(traceback.format_exc())
 
 def compress(folder, output=None, parent=False):
     """
@@ -81,16 +84,21 @@ def compress(folder, output=None, parent=False):
     print(f"成功压缩到 '{output}'")
     return True
 
-def build(qiniu_status: str ='y'):
+def build(qiniu_status: str ='y', manager: str = "uv"):
     '''
     qiniu_status: 是否上传到七牛云，y=True, n=False, 留空为y
+
+    manager: 要使用的包管理器，"poetry" 或 "uv", 默认为"uv"
     '''
 
     import env
     env_data = env.get_key()
 
     version = create_version(True)
-    os.system("poetry run python package.py --name start --windowed --icon static/logo.ico main.py")
+    if manager == "poetry":
+        os.system("poetry run python package.py --name start --windowed --icon static/logo.ico main.py")
+    elif manager == "uv":
+        os.system("uv run package.py --name start --windowed --icon static/logo.ico main.py")
     shutil.copytree("static", Path("dist", "start", "static"))
 
     data = ["guard-level-3.png", "guard-level-2.png", "guard-level-1.png", "latiao.png"]
@@ -169,30 +177,41 @@ def create_env_file(key_id, key_secret, app_id):
     }}"""
         )
 
-def no_env():
+def no_env(qiniu_status: str ='y', manager: str = "uv"):
     key_id = input("请输入开放平台ACCESS_KEY_ID：")
     key_secret = input("请输入开放平台ACCESS_KEY_SECRET：")
     app_id = input("请输入开放平台APP_ID：")
 
     create_env_file(key_id, key_secret, app_id)
 
-    build(qiniu_status.lower())
+    build(qiniu_status.lower(), manager)
 
 def run():
-    global qiniu_status
+    if sys.argv[-1] == "poetry":
+        manager = "poetry"
+    else:
+        manager = "uv"
+
+    manager_confirm = input(f"包管理器为{manager}，是否确认？(y/n), 默认为y：")
+
+    if manager_confirm.lower() == 'n':
+        print("请重新运行并输入正确的包管理器")
+        sys.exit()
+
+    qiniu_status = input("是否需要上传到七牛云？(y/n), 默认为y：")
+
     if os.path.exists("env.py"):
         status = input("检测到已有env.py文件，是否使用？(y/n), 默认为y：")
-        qiniu_status = input("是否需要上传到七牛云？(y/n), 默认为y：")
         if status.lower() == 'n':
-            no_env()
+            no_env(qiniu_status.lower(), manager)
         elif status.lower() == 'y' or status.lower() == '':
-            build(qiniu_status.lower())
+            build(qiniu_status.lower(), manager)
         else:
             print("参数错误")
             time.sleep(3)
             run()
     else:
-        no_env()
+        no_env(qiniu_status.lower(), manager)
 
 if __name__ == "__main__":
     run()
