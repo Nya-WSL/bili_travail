@@ -18,10 +18,10 @@ def get_key():
 
 import ping
 import styles
-import version
 import bili_api
 import travail_stat
 import dns_resolver
+import version as base_ver
 
 import gift as get_gift
 import config as travail_config
@@ -56,7 +56,7 @@ from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
-version = f"{version.base_version}.{ver_strftime}"
+version = f"{base_ver.base_version}.{ver_strftime}"
 
 logger = log.logger
 logger.debug("version: {}", version)
@@ -1929,7 +1929,10 @@ async def capture():
 
     # 创建预览界面
     with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"): # 居中、背景透明、取消卡片阴影、置顶居中
-        ui.badge(outline=True, color="", text_color=config["color"]["time_color"]).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl") # 创建时钟
+        if not config["bool"]["borderless_cd"]:
+            ui.badge(outline=True, color="", text_color=config["color"]["time_color"]).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl") # 创建时钟
+        else:
+            ui.label().bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl").style(f"color: {config['color']['time_color']}") # 创建时钟
 
         ui.separator() # 分割线
 
@@ -2435,9 +2438,11 @@ def index():
                 with ui.row().classes("gap-0"):
                     ui.label("房间号：")
                     login_status = ui.label("未连接").classes("text-red")
+                b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
 
             with ui.column(align_items="center").classes("gap-0"):
-                b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+                with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
+                    ui.tooltip("启用时预览界面倒计时将不显示边框，仅显示数字")
                 show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: base_config.save(config))
                 show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
 
@@ -2524,7 +2529,7 @@ async def _():
     # Card框
     with ui.card(align_items="center").classes("absolute-center"):
         ui.label(f"B站加班姬").classes("text-3xl").style(f"color: {config["color"]['text_color']}")
-        ui.badge(f"{version}", outline=True)
+        ui.badge(version, outline=True)
 
         # 私货
         def read_or_create_file(file_path, default_content):
@@ -2646,7 +2651,7 @@ async def _():
         # 项目介绍
         ui.html('A Project of <u><a href="https://nya-wsl.com" target="_blank">Nya-WSL</a></u>.', sanitize=False)
         ui.html('Powered by <u><a href="https://nicegui.io" target="_blank">NiceGUI</a></u> - <u><a href="https://github.com/xfgryujk/blivedm" target="_blank">blivedm</a></u>.', sanitize=False)
-        ui.label("Copyright © 2025. All rights reserved. ")
+        ui.label("Copyright © 2025 - 2026. All rights reserved. ")
         ui.separator()
 
         # 成员显示
@@ -2711,6 +2716,6 @@ def shutdown():
 # 运行NiceGUI
 if __name__ == "__main__":
     try:
-        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 700], reconnect_timeout=30, language="zh-CN")
+        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 740], reconnect_timeout=30, language="zh-CN")
     except:
         logger.error(f"run error: {traceback.format_exc()}")
