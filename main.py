@@ -2245,7 +2245,7 @@ def index():
                 server = "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
 
             elif server in ["CN-QN", "hi168"]:
-                server = f"{source.get("url", {}).get(server)}/{status}.zip"
+                server = f'{source.get("url", {}).get(server)}/{status}.zip'
 
             await travail_update.update(server) # 调用更新函数
 
