@@ -49,6 +49,7 @@ import traceback
 import itertools
 
 from typing import *
+from copy import deepcopy
 from nicegui import ui, app
 from packaging import version as pack_version
 from nicegui import __version__ as gui_version
@@ -2180,12 +2181,7 @@ def index():
     global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch, custom_gift_rate
 
     styles.page_styles() # 加载自定义样式
-    async def ping_server():
-        servers = {
-            "GitHub": "github.com",
-            "CN-HK": "travail.nya-wsl.com",
-            "CN-QN": "qn.nya-wsl.cn"
-        }
+    async def ping_server(servers):
         server = await ping.ping(servers.values())
         if server:
             server_name = {v: k for k, v in servers.items()}.get(server, server)
@@ -2210,22 +2206,56 @@ def index():
 
     # 检查版本更新按钮
     async def check_update():
+        def get_source():
+            try:
+                response = requests.get("http://version.nya-wsl.cn/bili_travail/source.json")
+                if response.status_code == 200:
+                    data = response.json()
+                    return data
+                else:
+                    ui.notify("获取更新源失败，尝试自动检测可用更新源", type="negative")
+                    logger.error(f"获取更新源失败，状态码: {response.status_code}")
+                    data = {"auto": "自动检测"}
 
-        async def update(server, status):
+            except Exception as e:
+                logger.error(e)
+                data = {"auto": "自动检测"}
+
+            return data
+
+        async def update(source: dict, server: str):
             if server == "auto":
                 ui.notify(f"测速中，请稍候...", progress=True, timeout=3000, type="ongoing", color="blue-100")
-                server = await ping_server()
-                if server == False:
-                    ui.notify("无法连接更新服务器", type="negative")
-                    return
+                source_copy = deepcopy(source)
+                urls = source_copy.get("url", {})
+                if urls != {}:
+                    for k, v in urls.items():
+                        urls[k] = v.replace("https://", "").replace("http://", "").split("/")[0]
+                    server = await ping_server(urls)
 
-            await travail_update.update(server, status) # 调用更新函数
+                    if server == False:
+                        ui.notify("无法连接更新服务器", type="negative")
+                        return
+                else:
+                    server = None
+
+            if server == None:
+                logger.error("更新源为空")
+                ui.notify("更新源为空，将尝试从Github获取更新", type="negative")
+                server = "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
+
+            elif server in ["CN-QN", "hi168"]:
+                server = f"{source.get("url", {}).get(server)}/{status}.zip"
+
+            await travail_update.update(server) # 调用更新函数
 
         def version_dialog():
             with ui.dialog() as dialog, ui.card(align_items="center"):
                 ui.label(f"当前版本：{version} | 最新版本：{status}")
-                server_select = ui.select(options={"CN-HK": "国内源", "CN-QN": "国内备用源", "GitHub": "GitHub", "auto": "自动检测"}, label="选择更新源", value="auto").classes("w-1/2")
-                ui.button("更新", on_click=lambda: update(server_select.value, status))
+                source = get_source()
+                # server_select = ui.select(options={"auto": "自动检测", "hi168": "国内首选", "CN-HK": "国内备用", "CN-QN": "国内CDN", "GitHub": "GitHub"}, label="选择更新源", value="auto").classes("w-1/2")
+                server_select = ui.select(options=source.get("source", {"auto": "自动检测"}), label="选择更新源", value="auto").classes("w-1/2")
+                ui.button("更新", on_click=lambda: update(source, server_select.value))
                 for k,v in get_version().items():
                     with ui.timeline(side="right", layout="dense", color="btn"):
                         with ui.timeline_entry(title=f"Release of {k}", subtitle=v["date"]):

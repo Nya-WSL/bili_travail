@@ -10,7 +10,7 @@ from nicegui import ui, app
 
 file_name = "cache\\bili_travail_update.zip"
 
-async def update(server, version):
+async def update(zipUrl):
     if os.path.exists("update.bat"):
         os.remove("update.bat")
 
@@ -77,15 +77,6 @@ timeout /t 1 /nobreak
     with ui.dialog() as dialog, ui.card(align_items="center"):
         percent_dialog = ui.label("")
         cancelButton = ui.button("取消")
-        if server == "GitHub":
-            zipUrl = "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
-        elif server == "CN-HK":
-            zipUrl = "https://travail.nya-wsl.com/bili_travail/update/update.zip"
-        elif server == "CN-QN":
-            zipUrl = f"https://qn.nya-wsl.cn/bili_travail/update/{version}.zip"
-        else:
-            ui.notify("更新源不存在", type="negative")
-            return
         try:
             await download(zipUrl, file_name)
         except Exception as e:
