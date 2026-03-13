@@ -1,0 +1,15 @@
+{
+    "source": {
+        "auto": "自动检测",
+        "hi168": "中国首选",
+        "CN-HK": "中国香港",
+        "CN-QN": "全球CDN",
+        "GitHub": "GitHub"
+    },
+    "url": {
+        "CN-QN": "https://domain/update",
+        "hi168": "https://s3.hi168.com/存储桶名称/bili_travail",
+        "CN-HK": "https://domain/update.zip",
+        "GitHub": "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
+    }
+}
