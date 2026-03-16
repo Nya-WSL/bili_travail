@@ -150,7 +150,7 @@ async def hook(room_id, file: UploadFile = File(...)):
         file_path = room_dir / file.filename
 
         # 处理文件
-        with open(file_path, "w") as f:
+        with open(file_path, "wb") as f:
             f.write(contents)
 
         return {

@@ -1539,7 +1539,8 @@ async def upload_log(room_id):
                     error = await response.text()
                     result = f"日志上传失败，状态码: {response.status}"
                     ui.notify(result, type="negative")
-                    logger.error(result)
+                    logger.error(f"{result}")
+                    logger.error(f"服务器返回错误: {error}")
 
     except aiohttp.ClientError as e:
         result = "日志上传失败，发生网络错误: "
@@ -2507,11 +2508,13 @@ def index():
             ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
         with ui.label(f"http://{host}:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
             ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
+        with ui.link("https://docs.travail.nya-wsl.com", new_tab=True):
+            ui.tooltip("点击查看使用说明书")
 
         init_task()
 
     # about按钮
-    with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
+    with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=15):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @ui.page('/changelog')
@@ -2732,6 +2735,7 @@ async def _():
         ui.link("support@nya-wsl.com", "mailto:support@nya-wsl.com", True)
         ui.link("Nya-WSL服务与反馈群", "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
         ui.separator()
+        ui.link("使用文档", "https://docs.travail.nya-wsl.com", True)
         # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵', sanitize=False).classes("text-2xl text-white")
 
 @app.on_startup
@@ -2746,6 +2750,6 @@ def shutdown():
 # 运行NiceGUI
 if __name__ == "__main__":
     try:
-        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 740], reconnect_timeout=30, language="zh-CN")
+        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 780], reconnect_timeout=30, language="zh-CN")
     except:
         logger.error(f"run error: {traceback.format_exc()}")
