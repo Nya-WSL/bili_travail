@@ -1660,11 +1660,12 @@ async def get_notes():
                     f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
                 )
 
-        if local_notes:
+        if local_notes and local_notes != []: # 如果公告列表不为空
             if "" in local_notes:
                 local_notes.remove("")
-            note = random.choice(local_notes)
-            notes_label.set_text(f"Tips: {note}")
+            if local_notes != []: # 移除占位符后再次检查公告列表是否不为空
+                note = random.choice(local_notes)
+                notes_label.set_text(f"Tips: {note}")
 
     notes_label = (
         ui.label()
