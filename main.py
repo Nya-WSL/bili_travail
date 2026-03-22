@@ -1660,10 +1660,10 @@ async def get_notes():
                     f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
                 )
 
-        if local_notes and local_notes != []: # 如果公告列表不为空
-            if "" in local_notes:
-                local_notes.remove("")
-            if local_notes != []: # 移除占位符后再次检查公告列表是否不为空
+        if local_notes: # 如果公告列表不为空
+            # 过滤掉所有空字符串占位符
+            local_notes = [n for n in local_notes if n]
+            if local_notes:
                 note = random.choice(local_notes)
                 notes_label.set_text(f"Tips: {note}")
 
@@ -2019,6 +2019,12 @@ async def capture():
         def capture_cd_rank_list_show():
             def rule_to_seconds(rule):
                 """将规则字符串转换为秒数，处理小时、分钟、秒，并跳过包含'倍'的规则"""
+
+                # 首先检查输入是否为字符串，如果不是则返回None
+                if not isinstance(rule, str):
+                    return None
+                rule = rule.strip() # 去除字符串首尾的空白字符
+
                 # 如果规则包含"倍"字，则返回None表示跳过
                 if "倍" in rule:
                     return None
