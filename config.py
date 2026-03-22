@@ -34,6 +34,7 @@ text_color = "#000000" # 文字颜色
 [bool]
 remote_text = true # about页面对话框内容是否从服务器获取
 show_capture_gift_list = false # 是否启用收到礼物列表
+show_capture_rank_list = false # 是否启用排行榜
 short_list = false # 是否启用简洁模式
 borderless_cd = false # 倒计时是否无边框
 

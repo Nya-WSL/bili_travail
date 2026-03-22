@@ -1,7 +1,9 @@
 import os
 import re
-import aiohttp
 import orjson
+import asyncio
+import aiohttp
+
 import gift_mapping as gift_map
 
 import dns_resolver
@@ -20,6 +22,7 @@ class BiliGiftManager:
         self.area_parent_id = 0
         self.area_id = 0
         self.custom_gifts = []
+        self.wait_num = 0
 
     async def init_gift(self, img_path):
         """
@@ -139,6 +142,11 @@ class BiliGiftManager:
                 if response.status == 200:
                     data = await response.json()
                     if data["code"] == 0:
+                        if len(data["data"]["gift_config"]["room_config"]) == 1 and self.wait_num < 3: # 只有一个值一般是红包，大概率还未下发自定义礼物数据，继续等待，最多等待3次避免无限递归
+                            self.wait_num += 1
+                            logger.warning(f"房间{self.room_id}的自定义礼物数据可能还未下发，继续等待...")
+                            await asyncio.sleep(5)
+                            await self.get_room_gift(platform)
                         for gift in data["data"]["gift_config"]["room_config"]:
                             if gift["corner_mark"] == "玩法":
                                 if gift["name"] not in self.custom_gifts:

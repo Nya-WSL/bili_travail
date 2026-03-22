@@ -1660,11 +1660,12 @@ async def get_notes():
                     f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
                 )
 
-        if local_notes:
-            if "" in local_notes:
-                local_notes.remove("")
-            note = random.choice(local_notes)
-            notes_label.set_text(f"Tips: {note}")
+        if local_notes: # 如果公告列表不为空
+            # 过滤掉所有空字符串占位符
+            local_notes = [n for n in local_notes if n]
+            if local_notes:
+                note = random.choice(local_notes)
+                notes_label.set_text(f"Tips: {note}")
 
     notes_label = (
         ui.label()
@@ -1771,7 +1772,7 @@ async def refresh_gift(heartbeat=False):
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail")
 async def capture():
-    global capture_cd_gift_list_show, capture_cd_is_created
+    global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created
 
     styles.page_styles() # 加载自定义样式
     # 检查是否需要刷新页面
@@ -1805,7 +1806,7 @@ async def capture():
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
             if k in GiftManager.custom_gifts:
-                v_label.set_text(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]))}")
+                v_label.set_text(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]) + v)}")
             else:
                 v_label.set_text(format_seconds(v))
             k_label.classes(replace="text-3xl font-extrabold")
@@ -1882,7 +1883,7 @@ async def capture():
                 k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                 ui.space()
                 if k in GiftManager.custom_gifts:
-                    v_label = ui.label(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]))}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
+                    v_label = ui.label(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]) + v)}").classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                 else:
                     v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
@@ -1997,7 +1998,9 @@ async def capture():
                             gift_rule = data["rule"]
                             gift_name = data["gift"]
                             gift_img = data["url"]
+                            gift_time = data["time"]
 
+                            ui.label(f"{gift_time}").classes("text-xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                             ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config["color"]['text_color']}")
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
@@ -2011,6 +2014,102 @@ async def capture():
                             ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config["color"]['text_color']}")
 
                 capture_gift_scroll.scroll_to(percent=1, duration=0.5)
+                capture_cd_rank_list_show() # 每次有新礼物时更新排行榜
+
+        def capture_cd_rank_list_show():
+            def rule_to_seconds(rule):
+                """将规则字符串转换为秒数，处理小时、分钟、秒，并跳过包含'倍'的规则"""
+
+                # 首先检查输入是否为字符串，如果不是则返回None
+                if not isinstance(rule, str):
+                    return None
+                rule = rule.strip() # 去除字符串首尾的空白字符
+
+                # 如果规则包含"倍"字，则返回None表示跳过
+                if "倍" in rule:
+                    return None
+
+                # 提取符号
+                sign = 1
+                if rule.startswith('-'):
+                    sign = -1
+                    rule = rule[1:]  # 移除负号
+                elif rule.startswith('+'):
+                    rule = rule[1:]  # 移除正号
+
+                # 初始化时间单位
+                hours = 0
+                minutes = 0
+                seconds = 0
+
+                # 使用正则表达式匹配小时、分钟、秒
+                # 匹配小时（支持"小时"或"时"）
+                hour_match = re.search(r'(\d+)(?:小时|时)', rule)
+                if hour_match:
+                    hours = int(hour_match.group(1))
+                    rule = rule.replace(hour_match.group(0), '')  # 移除已匹配部分
+
+                # 匹配分钟
+                minute_match = re.search(r'(\d+)分', rule)
+                if minute_match:
+                    minutes = int(minute_match.group(1))
+                    rule = rule.replace(minute_match.group(0), '')  # 移除已匹配部分
+
+                # 匹配秒
+                second_match = re.search(r'(\d+)秒', rule)
+                if second_match:
+                    seconds = int(second_match.group(1))
+                    rule = rule.replace(second_match.group(0), '')  # 移除已匹配部分
+
+                # 如果规则字符串中只有数字（可能是单独的秒数，如"+30"表示30秒）
+                remaining = rule.strip()
+                if remaining.isdigit():
+                    seconds += int(remaining)
+
+                # 计算总秒数
+                total_seconds = hours * 3600 + minutes * 60 + seconds
+
+                return sign * total_seconds
+
+            if not base_config.get("bool", "show_capture_rank_list", False):
+                rank_card.set_visibility(False)
+            else:
+                rank_card.set_visibility(True)
+                capture_rank_scroll.clear()
+
+            # 如果礼物历史数据不存在，直接返回
+            if not os.path.exists("data/gift_history.json"):
+                return
+
+            with open("data/gift_history.json", "rb") as f:
+                gift_history = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
+            rank_dict = {}
+
+            for i in gift_history["cd"]:
+                if not i["name"] in rank_dict:
+                    rank_dict[i["name"]] = 0
+                seconds = rule_to_seconds(i["rule"])
+                if seconds is not None:
+                    rank_dict[i["name"]] += seconds
+
+            with capture_rank_scroll:
+                trophy_color = ["#FFD43B", "#C0C0C0", "#CD7F32"]
+                for name, seconds in sorted(rank_dict.items(), key=lambda x: x[1], reverse=True)[:3]:
+                    with ui.row().classes("w-full"):
+                        ui.icon("emoji_events",size="30px", color=trophy_color[0])
+                        trophy_color.pop(0)
+                        ui.label(f"{name}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")
+                        ui.space()
+                        ui.label(format_seconds(seconds)).classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")
+
+            capture_rank_scroll.scroll_to(percent=1, duration=0.5)
+
+        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as rank_card:
+            with ui.scroll_area().classes('h-40 w-full') as capture_rank_scroll:
+                ui.label().set_visibility(False)
+
+        capture_cd_rank_list_show()
 
         with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
             with ui.scroll_area().classes('h-32 w-full') as capture_gift_scroll:
@@ -2472,12 +2571,15 @@ def index():
                 b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
 
             with ui.column(align_items="center").classes("gap-0"):
-                with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
-                    ui.tooltip("启用时预览界面倒计时将不显示边框，仅显示数字")
+                show_capture_rank_list_switch = ui.switch("OBS显示排行榜", value=False, on_change=lambda: base_config.save(config))
+                show_capture_rank_list_switch.bind_value(config["bool"], "show_capture_rank_list").props('color="btn"')
+
                 show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: base_config.save(config))
                 show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
 
             with ui.column(align_items="center").classes("gap-0"):
+                with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
+                    ui.tooltip("启用时预览界面倒计时将不显示边框，仅显示数字")
                 with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
                     ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
 
