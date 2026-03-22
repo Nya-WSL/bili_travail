@@ -116,8 +116,8 @@ def build(qiniu_status: str ='y', manager: str = "uv"):
         print("没有找到头像缓存文件，跳过复制")
 
     # 创建版本压缩包
-    if compress(Path("dist", "start"), Path("dist", f"bili_travail_{version}.zip")):
-        shutil.copy(Path("dist", f"bili_travail_{version}.zip"), Path("dist", f"B站加班姬_{version}.zip"))
+    if compress(Path("dist", "start"), Path("dist", f"bili_travail.zip")):
+        shutil.copy(Path("dist", f"bili_travail.zip"), Path("dist", f"B站加班姬_{version}.zip"))
     shutil.copytree(Path("dist", "start"), Path("dist", "update"))
     if compress(Path("dist", "update"), Path("dist", f"{version}.zip"), True):
         shutil.copy(Path("dist", f"{version}.zip"), Path("dist", f"update.zip"))
