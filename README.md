@@ -83,9 +83,11 @@ uv run build.py
 input your access_key_id、access_key_secred、app_id
 ```
 
-- 如果使用Nuitka编译需安装 `Visual Studio 2022 or higher`，并选择 `使用 C++ 的桌面开发`，在单个组件中勾选 `MSVC v*** - VS YYYY C++ x64/x86 生成工具(v***)` 或 `适用于Windows的 C++ Clang 编译器` + `Windows 11 SDK`
-
-- 或者可以尝试将Python版本降级至3.12及以下，使用从Nuitka下载的 `MinGW64` 编译器（如果Visual Studio无法安装，Nuitka似乎会自动安装该编译器）
+> 如果使用Nuitka编译需安装 `Visual Studio 2022 or higher`，并选择 `使用 C++ 的桌面开发`，在单个组件中勾选 `MSVC v*** - VS YYYY C++ x64/x86 生成工具(v***)` 或 `适用于Windows的 C++ Clang 编译器`
+>
+> 无论安装MSVC还是Clang都必须勾选 `Windows 11 SDK`
+>
+> 或者可以尝试将Python版本降级至3.12及以下，使用从Nuitka下载的 `MinGW64` 编译器（如果Visual Studio无法安装，Nuitka似乎会自动安装该编译器）
 
 ## Known Issues
 
