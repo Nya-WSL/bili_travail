@@ -84,22 +84,48 @@ def compress(folder, output=None, parent=False):
     print(f"成功压缩到 '{output}'")
     return True
 
-def build(qiniu_status: str ='y', manager: str = "uv"):
+def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_status: str = 'y'):
     '''
     qiniu_status: 是否上传到七牛云，y=True, n=False, 留空为y
 
     manager: 要使用的包管理器，"poetry" 或 "uv", 默认为"uv"
+
+    nuitka: 是否使用Nuitka编译，如果不使用Nuitka则使用pyinstaller，y=True, n=False, 留空为n
+
+    upload_status: 是否上传到服务器，y=True, n=False, 留空为y
     '''
 
     import env
     env_data = env.get_key()
 
+    main_py = "main.py"
+
     version = create_version(True)
+
     if manager == "poetry":
-        os.system("poetry run python package.py --name start --windowed --icon static/logo.ico main.py")
+        if nuitka == 'y':
+            shutil.rmtree(Path("dist", "start"), ignore_errors=True)
+            os.mkdir(Path("dist", "start"))
+            start_time = time.time()
+            os.system(f"poetry run python -m nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --report=dist/compilation-report.xml --output-dir=dist --output-filename=start.exe")
+            end_time = time.time()
+            print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
+            shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
+        else:
+            os.system(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}")
     elif manager == "uv":
-        os.system("uv run package.py --name start --windowed --icon static/logo.ico main.py")
-    shutil.copytree("static", Path("dist", "start", "static"))
+        if nuitka == 'y':
+            shutil.rmtree(Path("dist", "start"), ignore_errors=True)
+            os.mkdir(Path("dist", "start"))
+            start_time = time.time()
+            os.system(f"uv run nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --report=dist/compilation-report.xml --output-dir=dist --output-filename=start.exe")
+            end_time = time.time()
+            print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
+            shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
+        else:
+            os.system(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}")
+
+    shutil.copytree("static", Path("dist", "start", "static"), dirs_exist_ok=True)
 
     data = ["guard-level-3.png", "guard-level-2.png", "guard-level-1.png", "latiao.png"]
 
@@ -126,8 +152,11 @@ def build(qiniu_status: str ='y', manager: str = "uv"):
     if qiniu_status == 'y' or qiniu_status == '':
         upload(Path("dist", f"{version}.zip"), f"bili_travail/update/{version}.zip", "v1")
 
-    if env_data.get("scp_url", ""): # 如果有scp_url，则上传到服务器
-        os.system(f'scp {Path("dist", "update.zip")} {env_data["scp_url"]}')
+    if upload_status == 'y' or upload_status == '':
+        if env_data.get("scp_url", ""):
+            os.system(f'scp {Path("dist", "update.zip")} {env_data["scp_url"]}')
+        else:
+            print("未配置scp_url，无法上传到服务器")
 
 def create_version(full: bool = False):
     '''
@@ -177,14 +206,14 @@ def create_env_file(key_id, key_secret, app_id):
     }}"""
         )
 
-def no_env(qiniu_status: str ='y', manager: str = "uv"):
+def no_env(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_status: str = 'y'):
     key_id = input("请输入开放平台ACCESS_KEY_ID：")
     key_secret = input("请输入开放平台ACCESS_KEY_SECRET：")
     app_id = input("请输入开放平台APP_ID：")
 
     create_env_file(key_id, key_secret, app_id)
 
-    build(qiniu_status.lower(), manager)
+    build(qiniu_status.lower(), manager, nuitka.lower(), upload_status.lower())
 
 def run():
     if sys.argv[-1] == "poetry":
@@ -198,20 +227,29 @@ def run():
         print("请重新运行并输入正确的包管理器")
         sys.exit()
 
+    nuitka_status = input("是否使用nuitka编译？(y/n), 默认为n：")
+
+    if nuitka_status.lower() == 'y':
+        print(f"将使用Nuitka编译，目录：{Path('dist', 'start')}")
+        print("Nuitka编译较慢，请耐心等待...")
+    else:
+        print(f"将使用PyInstaller打包，目录：{Path('dist', 'start')}")
+
     qiniu_status = input("是否需要上传到七牛云？(y/n), 默认为y：")
+    upload_status = input("是否需要上传到服务器？(y/n), 默认为y：")
 
     if os.path.exists("env.py"):
         status = input("检测到已有env.py文件，是否使用？(y/n), 默认为y：")
         if status.lower() == 'n':
-            no_env(qiniu_status.lower(), manager)
+            no_env(qiniu_status.lower(), manager, nuitka_status.lower(), upload_status.lower())
         elif status.lower() == 'y' or status.lower() == '':
-            build(qiniu_status.lower(), manager)
+            build(qiniu_status.lower(), manager, nuitka_status.lower(), upload_status.lower())
         else:
             print("参数错误")
             time.sleep(3)
             run()
     else:
-        no_env(qiniu_status.lower(), manager)
+        no_env(qiniu_status.lower(), manager, nuitka_status.lower(), upload_status.lower())
 
 if __name__ == "__main__":
     run()
