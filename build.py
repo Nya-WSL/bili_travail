@@ -125,6 +125,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
         else:
             os.system(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}")
 
+    shutil.copy("check_runtime.ps1", Path("dist", "start", "check_runtime.ps1"))
     shutil.copytree("static", Path("dist", "start", "static"), dirs_exist_ok=True)
 
     data = ["guard-level-3.png", "guard-level-2.png", "guard-level-1.png", "latiao.png"]
