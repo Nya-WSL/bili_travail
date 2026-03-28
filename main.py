@@ -21,6 +21,7 @@ import styles
 import bili_api
 import travail_stat
 import dns_resolver
+import check_runtime
 import version as base_ver
 
 import gift as get_gift
@@ -36,12 +37,10 @@ from changelog import changelog, get_log
 # Third Party Packages
 import os
 import re
-import sys
 import orjson
 import shutil
 import random
 import psutil
-import uvicorn
 import cpuinfo
 import asyncio
 import aiohttp
@@ -2854,6 +2853,9 @@ def shutdown():
 # 运行NiceGUI
 if __name__ == "__main__":
     try:
+        logger.info("正在检查Edge WebView2 runtime...")
+        asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
+
         ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 780], reconnect_timeout=30, language="zh-CN", use_colors=False)
     except:
         logger.error(f"run error: {traceback.format_exc()}")
