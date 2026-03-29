@@ -1,4 +1,11 @@
 {
+    "1.38.032920": {
+        "date": "2026-03-29",
+        "content": [
+            "启动主窗口前会检查是否安装Edge Webview2 runtime",
+            "新增手动检测Edge Webview2 runtime的ps脚本"
+        ]
+    },
     "1.38.032801": {
         "date": "2026-03-28",
         "content": [
