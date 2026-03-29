@@ -2,10 +2,13 @@ import os
 import log
 import winreg
 import aiohttp
+import tempfile
 import traceback
 import dns_resolver
 
 logger = log.logger
+
+install_path = os.path.join(tempfile.gettempdir(), "MicrosoftEdgeWebview2Setup.exe")
 
 def webview2_check():
     """
@@ -46,7 +49,7 @@ async def download_webview2():
             async with session.get("https://go.microsoft.com/fwlink/p/?LinkId=2124703") as response:
                 if response.status == 200:
                     logger.info("正在下载 Edge WebView2 runtime 常青在线安装程序")
-                    with open("MicrosoftEdgeWebview2Setup.exe", "wb") as f:
+                    with open(install_path, "wb") as f:
                         f.write(await response.read())
                     logger.info("Edge WebView2 runtime 常青在线安装程序下载完成")
                     return True
@@ -64,17 +67,24 @@ async def check_runtime():
     """
     if not webview2_check():
         logger.warning("未检测到 Edge WebView2 runtime，正在安装...")
-        winget_status = os.system("winget --version >nul 2>&1")
+        winget_status = os.system("winget --version >null 2>&1")
 
-        if winget_status == 0:
-            logger.info("检测到 winget，正在安装 Edge WebView2 runtime...")
-            os.system("winget install Microsoft.EdgeWebview2Runtime --accept-source-agreements --accept-package-agreements")
-            return True
-        else:
+        try:
+            if winget_status == 0:
+                logger.info("检测到 winget，正在安装 Edge WebView2 runtime...")
+                winget_status = os.system("winget install Microsoft.EdgeWebview2Runtime --accept-source-agreements --accept-package-agreements >null 2>&1")
+                if winget_status == 0:
+                    logger.info("Edge WebView2 runtime 安装成功")
+                    return True
+                else:
+                    logger.error("使用 winget 安装 Edge WebView2 runtime 失败，错误代码: {winget_status}")
+                    raise Exception("winget 安装失败")
+        except:
             logger.warning("未检测到 winget，尝试使用在线安装程序安装...")
             download_status = await download_webview2()
             if download_status:
-                os.system("MicrosoftEdgeWebview2Setup.exe")
+                logger.info("正在安装 Edge WebView2 runtime...")
+                os.system(install_path)
                 return True
             else:
                 logger.error("无法下载 Edge WebView2 runtime，请手动安装")
