@@ -1,12 +1,11 @@
 import os
-import log
 import winreg
 import aiohttp
 import tempfile
 import traceback
-import dns_resolver
 
-logger = log.logger
+from .log import logger
+from . import dns_resolver
 
 install_path = os.path.join(tempfile.gettempdir(), "MicrosoftEdgeWebview2Setup.exe")
 

@@ -1,5 +1,5 @@
 # Local Packages
-import log
+from libs import log
 
 try:
     # 该模块在打包时填入密钥后自动生成
@@ -16,23 +16,24 @@ def get_key():
 """)
     import env # type: ignore
 
-import ping
-import styles
-import bili_api
-import travail_stat
-import dns_resolver
-import check_runtime
 import version as base_ver
+import libs.config as travail_config
 
-import gift as get_gift
-import config as travail_config
-import update as travail_update
-import gift_mapping as gift_map
 import blivedm.blivedm.models.web as web_models
 import blivedm.blivedm.models.open_live as open_models
 
+from libs import ping
+from libs import styles
+from libs import bili_api
+from libs import travail_stat
+from libs import dns_resolver
+from libs import check_runtime
+from libs import gift as get_gift
+from libs import update as travail_update
+from libs import gift_mapping as gift_map
+from libs.changelog import changelog, get_log
+
 from blivedm import blivedm
-from changelog import changelog, get_log
 
 # Third Party Packages
 import os
@@ -265,18 +266,18 @@ async def init_config():
     """
     初始化礼物数据
     """
-    # 确保礼物数据文件存在，如果不存在，则先初始化礼物数据
-    if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
-        # 如果配置文件中包含房间号，则传入；否则会直接初始化空数据
-        room_id = base_config.get("general", "room_id", "")
+    # # 确保礼物数据文件存在，如果不存在，则先初始化礼物数据
+    # if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
+    #     # 如果配置文件中包含房间号，则传入；否则会直接初始化空数据
+    #     room_id = base_config.get("general", "room_id", "")
 
-        # 如果配置文件中有room_id，则使用该房间号
-        if room_id:
-            GiftManager.set_room_id(room_id)
-            gift_config = await GiftManager.get_config("data/gift_img.json") # 使用B站api
-            # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
-            if not gift_config:
-                await GiftManager.init_gift("data/gift_img.json")
+    #     # 如果配置文件中有room_id，则使用该房间号
+    #     if room_id:
+    #         GiftManager.set_room_id(room_id)
+    #         gift_config = await GiftManager.get_config("data/gift_img.json") # 使用B站api
+    #         # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
+    #         if not gift_config:
+    #             await GiftManager.init_gift("data/gift_img.json")
 
     # 初始化数据
     if not os.path.exists("data/gift_img.json"):
@@ -1690,8 +1691,8 @@ def open_capture():
 
 
 async def refresh_gift_loop():
-    if auth_code.value == "":
-        logger.warning("身份码为空，跳过礼物更新")
+    if auth_code.value == "" or b_connect_status == False:
+        logger.warning("身份码为空或未连接弹幕服务器，跳过礼物更新")
         return
 
     gift_config = await GiftManager.get_config("data/gift_img.json")
@@ -2498,6 +2499,12 @@ def index():
 
         return gift_setting_dialog
 
+    def changelog_dialog() -> ui.dialog:
+        with ui.dialog() as changelog_dialog, ui.card(align_items="center"):
+            changelog()
+
+        return changelog_dialog
+
     # 统计相关弹窗
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
         with ui.row():
@@ -2516,7 +2523,7 @@ def index():
 
     if app.storage.general["version"] != version: # 如果版本号不一致
         app.storage.general["version"] = version # 更新版本号
-        ui.navigate.to("/changelog") # 跳转到更新日志页面
+        changelog_dialog().open() # 打开更新日志弹窗
 
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
@@ -2603,7 +2610,7 @@ def index():
             # Update version button
             ui.button("检查更新", on_click=lambda: check_update())
             # Changelog button
-            ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
+            ui.button("更新日志", on_click=lambda: changelog_dialog().open())
             ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
 
         # obs源
@@ -2619,11 +2626,6 @@ def index():
     # about按钮
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=15):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
-
-@ui.page('/changelog')
-def _():
-    styles.page_styles() # 加载自定义样式
-    changelog()
 
 @ui.page('/count')
 def _():
