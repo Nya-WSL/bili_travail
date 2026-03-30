@@ -1691,8 +1691,8 @@ def open_capture():
 
 
 async def refresh_gift_loop():
-    if auth_code.value == "":
-        logger.warning("身份码为空，跳过礼物更新")
+    if auth_code.value == "" and b_connect_status == False:
+        logger.warning("身份码为空或未连接弹幕服务器，跳过礼物更新")
         return
 
     gift_config = await GiftManager.get_config("data/gift_img.json")
