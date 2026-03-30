@@ -2499,6 +2499,12 @@ def index():
 
         return gift_setting_dialog
 
+    def changelog_dialog() -> ui.dialog:
+        with ui.dialog() as changelog_dialog, ui.card(align_items="center"):
+            changelog()
+
+        changelog_dialog.open()
+
     # 统计相关弹窗
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
         with ui.row():
@@ -2517,7 +2523,7 @@ def index():
 
     if app.storage.general["version"] != version: # 如果版本号不一致
         app.storage.general["version"] = version # 更新版本号
-        ui.navigate.to("/changelog") # 跳转到更新日志页面
+        changelog_dialog() # 打开更新日志弹窗
 
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
@@ -2604,7 +2610,7 @@ def index():
             # Update version button
             ui.button("检查更新", on_click=lambda: check_update())
             # Changelog button
-            ui.button("更新日志", on_click=lambda: ui.navigate.to("/changelog"))
+            ui.button("更新日志", on_click=lambda: changelog_dialog())
             ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
 
         # obs源
@@ -2620,11 +2626,6 @@ def index():
     # about按钮
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=15):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
-
-@ui.page('/changelog')
-def _():
-    styles.page_styles() # 加载自定义样式
-    changelog()
 
 @ui.page('/count')
 def _():
