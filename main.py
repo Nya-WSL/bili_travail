@@ -266,18 +266,18 @@ async def init_config():
     """
     初始化礼物数据
     """
-    # 确保礼物数据文件存在，如果不存在，则先初始化礼物数据
-    if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
-        # 如果配置文件中包含房间号，则传入；否则会直接初始化空数据
-        room_id = base_config.get("general", "room_id", "")
+    # # 确保礼物数据文件存在，如果不存在，则先初始化礼物数据
+    # if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
+    #     # 如果配置文件中包含房间号，则传入；否则会直接初始化空数据
+    #     room_id = base_config.get("general", "room_id", "")
 
-        # 如果配置文件中有room_id，则使用该房间号
-        if room_id:
-            GiftManager.set_room_id(room_id)
-            gift_config = await GiftManager.get_config("data/gift_img.json") # 使用B站api
-            # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
-            if not gift_config:
-                await GiftManager.init_gift("data/gift_img.json")
+    #     # 如果配置文件中有room_id，则使用该房间号
+    #     if room_id:
+    #         GiftManager.set_room_id(room_id)
+    #         gift_config = await GiftManager.get_config("data/gift_img.json") # 使用B站api
+    #         # 如获取B站礼物数据失败，则从Nya-WSL服务器或本地注入方式写入
+    #         if not gift_config:
+    #             await GiftManager.init_gift("data/gift_img.json")
 
     # 初始化数据
     if not os.path.exists("data/gift_img.json"):
