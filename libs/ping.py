@@ -1,6 +1,7 @@
 import asyncio
+
+from .log import logger
 from icmplib import async_ping, Host, exceptions
-from log import logger
 from typing import List, Tuple, Dict, Optional, Any
 
 

@@ -1,5 +1,5 @@
 # Local Packages
-import log
+from libs import log
 
 try:
     # 该模块在打包时填入密钥后自动生成
@@ -16,23 +16,24 @@ def get_key():
 """)
     import env # type: ignore
 
-import ping
-import styles
-import bili_api
-import travail_stat
-import dns_resolver
-import check_runtime
 import version as base_ver
+import libs.config as travail_config
 
-import gift as get_gift
-import config as travail_config
-import update as travail_update
-import gift_mapping as gift_map
 import blivedm.blivedm.models.web as web_models
 import blivedm.blivedm.models.open_live as open_models
 
+from libs import ping
+from libs import styles
+from libs import bili_api
+from libs import travail_stat
+from libs import dns_resolver
+from libs import check_runtime
+from libs import gift as get_gift
+from libs import update as travail_update
+from libs import gift_mapping as gift_map
+from libs.changelog import changelog, get_log
+
 from blivedm import blivedm
-from changelog import changelog, get_log
 
 # Third Party Packages
 import os

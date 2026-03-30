@@ -4,11 +4,10 @@ import orjson
 import asyncio
 import aiohttp
 
-import gift_mapping as gift_map
-
-import dns_resolver
-import config as travail_config
-from log import logger
+from .log import logger
+from . import dns_resolver
+from . import gift_mapping as gift_map
+from . import config as travail_config
 
 base_config = travail_config.Config()
 

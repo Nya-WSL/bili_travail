@@ -2,7 +2,7 @@ import requests
 
 from nicegui import ui
 
-import config as travail_config
+from . import config as travail_config
 
 def get_log() -> dict:
     url = "http://version.nya-wsl.cn/bili_travail/changelog.json"

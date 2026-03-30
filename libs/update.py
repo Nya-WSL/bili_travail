@@ -3,9 +3,8 @@ import aiohttp
 import zipfile
 import asyncio
 
-import dns_resolver
-
-from log import logger
+from .log import logger
+from . import dns_resolver
 from nicegui import ui, app
 
 file_name = "cache\\bili_travail_update.zip"
