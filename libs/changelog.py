@@ -2,14 +2,19 @@ import requests
 
 from nicegui import ui
 
+from .log import logger
 from . import config as travail_config
 
 def get_log() -> dict:
     url = "http://version.nya-wsl.cn/bili_travail/changelog.json"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
+    try:
+        response = requests.get(url, timeout=30)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {}
+    except Exception as e:
+        logger.error(f"获取更新日志失败: {e}")
         return {}
 
 
