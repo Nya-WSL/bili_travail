@@ -1691,7 +1691,7 @@ def open_capture():
 
 
 async def refresh_gift_loop():
-    if auth_code.value == "" and b_connect_status == False:
+    if auth_code.value == "" or b_connect_status == False:
         logger.warning("身份码为空或未连接弹幕服务器，跳过礼物更新")
         return
 
@@ -2503,7 +2503,7 @@ def index():
         with ui.dialog() as changelog_dialog, ui.card(align_items="center"):
             changelog()
 
-        changelog_dialog.open()
+        return changelog_dialog
 
     # 统计相关弹窗
     with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
@@ -2523,7 +2523,7 @@ def index():
 
     if app.storage.general["version"] != version: # 如果版本号不一致
         app.storage.general["version"] = version # 更新版本号
-        changelog_dialog() # 打开更新日志弹窗
+        changelog_dialog().open() # 打开更新日志弹窗
 
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
@@ -2610,7 +2610,7 @@ def index():
             # Update version button
             ui.button("检查更新", on_click=lambda: check_update())
             # Changelog button
-            ui.button("更新日志", on_click=lambda: changelog_dialog())
+            ui.button("更新日志", on_click=lambda: changelog_dialog().open())
             ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
 
         # obs源
