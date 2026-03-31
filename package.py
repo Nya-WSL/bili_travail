@@ -27,10 +27,6 @@ def main() -> None:
     parser.add_argument('--icon', type=str, help='Icon file for the program. Must be a .ico file on Windows.')
     args = parser.parse_args()
 
-    for directory in ['build', 'dist']:
-        if Path(directory).exists():
-            shutil.rmtree(Path(directory))
-
     command = ['pyinstaller'] if platform.system() == 'Windows' else ['python', '-m', 'PyInstaller']
     command.extend(['--name', args.name])
     if args.windowed:

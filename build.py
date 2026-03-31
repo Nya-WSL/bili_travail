@@ -102,10 +102,15 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
 
     version = create_version(True)
 
+    for directory in ['build', 'dist']:
+        if Path(directory).exists():
+            shutil.rmtree(Path(directory))
+
+    if nuitka == 'y':
+        os.makedirs(Path("dist", "start"), exist_ok=True)
+
     if manager == "poetry":
         if nuitka == 'y':
-            shutil.rmtree(Path("dist", "start"), ignore_errors=True)
-            os.mkdir(Path("dist", "start"))
             start_time = time.time()
             os.system(f"poetry run python -m nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
             end_time = time.time()
@@ -115,8 +120,6 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
             os.system(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}")
     elif manager == "uv":
         if nuitka == 'y':
-            shutil.rmtree(Path("dist", "start"), ignore_errors=True)
-            os.mkdir(Path("dist", "start"))
             start_time = time.time()
             os.system(f"uv run nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
             end_time = time.time()
