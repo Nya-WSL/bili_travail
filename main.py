@@ -114,33 +114,6 @@ if os.path.exists("data/blind_box_value.json"):
         os.mkdir("data/blind_box")
     shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
 
-
-# 清理旧版本冲突的礼物数据
-def clear_old_data(paths: list):
-    for file_path in paths:
-        modified = False
-        try:
-            with open(file_path, "rb") as f:
-                data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-            old_key = [k for k, v in data.items() if v == 0] # 记录需要删除的key，防止破坏迭代器
-
-            # 执行删除
-            if old_key != []:
-                for k in old_key:
-                    data.pop(k)
-                    modified = True
-
-            if modified:
-                with open(file_path, "wb") as f:
-                    f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
-                logger.debug(f"已清理与新版本冲突的礼物数据：{file_path}")
-
-        except Exception as e:
-            logger.error(f"清理数据 {file_path} 时出错: {str(e)}")
-
-clear_old_data(["data/gifts.json", "data/gifts_count.json"])
-
 def format_seconds(seconds):
     """
     格式化时间
@@ -175,18 +148,21 @@ def format_cd(seconds):
     return ("%02d:%02d:%02d" % (hour, minute, second))
 
 # 检查storage状态
-app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
-app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
-app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_challenge_text", "")
-app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
-app.storage.general["version"] = app.storage.general.get("version", version)
-app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
-app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
-app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
+def init_storage():
+    app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
+    app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
+    app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_challenge_text", "")
+    app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
+    app.storage.general["version"] = app.storage.general.get("version", version)
+    app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
+    app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
+    app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
 
 # ================================
 # 初始化配置文件
 # ================================
+
+init_storage()
 
 base_config = travail_config.Config()
 base_config.sync_config(base_config.load(), base_config.default_data)
