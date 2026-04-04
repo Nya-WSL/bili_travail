@@ -148,18 +148,21 @@ def format_cd(seconds):
     return ("%02d:%02d:%02d" % (hour, minute, second))
 
 # 检查storage状态
-app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
-app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
-app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_challenge_text", "")
-app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
-app.storage.general["version"] = app.storage.general.get("version", version)
-app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
-app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
-app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
+def init_storage():
+    app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
+    app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
+    app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_challenge_text", "")
+    app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
+    app.storage.general["version"] = app.storage.general.get("version", version)
+    app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
+    app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
+    app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
 
 # ================================
 # 初始化配置文件
 # ================================
+
+init_storage()
 
 base_config = travail_config.Config()
 base_config.sync_config(base_config.load(), base_config.default_data)
