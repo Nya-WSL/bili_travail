@@ -2250,6 +2250,10 @@ async def capture():
 
     ui.timer(5, callback=lambda: check_gift_refresh())
 
+@ui.page("/poll", title="投票 | bili_travail")
+def poll_page():
+    ...
+
 @ui.page("/")
 def index():
     # ================================
@@ -2594,7 +2598,9 @@ def index():
             ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
         with ui.label(f"http://{host}:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
             ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
-        with ui.link("https://docs.travail.nya-wsl.com", new_tab=True):
+        with ui.label(f"http://{host}:{port}/poll").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/poll")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
+            ui.tooltip("OBS投票浏览器源URL，单击可复制至剪贴板")
+        with ui.link("使用文档", "https://docs.travail.nya-wsl.com", True):
             ui.tooltip("点击查看使用说明书")
 
         init_task()
