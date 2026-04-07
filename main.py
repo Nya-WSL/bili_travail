@@ -87,8 +87,8 @@ capture_gift_is_created = False # 初始化投喂挑战页面状态
 if not os.path.exists("data"):
     os.mkdir("data")
 
-if not os.path.exists("data/blinx_box_data.json"):
-    with open("data/blinx_box_data.json", "wb+") as f:
+if not os.path.exists("data/blind_box_data.json"):
+    with open("data/blind_box_data.json", "wb+") as f:
         f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
 
 if not os.path.exists("data/time.json"):
@@ -238,10 +238,10 @@ async def create_blind_box():
             blind_box[box].append(gift['gift'])
             box_price[box] = int(gift['price'] / 100) # API的单位是金瓜子，这里换算为电池
 
-    with open("data/blinx_box_data.json", "wb+") as f:
+    with open("data/blind_box_data.json", "wb+") as f:
         f.write(orjson.dumps(blind_box, option=orjson.OPT_INDENT_2))
 
-    with open("data/blinx_box_price.json", "wb+") as f:
+    with open("data/blind_box_price.json", "wb+") as f:
         f.write(orjson.dumps(box_price, option=orjson.OPT_INDENT_2))
 
 async def init_config():
@@ -523,7 +523,7 @@ class BiliHandler(blivedm.BaseHandler):
                             f.write(orjson.dumps(gift_img, option=orjson.OPT_INDENT_2))
 
                     # 初始化盲盒数据
-                    with open("data/blinx_box_data.json", "rb") as f:
+                    with open("data/blind_box_data.json", "rb") as f:
                         blind_box = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                     blind_box_gifts = []
@@ -630,7 +630,7 @@ class BiliHandler(blivedm.BaseHandler):
                             f.write(orjson.dumps(gift_img, option=orjson.OPT_INDENT_2))
 
                     # 初始化盲盒数据
-                    with open("data/blinx_box_data.json", "rb") as f:
+                    with open("data/blind_box_data.json", "rb") as f:
                         blind_box = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                     blind_box_gifts = []
@@ -1120,13 +1120,13 @@ def blind_box_value_dialog():
         if not os.path.exists("data/blind_box_value.json"):
             with open("data/blind_box_value.json", "wb+") as f:
                 f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-        if not os.path.exists("data/blinx_box_price.json"):
-            with open("data/blinx_box_price.json", "wb+") as f:
+        if not os.path.exists("data/blind_box_price.json"):
+            with open("data/blind_box_price.json", "wb+") as f:
                 f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
 
         with open("data/blind_box_value.json", "rb") as f:
             box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/blinx_box_price.json", "rb") as f:
+        with open("data/blind_box_price.json", "rb") as f:
             box_price_list = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         value_list = {}
