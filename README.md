@@ -2,6 +2,8 @@
 
 基于blivedm和NiceGUI的B站直播加班姬
 
+#### [当前迭代和路线图](https://github.com/orgs/Nya-WSL/projects/4)
+
 ## Feature
 
 - 支持身份码连接
