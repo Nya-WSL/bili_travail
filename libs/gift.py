@@ -181,7 +181,7 @@ class BiliGiftManager:
 
                 if blind_box != {}:
                     for gifts in blind_box.values():
-                        for gift in gifts:
+                        for gift in gifts["gifts"]:
                             gift_mapping[gift['gift']] = gift['gift_img']
                 else:
                     logger.error(f"盲盒数据为空")

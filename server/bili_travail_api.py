@@ -100,10 +100,9 @@ async def get_blind_box(gift_ids: list) -> dict:
                     if data['code'] == 0:
                         for gift in data['data']['gifts']:
                             if data['data']['blind_gift_name'] not in blind_box:
-                                blind_box[data['data']['blind_gift_name']] = []
-                            blind_box[data['data']['blind_gift_name']].append({
+                                blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
+                            blind_box[data['data']['blind_gift_name']]['gifts'].append({
                                 'gift': gift['gift_name'], 
-                                'price': data['data']['blind_price'],
                                 "gift_img": gift['gift_img']
                             })
                     else:

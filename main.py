@@ -232,11 +232,11 @@ async def create_blind_box():
     # 忽略盲盒礼物图标，图标在gift.get_config()中已经处理了
     for box, box_gifts in blind_boxes.items():
         box_price.setdefault(box, 0)
+        box_price[box] = int(box_gifts['price'] / 100) # API的单位是金瓜子，这里换算为电池
         if not box in blind_box:
             blind_box[box] = []
-        for gift in box_gifts:
+        for gift in box_gifts["gifts"]:
             blind_box[box].append(gift['gift'])
-            box_price[box] = int(gift['price'] / 100) # API的单位是金瓜子，这里换算为电池
 
     with open("data/blind_box_data.json", "wb+") as f:
         f.write(orjson.dumps(blind_box, option=orjson.OPT_INDENT_2))
