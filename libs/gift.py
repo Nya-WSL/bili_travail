@@ -146,6 +146,9 @@ class BiliGiftManager:
                             logger.warning(f"房间{self.room_id}的自定义礼物数据可能还未下发，继续等待...")
                             await asyncio.sleep(5)
                             await self.get_room_gift(platform)
+                        else:
+                            logger.info(f"成功获取房间{self.room_id}的礼物数据")
+
                         for gift in data["data"]["gift_config"]["room_config"]:
                             if gift["corner_mark"] == "玩法":
                                 if gift["name"] not in self.custom_gifts:
