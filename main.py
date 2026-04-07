@@ -217,6 +217,7 @@ GiftManager = get_gift.BiliGiftManager()
 async def create_blind_box():
     box_id = []
     blind_box = {}
+    box_price = {}
     gifts = await GiftManager.get_room_gift("android")
     for gift in gifts:
         if re.search("盒", gift["name"]):
@@ -228,15 +229,20 @@ async def create_blind_box():
 
     blind_boxes = await GiftManager.get_blind_box(box_id)
 
-    # 忽略盲盒礼物图标，图标在gift.get_config()中已经处理了，这个字典不能存图标
+    # 忽略盲盒礼物图标，图标在gift.get_config()中已经处理了
     for box, box_gifts in blind_boxes.items():
+        box_price.setdefault(box, 0)
         if not box in blind_box:
             blind_box[box] = []
         for gift in box_gifts:
             blind_box[box].append(gift['gift'])
+            box_price[box] = int(gift['price'] / 100) # API的单位是金瓜子，这里换算为电池
 
     with open("data/blinx_box_data.json", "wb+") as f:
         f.write(orjson.dumps(blind_box, option=orjson.OPT_INDENT_2))
+
+    with open("data/blinx_box_price.json", "wb+") as f:
+        f.write(orjson.dumps(box_price, option=orjson.OPT_INDENT_2))
 
 async def init_config():
     """
@@ -1114,9 +1120,15 @@ def blind_box_value_dialog():
         if not os.path.exists("data/blind_box_value.json"):
             with open("data/blind_box_value.json", "wb+") as f:
                 f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+        if not os.path.exists("data/blinx_box_price.json"):
+            with open("data/blinx_box_price.json", "wb+") as f:
+                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+
         with open("data/blind_box_value.json", "rb") as f:
             box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        box_price_list = {"星月盲盒": 50, "心动盲盒": 150, "奇遇盲盒": 330, "闪耀盲盒": 500, "至尊盲盒": 1000, "百花盲盒": 250} # 盲盒基础价值
+        with open("data/blinx_box_price.json", "rb") as f:
+            box_price_list = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
         value_list = {}
         price_list = {}
         for k,v in box_value.items():
@@ -2840,6 +2852,6 @@ if __name__ == "__main__":
         logger.info("正在检查Edge WebView2 runtime...")
         asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
 
-        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 780], reconnect_timeout=30, language="zh-CN", use_colors=False)
+        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 810], reconnect_timeout=30, language="zh-CN", use_colors=False)
     except:
         logger.error(f"run error: {traceback.format_exc()}")

@@ -103,6 +103,7 @@ async def get_blind_box(gift_ids: list) -> dict:
                                 blind_box[data['data']['blind_gift_name']] = []
                             blind_box[data['data']['blind_gift_name']].append({
                                 'gift': gift['gift_name'], 
+                                'price': data['data']['blind_price'],
                                 "gift_img": gift['gift_img']
                             })
                     else:
