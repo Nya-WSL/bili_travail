@@ -2262,10 +2262,6 @@ async def capture():
 
     ui.timer(5, callback=lambda: check_gift_refresh())
 
-@ui.page("/poll", title="投票 | bili_travail")
-def poll_page():
-    ...
-
 @ui.page("/")
 def index():
     # ================================
@@ -2610,8 +2606,6 @@ def index():
             ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
         with ui.label(f"http://{host}:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
             ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
-        with ui.label(f"http://{host}:{port}/poll").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/poll")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
-            ui.tooltip("OBS投票浏览器源URL，单击可复制至剪贴板")
         with ui.link("使用文档", "https://docs.travail.nya-wsl.com", True):
             ui.tooltip("点击查看使用说明书")
 
@@ -2852,6 +2846,6 @@ if __name__ == "__main__":
         logger.info("正在检查Edge WebView2 runtime...")
         asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
 
-        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 810], reconnect_timeout=30, language="zh-CN", use_colors=False)
+        ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 780], reconnect_timeout=30, language="zh-CN", use_colors=False)
     except:
         logger.error(f"run error: {traceback.format_exc()}")
