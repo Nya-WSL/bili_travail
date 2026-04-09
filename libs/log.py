@@ -1,46 +1,45 @@
 import os
 import sys
-import logging as log
 import datetime
-from loguru import logger as logging
+from loguru import logger
 
 if not os.path.exists("logs"):
     os.mkdir("logs")
+
+HOME_DIR = os.path.expanduser("~")
 
 file_time = datetime.datetime.now().strftime("%Y%m%d")
 file_name = os.path.join("logs", f"bili_travail_{file_time}.log")
 
 
-# LEVEL: DEBUG INFO WARNING ERROR CRITICAL
-log.basicConfig(level=log.DEBUG,
-                    format='%(asctime)s [%(levelname)s]: %(message)s',
-                    datefmt='%Y-%m-%d %H:%M:%S',
-                    filename=file_name,
-                    encoding="utf-8"
-                    )
+def mask_home_dir(record):
+    """将日志中的 HOME_DIR 替换为 ~"""
+    msg = record.get("message", "")
+    record["message"] = msg.replace(HOME_DIR, "[HOME_DIR]")
 
-logging.remove()  # 移除默认的日志处理器
-logging.add(
-    os.path.join("logs", f"bili_travail_{file_time}.log"),
+
+logger.remove()  # 移除默认 handler
+
+logger.add(
+    file_name,
     encoding="utf-8",
     enqueue=True,
     backtrace=True,
-    format='{time:%Y-%m-%d %H:%M:%S} [{level}]: {name} | {function}({line}): <level>{message}</level>'
-    )
+    diagnose=True,
+    format="{time:%Y-%m-%d %H:%M:%S} [{level}]: {name} | {function}({line}): <level>{message}</level>",
+)
 
-# 全局异常处理钩子
+logger = logger.patch(mask_home_dir)
+
+
+# 全局异常捕获
 def handle_exception(exc_type, exc_value, exc_traceback):
-    if exc_value != KeyboardInterrupt:
-        log.error(
-            "未知错误！",
-            exc_info=(exc_type, exc_value, exc_traceback)
-        )
+    if exc_type != KeyboardInterrupt:
+        logger.opt(exception=(exc_type, exc_value, exc_traceback)).error("未知错误！")
     else:
-        log.warning(
-            "程序被用户中断",
-            exc_info=(exc_type, exc_value, exc_traceback)
+        logger.opt(exception=(exc_type, exc_value, exc_traceback)).warning(
+            "程序被用户中断"
         )
+
 
 sys.excepthook = handle_exception
-
-logger = logging
