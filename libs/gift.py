@@ -1,13 +1,20 @@
 import os
 import re
+import sys
 import orjson
 import asyncio
 import aiohttp
+import traceback
 
 from .log import logger
 from . import dns_resolver
 from . import gift_mapping as gift_map
 from . import config as travail_config
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) # 将上级目录加入路径，以便导入版本号
+
+import env
+import version as base_ver
 
 base_config = travail_config.Config()
 
@@ -74,7 +81,8 @@ class BiliGiftManager:
 
         url = f"{base_config.get('api', 'server', 'http://api.travail.nya-wsl.cn')}/gift/get_blind_boxes"
         data = {
-            "gift_ids": gift_ids
+            "gift_ids": gift_ids,
+            "version": f"{base_ver.base_version}.{env.get_key().get('version', '0')}"
         }
 
         async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
@@ -211,5 +219,5 @@ class BiliGiftManager:
                 return True
 
         except Exception as e:
-            logger.exception(f"获取礼物数据失败: {e}")
+            logger.error(f"获取礼物数据失败:\n{traceback.format_exc()}")
             return False
