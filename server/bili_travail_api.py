@@ -16,6 +16,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, status, Request
 
 class GiftIdsRequest(BaseModel):
     gift_ids: List[int]
+    version: str = None
 
 class StatRequest(BaseModel):
     room_id: int
@@ -62,11 +63,12 @@ def init_config():
     with open("config.json", "wb") as f:
         f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
 
-async def get_blind_box(gift_ids: list) -> dict:
+async def get_blind_box(gift_ids: list, version: str = None) -> dict:
     """
     获取盲盒礼物列表
     
     :param gift_ids (_list_) : 盲盒礼物ID
+    :param version (str) : 客户端版本号
     :return dict: 盲盒礼物列表
     """
 
@@ -100,11 +102,20 @@ async def get_blind_box(gift_ids: list) -> dict:
                     if data['code'] == 0:
                         for gift in data['data']['gifts']:
                             if data['data']['blind_gift_name'] not in blind_box:
-                                blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
-                            blind_box[data['data']['blind_gift_name']]['gifts'].append({
-                                'gift': gift['gift_name'], 
-                                "gift_img": gift['gift_img']
-                            })
+                                if version is not None and version > "1.38.041001" and version != "1.38.0":
+                                    blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
+                                else:
+                                    blind_box[data['data']['blind_gift_name']] = []
+                            if version is not None and version > "1.38.041001" and version != "1.38.0":
+                                blind_box[data['data']['blind_gift_name']]['gifts'].append({
+                                    'gift': gift['gift_name'], 
+                                    "gift_img": gift['gift_img']
+                                })
+                            else:
+                                blind_box[data['data']['blind_gift_name']].append({
+                                    'gift': gift['gift_name'], 
+                                    "gift_img": gift['gift_img']
+                                })
                     else:
                         print(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
                 else:
@@ -115,7 +126,7 @@ async def get_blind_box(gift_ids: list) -> dict:
 @app.post("/gift/get_blind_boxes", status_code=status.HTTP_200_OK)
 async def index(request: GiftIdsRequest):
     try:
-        blind_box = await get_blind_box(request.gift_ids)
+        blind_box = await get_blind_box(request.gift_ids, request.version)
 
         if blind_box == {}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="盲盒数据为空")
