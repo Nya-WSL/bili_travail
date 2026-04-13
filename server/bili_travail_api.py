@@ -141,7 +141,7 @@ async def index(request: GiftIdsRequest):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/log/{room_id}", status_code=status.HTTP_201_CREATED)
-async def hook(room_id, file: UploadFile = File(...)):
+async def hook(room_id: str, file: UploadFile = File(...)):
     try:
         with open("config.json", "rb") as f:
             config = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
@@ -155,10 +155,31 @@ async def hook(room_id, file: UploadFile = File(...)):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不允许上传空文件")
 
         # 创建房间目录
-        room_dir = Path(save_path) / room_id
+        # 校验 room_id（房间号仅允许数字）
+        if not room_id.isdigit():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法 room_id")
+
+        # 安全化文件名，防止路径穿越
+        safe_filename = os.path.basename(file.filename or "")
+        if safe_filename in ("", ".", ".."):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法文件名")
+
+        # 规范化并校验路径必须位于 save_path 下
+        base_dir = Path(save_path).resolve()
+        room_dir = (base_dir / room_id).resolve()
+        try:
+            room_dir.relative_to(base_dir)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法保存路径")
+
         room_dir.mkdir(parents=True, exist_ok=True)
 
-        file_path = room_dir / file.filename
+        file_path = (room_dir / safe_filename).resolve()
+
+        try:
+            file_path.relative_to(base_dir)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法文件路径")
 
         # 处理文件
         with open(file_path, "wb") as f:
@@ -169,7 +190,7 @@ async def hook(room_id, file: UploadFile = File(...)):
                 "message": "文件上传成功",
                 "path": str(file_path),
                 "room_id": room_id,
-                "filename": file.filename,
+                "filename": safe_filename,
                 "size": f"{bytes_to_kb(len(contents))} KB"
             }
 
