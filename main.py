@@ -123,6 +123,7 @@ def format_seconds(seconds) -> str:
 
     # 如果输入不是数字，直接返回
     if not isinstance(seconds, (int, float)):
+        logger.warning(f"{seconds} 不是int或float，跳过格式化")
         return str(seconds)
 
     # 处理符号：正数加 `+`，负数加 `-`，0 不加符号
@@ -1848,7 +1849,7 @@ async def capture():
             k, v = next(items)
             if type(v) == list:
                 change_gift_element("list", k, v)
-            elif type(v) == int or type(v) == float:
+            elif isinstance(v, (int, float)):
                 change_gift_element("normal", k, v)
             else:
                 change_gift_element("special", k, v)
@@ -1856,7 +1857,7 @@ async def capture():
         # 初始化第一个礼物元素
         if type(v) == list:
             gift_element("list", k, v)
-        elif type(v) == int or type(v) == float:
+        elif isinstance(v, (int, float)):
             gift_element("normal", k, v)
         else:
             gift_element("special", k, v)
