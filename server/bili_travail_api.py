@@ -188,7 +188,6 @@ async def hook(room_id: str, file: UploadFile = File(...)):
         return {
                 "status": status.HTTP_201_CREATED,
                 "message": "文件上传成功",
-                "path": str(file_path),
                 "room_id": room_id,
                 "filename": safe_filename,
                 "size": f"{bytes_to_kb(len(contents))} KB"
