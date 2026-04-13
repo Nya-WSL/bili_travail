@@ -38,6 +38,7 @@ from blivedm import blivedm
 # Third Party Packages
 import os
 import re
+import time
 import orjson
 import shutil
 import random
@@ -1565,6 +1566,11 @@ async def check_b_connect_status():
     global b_connect_status
     switch_value = b_connect_switch.value
 
+    def disconnect_timer():
+        if switch_value == "null":
+            ui.notify("连接超时，请检查日志", type="negative")
+            b_connect_switch.set_value(False)
+
     # 开关关闭状态：断开连接
     if switch_value == False:
         # 无身份码且未连接
@@ -1578,7 +1584,7 @@ async def check_b_connect_status():
         b_connect_status = False
         client.stop() # 断开弹幕服务器ws连接
         logger.info("弹幕服务器ws连接已断开")
-        ui.notify("已断开连接，这通常是因为手动关闭了连接或身份码不正确")
+        ui.notify("已断开连接")
         b_connect_switch.set_value(False)
         b_connect_switch.set_text("连接至弹幕服务器")
         login_status.set_text("未连接")
@@ -1595,6 +1601,7 @@ async def check_b_connect_status():
         # 启动连接
         if not b_connect_status:
             asyncio.create_task(start_handler())
+            ui.timer(30, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
             login_status.set_text("未连接")
