@@ -38,6 +38,7 @@ from blivedm import blivedm
 # Third Party Packages
 import os
 import re
+import time
 import orjson
 import shutil
 import random
@@ -383,6 +384,8 @@ class BiliHandler(blivedm.BaseHandler):
     heart_count = 0
     # 心跳数据
     async def _on_heartbeat(self, client: blivedm.BLiveClient, message: web_models.HeartbeatMessage):
+        global b_connect_status
+
         self.heart_count += 1
         logger.info("触发心跳")
         if self.heart_count == 1:
@@ -400,10 +403,12 @@ class BiliHandler(blivedm.BaseHandler):
             with main_card:
                 ui.notify("正在等待B站下发自定义礼物数据，请稍候...", type="info")
                 await asyncio.sleep(5) # 等待5秒B站发送自定义礼物数据
-                await refresh_gift(True) # 刷新礼物数据
 
-            b_connect_switch.set_value(True)
-            b_connect_switch.set_text("已连接弹幕服务器")
+                try:
+                    await refresh_gift(True) # 刷新礼物数据
+                except:
+                    ui.notify("获取礼物数据失败，可能导致部分功能异常", type="warning")
+
             logger.info(f"已连接至{room_id}")
 
             uid = client.room_owner_uid
@@ -412,6 +417,9 @@ class BiliHandler(blivedm.BaseHandler):
                 await travail_stat.stat(room_id, uid, version, now_time)
                 login_status.set_text(room_id)
                 login_status.classes("text-green")
+                b_connect_status = True # 在第一次心跳时设置状态为已连接至弹幕服务器
+                b_connect_switch.set_value(True)
+                b_connect_switch.set_text("已连接弹幕服务器")
             else:
                 login_status.set_text("未连接")
                 login_status.classes(replace="text-red")
@@ -1558,6 +1566,11 @@ async def check_b_connect_status():
     global b_connect_status
     switch_value = b_connect_switch.value
 
+    def disconnect_timer():
+        if b_connect_switch.value == "null":
+            ui.notify("连接超时，请检查日志", type="negative")
+            b_connect_switch.set_value(False)
+
     # 开关关闭状态：断开连接
     if switch_value == False:
         # 无身份码且未连接
@@ -1571,7 +1584,7 @@ async def check_b_connect_status():
         b_connect_status = False
         client.stop() # 断开弹幕服务器ws连接
         logger.info("弹幕服务器ws连接已断开")
-        ui.notify("已断开连接，这通常是因为手动关闭了连接或身份码不正确")
+        ui.notify("已断开连接")
         b_connect_switch.set_value(False)
         b_connect_switch.set_text("连接至弹幕服务器")
         login_status.set_text("未连接")
@@ -1588,11 +1601,11 @@ async def check_b_connect_status():
         # 启动连接
         if not b_connect_status:
             asyncio.create_task(start_handler())
+            ui.timer(30, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
             login_status.set_text("未连接")
             login_status.classes(replace="text-red")
-            b_connect_status = True
         else:
             b_connect_switch.set_value(True)
 
@@ -1721,8 +1734,12 @@ async def refresh_gift(heartbeat=False):
 
         await asyncio.sleep(1)
 
-        gift_config = await GiftManager.get_config("data/gift_img.json")
-        await create_blind_box()
+        try:
+            gift_config = await GiftManager.get_config("data/gift_img.json")
+            await create_blind_box()
+        except Exception as e:
+            logger.error(f"更新礼物数据时发生错误: {e}")
+            raise
 
         if gift_config == True:
             ui.notify("礼物数据更新完成", type="positive")
@@ -1746,7 +1763,7 @@ async def refresh_gift(heartbeat=False):
             await GiftManager.init_gift("data/gift_img.json")
             ui.notify("重置成功", type="positive")
         except Exception as e:
-            logger.exception(f"使用本地数据重置失败：{e}")
+            logger.error(f"使用本地数据重置失败：{e}")
             ui.notify("重置失败", type="negative")
 
     if heartbeat:
@@ -2691,9 +2708,9 @@ async def _():
             except asyncio.TimeoutError:
                 logger.warning(f"请求超时: {url}")
             except aiohttp.ClientError as e:
-                logger.exception(f"网络错误: {url} - {e}")
+                logger.error(f"网络错误: {url} - {e}")
             except Exception as e:
-                logger.exception(f"未知错误: {url} - {e}")
+                logger.error(f"未知错误: {url} - {e}")
             return None
 
         async def get_remote_text(session):
@@ -2753,7 +2770,7 @@ async def _():
                     )
 
             except Exception as e:
-                logger.exception(f"显示聊天消息失败: {e}")
+                logger.error(f"显示聊天消息失败: {e}")
                 # 显示错误消息
                 ui.notify("加载聊天消息失败，请稍后再试", type="negative")
 
