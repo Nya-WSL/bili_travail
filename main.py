@@ -1567,7 +1567,7 @@ async def check_b_connect_status():
     switch_value = b_connect_switch.value
 
     def disconnect_timer():
-        if switch_value == "null":
+        if b_connect_switch.value == "null":
             ui.notify("连接超时，请检查日志", type="negative")
             b_connect_switch.set_value(False)
 
@@ -1739,7 +1739,7 @@ async def refresh_gift(heartbeat=False):
             await create_blind_box()
         except Exception as e:
             logger.error(f"更新礼物数据时发生错误: {e}")
-            raise e
+            raise
 
         if gift_config == True:
             ui.notify("礼物数据更新完成", type="positive")
