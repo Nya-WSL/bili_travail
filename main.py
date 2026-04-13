@@ -114,11 +114,18 @@ if os.path.exists("data/blind_box_value.json"):
         os.mkdir("data/blind_box")
     shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
 
-def format_seconds(seconds):
+def format_seconds(seconds) -> str:
     """
     格式化时间
+
     :param seconds: 秒数
     """
+
+    # 如果输入不是数字，直接返回
+    if not isinstance(seconds, (int, float)):
+        logger.warning(f"{seconds} 不是int或float，跳过格式化")
+        return str(seconds)
+
     # 处理符号：正数加 `+`，负数加 `-`，0 不加符号
     if seconds > 0:
         sign = "+"
@@ -1842,7 +1849,7 @@ async def capture():
             k, v = next(items)
             if type(v) == list:
                 change_gift_element("list", k, v)
-            elif type(v) == int:
+            elif isinstance(v, (int, float)):
                 change_gift_element("normal", k, v)
             else:
                 change_gift_element("special", k, v)
@@ -1850,7 +1857,7 @@ async def capture():
         # 初始化第一个礼物元素
         if type(v) == list:
             gift_element("list", k, v)
-        elif type(v) == int:
+        elif isinstance(v, (int, float)):
             gift_element("normal", k, v)
         else:
             gift_element("special", k, v)
