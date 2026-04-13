@@ -143,6 +143,7 @@ async def hook(room_id: str, file: UploadFile = File(...)):
         if not contents:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不允许上传空文件")
 
+        # 创建房间目录
         # 校验 room_id（房间号仅允许数字）
         if not room_id.isdigit():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法 room_id")
@@ -159,9 +160,11 @@ async def hook(room_id: str, file: UploadFile = File(...)):
             room_dir.relative_to(base_dir)
         except ValueError:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="非法保存路径")
+
         room_dir.mkdir(parents=True, exist_ok=True)
 
         file_path = (room_dir / safe_filename).resolve()
+
         try:
             file_path.relative_to(base_dir)
         except ValueError:
