@@ -406,7 +406,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                 try:
                     await refresh_gift(True) # 刷新礼物数据
-                except:
+                except: # type: ignore
                     ui.notify("获取礼物数据失败，可能导致部分功能异常", type="warning")
 
             logger.info(f"已连接至{room_id}")
@@ -1582,8 +1582,13 @@ async def check_b_connect_status():
         start_button.disable()
         gift_challenge_switch.disable()
         b_connect_status = False
-        client.stop() # 断开弹幕服务器ws连接
-        logger.info("弹幕服务器ws连接已断开")
+
+        if "client" in globals() and client is not None:
+            client.stop() # 断开弹幕服务器ws连接
+            logger.info("弹幕服务器ws连接已断开")
+        else:
+            logger.warning("弹幕服务器ws连接未建立，跳过断开")
+
         ui.notify("已断开连接")
         b_connect_switch.set_value(False)
         b_connect_switch.set_text("连接至弹幕服务器")
@@ -2322,7 +2327,7 @@ def index():
     async def check_update():
         def get_source():
             try:
-                response = requests.get("http://version.nya-wsl.cn/bili_travail/source.json")
+                response = requests.get("http://version.nya-wsl.cn/bili_travail/source.json", timeout=30)
                 if response.status_code == 200:
                     data = response.json()
                     return data
@@ -2382,7 +2387,7 @@ def index():
         def version_check():
             url = ["http://version.nya-wsl.cn/bili_travail/version.json", "https://nya-wsl.com/bili_travail/version.json"]
             try:
-                response = requests.get(url[0]) # 优先从Nya-WSL中国服务器获取版本信息
+                response = requests.get(url[0], timeout=30) # 优先从Nya-WSL中国服务器获取版本信息
                 if response.status_code == 200:
                     data = response.json()
                     latest_version = data["version"]
@@ -2391,7 +2396,7 @@ def index():
             except Exception as e:
                 logger.error(e)
                 try:
-                    response = requests.get(url[1]) # 从Nya-WSL海外服务器获取版本信息
+                    response = requests.get(url[1], timeout=30) # 从Nya-WSL海外服务器获取版本信息
                     if response.status_code == 200: # 服务器请求返回值
                         data = response.json()
                         latest_version = data["version"]
@@ -2648,7 +2653,8 @@ def _():
             count = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         if count == {}:
             raise Exception("No data")
-    except:
+    except Exception as e:
+        logger.warning(f"读取 gift_statistics 失败，使用占位数据: {e}")
         count = {
             "占位礼物": {
                 "num": 0,
@@ -2871,5 +2877,5 @@ if __name__ == "__main__":
         asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
 
         ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=[600, 780], reconnect_timeout=30, language="zh-CN", use_colors=False)
-    except:
+    except Exception:
         logger.error(f"run error: {traceback.format_exc()}")
