@@ -16,7 +16,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, status, Request
 
 class GiftIdsRequest(BaseModel):
     gift_ids: List[int]
-    version: str = None
+    version: str | None
 
 class StatRequest(BaseModel):
     room_id: int
@@ -63,10 +63,10 @@ def init_config():
     with open("config.json", "wb") as f:
         f.write(orjson.dumps(config, option=orjson.OPT_INDENT_2))
 
-async def get_blind_box(gift_ids: list, version: str = None) -> dict:
+async def get_blind_box(gift_ids: list, version: str | None) -> dict:
     """
     获取盲盒礼物列表
-    
+
     :param gift_ids (_list_) : 盲盒礼物ID
     :param version (str) : 客户端版本号
     :return dict: 盲盒礼物列表
@@ -124,7 +124,7 @@ async def get_blind_box(gift_ids: list, version: str = None) -> dict:
     return blind_box
 
 @app.post("/gift/get_blind_boxes", status_code=status.HTTP_200_OK)
-async def index(request: GiftIdsRequest):
+async def index(request: GiftIdsRequest):  # pyright: ignore[reportRedeclaration]
     try:
         blind_box = await get_blind_box(request.gift_ids, request.version)
 
@@ -201,7 +201,7 @@ async def hook(room_id: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/stat", status_code=status.HTTP_200_OK)
-async def index(request: StatRequest):
+async def index(request: StatRequest):  # pyright: ignore[reportRedeclaration]
     try:
         if not Path("stat.json").exists():
             with open("stat.json", "wb+") as f:
