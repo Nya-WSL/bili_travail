@@ -40,7 +40,7 @@ async def update(zipUrl):
                     while True:
                         chunk = await response.content.read(1024)
                         f.write(chunk)
-                        if response.content_length is not None:
+                        if response.content_length is not None and response.content_length > 0:
                             percent_dialog.set_text("下载进度：" + "%.2f%%" % (f.tell() / response.content_length * 100))
                         else:
                             percent_dialog.set_text(f"下载中... 已下载 {f.tell()} 字节")
