@@ -30,7 +30,7 @@ def changelog():
             on_click=lambda: ui.navigate.to(
                 "https://github.com/Nya-WSL/bili_travail", new_tab=True
             ),
-            color=config["color"]["btn_color"],
+            color=config["color"]["btn_color"],  # pyright: ignore[reportIndexIssue, reportArgumentType]
         ).style("right: -15%")
 
     if logs != {}:
