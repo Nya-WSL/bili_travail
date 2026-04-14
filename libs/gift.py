@@ -58,7 +58,7 @@ class BiliGiftManager:
             blind_box = gift_map.blind_box
 
             with open(img_path, "wb+") as f:
-                f.write(orjson.dumps(gift_mapping + blind_box, option=orjson.OPT_INDENT_2))
+                f.write(orjson.dumps(gift_mapping + blind_box, option=orjson.OPT_INDENT_2))  # pyright: ignore[reportOperatorIssue]
 
     def set_room_id(self, room_id):
         """
@@ -112,7 +112,7 @@ class BiliGiftManager:
         }
 
         async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
-            async with session.get(url, params=params, headers=headers) as response:
+            async with session.get(url, params=params, headers=headers) as response:  # pyright: ignore[reportArgumentType]
                 if response.status == 200:
                     data = await response.json()
                     if data["code"] == 0:
@@ -172,6 +172,10 @@ class BiliGiftManager:
         try:
             # 获取房间礼物
             gifts_data = await self.get_room_gift("android")
+
+            if gifts_data is None:
+                logger.error("获取礼物数据失败，无法初始化礼物配置")
+                return False
 
             gift_mapping = {}
             box_id = []

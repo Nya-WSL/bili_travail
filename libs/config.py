@@ -93,19 +93,19 @@ custom_gift_rate = 1.5 # 自定义礼物暴击倍率'''
 
             for example_key, example_value in example_data.items():
                 if example_key not in config[example_table]:
-                    # 如果子键不存在，直接复制默认值
-                    config[example_table][example_key] = example_value
+                    # 如果子键不存在,直接复制默认值
+                    config[example_table][example_key] = example_value  # type: ignore[index]
                 else:
                     # 检查配置文件缺失项
-                    diff = example_data.keys() - config[example_table].keys()
+                    diff = example_data.keys() - config[example_table].keys()  # type: ignore[attr-defined]
 
                     for key in diff:
-                        config[example_table][key] = example_config[example_table][key]
+                        config[example_table][key] = example_config[example_table][key]  # type: ignore[index]
 
                     # 检查配置文件多余项
-                    diff = config[example_table].keys() - example_data.keys()
+                    diff = config[example_table].keys() - example_data.keys()  # type: ignore[attr-defined]
 
                     for key in diff:
-                        config[example_table].pop(key, None)
+                        config[example_table].pop(key, None)  # type: ignore[attr-defined]
 
         self.save(config)

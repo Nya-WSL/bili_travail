@@ -7,7 +7,7 @@ from typing import List, Tuple, Dict, Optional, Any
 
 async def ping_server(
     host: str,
-    timeout: float = 2,
+    timeout: int = 2,
     retries: int = 3,
     count: int = 1,
     privileged: bool = True,
@@ -102,7 +102,7 @@ async def ping_server(
 
 async def find_fastest_server(
     servers: List[str],
-    timeout: float = 1.5,
+    timeout: int = 2,
     retries: int = 3,
     count: int = 1,
     privileged: bool = True,
@@ -142,20 +142,20 @@ async def find_fastest_server(
     server_results = dict(zip(servers, processed_results))
 
     # 过滤掉不可达的服务器
-    reachable = {s: lat for s, lat in server_results.items() if lat is not None}
+    reachable = {s: lat for s, lat in server_results.items() if lat is not None} # type: ignore[assignment]
 
     if not reachable:
         logger.warning("📡 所有服务器均不可达")
         return None, None, server_results
 
     # 找到延迟最小的服务器
-    fastest_server = min(reachable, key=reachable.get)
+    fastest_server = min(reachable, key=reachable.get)  # type: ignore[arg-type]
     return fastest_server, reachable[fastest_server], server_results
 
 
 async def ping(
     servers: List[str],
-    timeout: float = 1.0,
+    timeout: int = 1,
     retries: int = 4,
     count: int = 2,
     privileged: bool = True,
