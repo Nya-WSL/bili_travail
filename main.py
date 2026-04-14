@@ -371,7 +371,7 @@ async def run_client():
     client = blivedm.OpenLiveClient(
         access_key_id=ACCESS_KEY_ID,  # pyright: ignore[reportArgumentType]
         access_key_secret=ACCESS_KEY_SECRET,  # pyright: ignore[reportArgumentType]
-        app_id=APP_ID,  # pyright: ignore[reportArgumentType]
+        app_id=int(APP_ID),  # pyright: ignore[reportArgumentType]
         room_owner_auth_code=base_config.get("general", "auth_code", None),  # pyright: ignore[reportArgumentType]
     )
     handler = BiliHandler()
@@ -450,8 +450,6 @@ class BiliHandler(blivedm.BaseHandler):
         num = message.guard_num
         uname = message.user_info.uname
         price = message.price / 100
-
-        await self._on_gift_statistics(uname, gift, int(price), num)  # type: ignore[arg-type]
 
         if gift == 1:
             gift = "总督"
@@ -2218,7 +2216,7 @@ async def capture():
                         ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
                         ui.space()
                         if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
                         elif v[0] < 0 and v[1] != 0:
                             ui.label(f"{int(v[0])} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
                         elif v[0] < 0 and v[1] == 0:
