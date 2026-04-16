@@ -875,7 +875,8 @@ class CountdownTimer:
             update_btn_state("stop") # 更新按钮状态
             cd_status = False
             logger.info("倒计时停止，启动计时器")
-            self.exit_timer = app.timer(base_config.get("num", "exit_time", 1800), lambda: self.exit_func(), once=True) # pyright: ignore[reportArgumentType]
+            if not self.exit_timer:
+                self.exit_timer = app.timer(base_config.get("num", "exit_time", 1800), lambda: self.exit_func(), once=True) # pyright: ignore[reportArgumentType]
         else:
             if reset_inherit_status:
                 app.storage.general["countdown_time"] = 0
