@@ -360,11 +360,6 @@ async def debug():
 async def start_handler():
     await run_client()
 
-@app.on_shutdown
-async def shut_down():
-    await client.stop_and_close()
-    logger.info('ws connect shut down')
-
 async def run_client():
     global client
 
@@ -794,6 +789,11 @@ class CountdownTimer:
         self._paused_event = asyncio.Event() # 初始化event
         self._paused_event.set()  # 最开始没有暂停
         self._task = None # 初始化task
+        self.exit_timer = None
+
+    def exit_func(self):
+        logger.info("计时器结束，退出程序")
+        app.shutdown()
 
     @property
     def remaining_seconds(self) -> float:
@@ -837,6 +837,8 @@ class CountdownTimer:
             self._task = asyncio.create_task(self.update()) # 创建倒计时协程
             update_btn_state("start") # 更新按钮状态
             cd_status = True # 设置倒计时运行状态
+            if self.exit_timer is not None:
+                self.exit_timer.deactivate() # 关闭退出计时器
         else:
             ui.notify("请输入时间", type="negative")
             self._running = False
@@ -872,6 +874,8 @@ class CountdownTimer:
             self.remaining_time = datetime.timedelta(0)
             update_btn_state("stop") # 更新按钮状态
             cd_status = False
+            logger.info("倒计时停止，启动计时器")
+            self.exit_timer = app.timer(base_config.get("num", "exit_time", 1800), lambda: self.exit_func(), once=True) # pyright: ignore[reportArgumentType]
         else:
             if reset_inherit_status:
                 app.storage.general["countdown_time"] = 0
@@ -1615,7 +1619,7 @@ async def check_b_connect_status():
         # 启动连接
         if not b_connect_status:
             asyncio.create_task(start_handler())
-            ui.timer(30, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
+            ui.timer(40, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
             login_status.set_text("未连接")
@@ -2878,7 +2882,9 @@ async def create_job():
     scheduler.start()
 
 @app.on_shutdown
-def shutdown():
+async def shutdown():
+    await client.stop_and_close()
+    logger.info('ws connect shut down')
     scheduler.shutdown()
 
 # 运行NiceGUI
