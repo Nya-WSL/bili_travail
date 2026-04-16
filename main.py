@@ -1619,7 +1619,7 @@ async def check_b_connect_status():
         # 启动连接
         if not b_connect_status:
             asyncio.create_task(start_handler())
-            ui.timer(40, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
+            ui.timer(60, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
             login_status.set_text("未连接")
