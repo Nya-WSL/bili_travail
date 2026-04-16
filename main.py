@@ -479,11 +479,7 @@ class BiliHandler(blivedm.BaseHandler):
             with main_card:
                 ui.notify("正在等待B站下发自定义礼物数据，请稍候...", type="info")
                 await asyncio.sleep(5) # 等待5秒B站发送自定义礼物数据
-
-                try:
-                    await refresh_gift(True) # 刷新礼物数据
-                except: # type: ignore
-                    ui.notify("获取礼物数据失败，可能导致部分功能异常", type="warning")
+                await refresh_gift(True) # 刷新礼物数据
 
             logger.info(f"已连接至{room_id}")
 
