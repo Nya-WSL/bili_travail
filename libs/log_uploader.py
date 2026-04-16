@@ -234,6 +234,9 @@ def setup_error_handler(base_config):
         if original_excepthook is not None:
             original_excepthook(exc_type, exc_value, exc_traceback)
 
+        if exc_type is KeyboardInterrupt:
+            return
+
         # 尝试上传日志（如果启用了上传功能）
         # 注意：这里需要在新的线程或进程中进行，避免阻塞
         try:
