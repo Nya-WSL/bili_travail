@@ -55,7 +55,7 @@ logger.remove()  # 移除默认 handler
 logger.add(
     file_name,
     encoding="utf-8",
-    enqueue=True,  # 改为同步写入，确保即使程序崩溃也不会丢失日志
+    enqueue=True,
     backtrace=True,
     diagnose=True,
     format="{time:%Y-%m-%d %H:%M:%S} [{level}]: {name} | {function}({line}): <level>{message}</level>",
