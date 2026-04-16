@@ -27,10 +27,12 @@ from libs import styles
 from libs import bili_api
 from libs import travail_stat
 from libs import dns_resolver
+from libs import log_uploader
 from libs import check_runtime
 from libs import gift as get_gift
 from libs import update as travail_update
 from libs import gift_mapping as gift_map
+
 from libs.changelog import changelog, get_log
 
 from blivedm import blivedm
@@ -174,6 +176,76 @@ init_storage()
 base_config = travail_config.Config()
 base_config.sync_config(base_config.load(), base_config.default_data)
 config = base_config.load()
+
+# 检查是否需要显示错误日志上传确认弹窗
+def show_error_upload_dialog():
+    """显示错误日志上传确认弹窗"""
+    with ui.dialog() as dialog, ui.card(align_items="center"):
+        with ui.column(align_items="start"):
+            ui.label('为了帮助我们更好地修复程序问题，您是否允许在程序发生未知错误时自动上传日志？')
+            ui.label('日志内容：').classes('font-bold')
+            ui.label('• 错误堆栈信息').classes('text-gray-600')
+            ui.label('• 程序运行状态').classes('text-gray-600')
+            ui.label('• 程序运行期间收到的礼物记录').classes('text-gray-600')
+            ui.label('• 程序运行期间B站API返回的部分数据').classes('text-gray-600')
+            ui.label('• 程序运行期间收到的部分弹幕详细信息').classes('text-gray-600')
+
+            ui.label('隐私保护：').classes('font-bold')
+            ui.label('• 记录日志时会进行脱敏处理，移除用户文件夹路径以及其他可能存在的个人隐私信息').classes('text-gray-600')
+            ui.label('• 如日后不允许上传您可以通过 config.toml -> error_upload = false 关闭此功能').classes('text-gray-600 mb-4')
+
+        with ui.row(align_items="center"):
+            ui.button('允许并启用', on_click=lambda: enable_error_upload(dialog)).props('color="positive"')
+            ui.button('稍后再说', on_click=lambda: dialog.close())
+            ui.button('不允许', on_click=lambda: disable_error_upload(dialog)).props('color="negative"')
+
+    dialog.open()
+
+    def enable_error_upload(dialog_instance):
+        """启用错误日志自动上传"""
+        # 重新加载配置文件
+        current_config = base_config.load()
+        current_config["bool"]["error_upload"] = True  # type: ignore[index]
+        current_config["bool"]["error_upload_confirmed"] = True  # type: ignore[index]
+        base_config.save(current_config)
+
+        ui.notify("已启用错误日志自动上传", type="positive", position="top")
+        dialog_instance.close()
+
+    def disable_error_upload(dialog_instance):
+        """禁用错误日志自动上传"""
+        # 重新加载配置文件
+        current_config = base_config.load()
+        current_config["bool"]["error_upload"] = False  # type: ignore[index]
+        current_config["bool"]["error_upload_confirmed"] = True  # type: ignore[index]
+        base_config.save(current_config)
+        ui.notify("❌ 已禁用错误日志自动上传", type="info", position="top")
+        dialog_instance.close()
+
+# 延迟显示弹窗，等待 UI 初始化完成
+def show_dialog_delayed():
+    """延迟显示弹窗"""
+    if not base_config.get("bool", "error_upload_confirmed", False):
+        # 检查是否配置了服务器地址
+        server_url = base_config.get("api", "server", None)
+        if server_url and server_url != "":
+            show_error_upload_dialog()
+        else:
+            # 没有配置服务器，标记为已确认但不启用
+            current_config = base_config.load()
+            current_config["bool"]["error_upload_confirmed"] = True  # type: ignore[index]
+            base_config.save(current_config)
+            logger.info("未配置服务器地址，跳过错误日志上传弹窗")
+
+# 设置错误日志自动上传
+# 注：必须在 log 模块导入之后调用，因为 log 模块已经设置了 sys.excepthook
+# setup_error_handler 会包装原有的异常处理器，确保异常先被记录到日志，再上传
+try:
+    # 无论是否启用上传，都要设置错误处理器，包装原有的 log.handle_exception
+    # 这样确保异常始终会被记录到本地日志文件
+    log_uploader.setup_error_handler(base_config)
+except Exception as e:
+    logger.warning(f"错误日志自动上传功能初始化失败: {e}")
 
 host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
@@ -1509,66 +1581,16 @@ async def upload_log(room_id):
     '''
     发送日志到服务器
     '''
+    uploader = log_uploader.get_log_uploader()
+    if uploader is None:
+        logger.warning("日志上传器未初始化，尝试重新初始化")
+        log_uploader.init_log_uploader(base_config)
+        uploader = log_uploader.get_log_uploader()
+        if uploader is None:
+            logger.error("日志上传器初始化失败")
+            return
 
-    file_path = log.file_name
-    url = base_config.get("api", "server", None)
-
-    if url is None or url == "":
-        result = "未配置服务器地址，上传日志失败"
-        ui.notify(result, type="negative")
-        logger.error(result)
-        return
-
-    # 验证文件是否存在
-    if not os.path.exists(file_path):
-        result = f"文件不存在: {file_path}"
-        ui.notify(result, type="negative")
-        logger.error(result)
-        return
-
-    url = f"{url}/log/{room_id}"
-
-    try:
-        data = aiohttp.FormData()
-
-        file_obj = open(file_path, "rb")
-
-        data.add_field(
-            name="file", # 参数名必须与FastAPI接口一致
-            value=file_obj,
-            filename=os.path.basename(file_path),
-            content_type="application/octet-stream"
-        )
-
-        timeout = aiohttp.ClientTimeout(total=60)  # 60秒超时
-
-        async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
-            async with session.post(url, data=data) as response:
-                if response.status == 201:
-                    result = await response.json()
-                    ui.notify(f"日志上传成功，状态码：{result.get("status", None)}", type="positive")
-                    logger.info(f"日志上传成功：{result}")
-                else:
-                    error = await response.text()
-                    result = f"日志上传失败，状态码: {response.status}"
-                    ui.notify(result, type="negative")
-                    logger.error(f"{result}")
-                    logger.error(f"服务器返回错误: {error}")
-
-    except aiohttp.ClientError as e:
-        result = "日志上传失败，发生网络错误: "
-        ui.notify(result + str(e), type="negative")
-        logger.error(result + traceback.format_exc())
-
-    except Exception as e:
-        result = "日志上传失败，发生错误: "
-        ui.notify(result + str(e), type="negative")
-        logger.error(result + traceback.format_exc())
-
-    finally:
-        file_obj = locals().get("file_obj")
-        if file_obj is not None and not file_obj.closed:
-            file_obj.close()
+    await uploader.upload_log(room_id, show_notification=True)
 
 
 async def check_b_connect_status():
@@ -1753,9 +1775,8 @@ async def refresh_gift(heartbeat=False):
         try:
             gift_config = await GiftManager.get_config("data/gift_img.json")
             await create_blind_box()
-        except Exception as e:
-            logger.error(f"更新礼物数据时发生错误: {e}")
-            raise
+        except:
+            logger.error(f"更新礼物数据时发生错误: \n{traceback.format_exc()}")
 
         if gift_config == True:
             ui.notify("礼物数据更新完成", type="positive")
@@ -2556,6 +2577,7 @@ def index():
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
         asyncio.create_task(check_update())
+        show_dialog_delayed()
         time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
 
         # 时间输入框
@@ -2888,5 +2910,16 @@ if __name__ == "__main__":
         asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
 
         ui.run(host=host, port=port, title=f"bili_travail | {version}", favicon="static/logo.ico", reload=False, show=False, native=True, window_size=(600, 780), reconnect_timeout=30, language="zh-CN", use_colors=False)  # pyright: ignore[reportArgumentType]
-    except Exception:
-        logger.error(f"run error: {traceback.format_exc()}")
+
+    except BaseException as e:
+        # 捕获其他所有异常，包括系统级别的异常
+        logger.error(f"致命错误: {type(e).__name__}: {e}")
+        logger.error(f"堆栈跟踪:\n{traceback.format_exc()}")
+
+        # 确保日志写入磁盘，防止程序快速崩溃导致日志丢失
+        from loguru import logger as loguru_logger
+        try:
+            loguru_logger.complete()
+        except:
+            pass
+        raise  # 重新抛出异常

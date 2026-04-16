@@ -55,7 +55,7 @@ logger.remove()  # 移除默认 handler
 logger.add(
     file_name,
     encoding="utf-8",
-    enqueue=True,
+    enqueue=True,  # 改为同步写入，确保即使程序崩溃也不会丢失日志
     backtrace=True,
     diagnose=True,
     format="{time:%Y-%m-%d %H:%M:%S} [{level}]: {name} | {function}({line}): <level>{message}</level>",
@@ -70,22 +70,49 @@ def mask_rule(logger):
 
 logger = mask_rule(logger)
 
+# 注册清理函数，确保程序退出时日志被写入磁盘
+def cleanup_logs():
+    """程序退出时确保日志写入磁盘"""
+    try:
+        logger.complete()
+    except:
+        pass
+
+import atexit
+atexit.register(cleanup_logs)
+
 # 全局异常捕获
 def handle_exception(exc_type, exc_value, exc_traceback):
+    # 用户主动中断，不记录日志
+    if exc_type == KeyboardInterrupt:
+        return
+
     tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
     tb_str = "".join(tb_lines)
 
     tb_str = mask_home_dir(exc_traceback=tb_str)
     tb_str = mask_phone_num(exc_traceback=tb_str)
 
-    if exc_type != KeyboardInterrupt:
+    # 先尝试写入日志文件
+    try:
         logger.opt(exception=False).error(
             "未知错误！\n{}", tb_str
         )
-    else:
-        logger.opt(exception=False).warning(
-            "程序被用户中断\n{}", tb_str
-        )
+
+        # 在异常处理完成后，立即刷新日志
+        logger.complete()
+    except Exception:
+        # 如果日志系统失败，尝试直接写入文件
+        try:
+            with open(file_name, "a", encoding="utf-8") as f:
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"{timestamp} [CRITICAL]: 异常处理器日志系统失败\n")
+                f.write(f"异常类型: {exc_type.__name__}\n")
+                f.write(f"异常信息: {exc_value}\n")
+                f.write(f"堆栈跟踪:\n{tb_str}\n")
+                f.write("=" * 80 + "\n")
+        except:
+            pass  # 所有的日志方式都失败了，只能放弃
 
 
 sys.excepthook = handle_exception

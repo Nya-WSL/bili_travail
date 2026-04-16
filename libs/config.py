@@ -6,7 +6,7 @@ class Config:
     def __init__(self) -> None:
         self.file = Path("config.toml")
         self.default_data = '''[general]
-room_id = "" # 房间号
+room_id = 3 # 房间号
 host = "127.0.0.1" # 监听地址
 port = 65000 # 监听端口
 auth_code = "" # 主播身份码
@@ -37,6 +37,8 @@ show_capture_gift_list = false # 是否启用收到礼物列表
 show_capture_rank_list = false # 是否启用排行榜
 short_list = false # 是否启用简洁模式
 borderless_cd = false # 倒计时是否无边框
+error_upload = false # 是否自动上传错误信息
+error_upload_confirmed = false # 是否已确认错误日志上传弹窗
 
 [num]
 short_time = 5 # 简洁模式滚动时间
