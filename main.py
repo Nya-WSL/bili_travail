@@ -837,7 +837,7 @@ class CountdownTimer:
             self._task = asyncio.create_task(self.update()) # 创建倒计时协程
             update_btn_state("start") # 更新按钮状态
             cd_status = True # 设置倒计时运行状态
-            if not self.exit_timer is None and self.exit_timer.active:
+            if self.exit_timer and self.exit_timer.active:
                 logger.info("倒计时开始，停止计时器")
                 self.exit_timer.cancel(with_current_invocation=True) # 关闭退出计时器
         else:
