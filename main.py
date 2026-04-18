@@ -508,10 +508,10 @@ class BiliHandler(blivedm.BaseHandler):
             with open("data/blind_box_value.json", "rb") as f:
                 box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-            if box_value.get(box_name, None) == None:
+            if box_value.get(box_name, None) is None:
                 box_value[box_name] = {}
 
-            if box_value[box_name].get(gift, None) == None:
+            if box_value[box_name].get(gift, None) is None:
                 box_value[box_name][gift] = {"num": 0, "price": 0}
 
             box_value[box_name][gift] = {"num": box_value[box_name][gift]["num"] + num, "price": price}
@@ -557,7 +557,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if gift in gifts_name:
                                 if gifts.get(box_name, None) != None or special.get(box_name, None) != None:
                                     origin_gift = gift
-                                    if gift not in special and gifts.get(gift, None) == None:
+                                    if gift not in special and gifts.get(gift, None) is None:
                                         is_blind_box = True
                                         gift = box_name
 
@@ -666,7 +666,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if gift in gifts_name:
                                 if gifts.get(box_name, None) != None or special.get(box_name, None) != None:
                                     origin_gift = gift
-                                    if gift not in special and gifts.get(gift, None) == None:
+                                    if gift not in special and gifts.get(gift, None) is None:
                                         is_blind_box = True
                                         gift = box_name
 
@@ -837,8 +837,9 @@ class CountdownTimer:
             self._task = asyncio.create_task(self.update()) # 创建倒计时协程
             update_btn_state("start") # 更新按钮状态
             cd_status = True # 设置倒计时运行状态
-            if self.exit_timer is not None:
-                self.exit_timer.deactivate() # 关闭退出计时器
+            if self.exit_timer and self.exit_timer.active:
+                logger.info("倒计时开始，停止计时器")
+                self.exit_timer.cancel(with_current_invocation=True) # 关闭退出计时器
         else:
             ui.notify("请输入时间", type="negative")
             self._running = False
@@ -874,8 +875,8 @@ class CountdownTimer:
             self.remaining_time = datetime.timedelta(0)
             update_btn_state("stop") # 更新按钮状态
             cd_status = False
-            logger.info("倒计时停止，启动计时器")
-            if not self.exit_timer:
+            if not self.exit_timer and base_config.get("bool", "exit_timer", True):
+                logger.info("倒计时停止，启动计时器")
                 self.exit_timer = app.timer(base_config.get("num", "exit_time", 1800), lambda: self.exit_func(), once=True) # pyright: ignore[reportArgumentType]
         else:
             if reset_inherit_status:
@@ -953,8 +954,8 @@ def cd_setting_dialog():
         with open("data/special.json", "rb") as f:
             special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-        if gift_name.value == None or time.value < 0:
-            if gift_name.value == None:
+        if gift_name.value is None or time.value < 0:
+            if gift_name.value is None:
                 ui.notify("请选择礼物", type="negative")
             if time.value < 0:
                 ui.notify("时间不能是负数", type="negative")
@@ -1167,7 +1168,7 @@ def blind_box_value_dialog():
                 gift_name = gift
                 num = int(value["num"])
                 price = int(value["price"])
-                if value_list.get(k, None) == None:
+                if value_list.get(k, None) is None:
                     value_list[k] = []
                 value_list[k].append(f"礼物：{gift_name} | 数量：{num} | 总价格：{num * price}电池")
 
@@ -1237,8 +1238,8 @@ def gift_count_setting_dialog():
             gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb") as f:
             special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        if gift_name.value == None or number.value < 0:
-            if gift_name.value == None:
+        if gift_name.value is None or number.value < 0:
+            if gift_name.value is None:
                 ui.notify("请选择礼物", type="negative")
             if number.value < 0:
                 ui.notify("数量不能是负数", type="negative")
@@ -1586,7 +1587,7 @@ async def check_b_connect_status():
             b_connect_switch.set_value(False)
 
     # 开关关闭状态：断开连接
-    if switch_value == False:
+    if switch_value is False:
         # 无身份码且未连接
         if auth_code.value == "" and not b_connect_status:
             b_connect_switch.set_value(False)
@@ -1629,7 +1630,7 @@ async def check_b_connect_status():
             b_connect_switch.set_value(True)
 
     # 开关打开状态：已连接
-    if switch_value == True:
+    if switch_value is True:
         if not auth_code.value:
             ui.notify("请输入身份码", type="negative")
             b_connect_switch.set_value(False)
@@ -1720,7 +1721,7 @@ def open_capture():
 
 
 async def refresh_gift_loop():
-    if auth_code.value == "" or b_connect_status == False:
+    if auth_code.value == "" or b_connect_status is False:
         logger.warning("身份码为空或未连接弹幕服务器，跳过礼物更新")
         return
 
@@ -1762,10 +1763,10 @@ async def refresh_gift(heartbeat=False):
             logger.error(f"更新礼物数据时发生错误: {e}")
             raise
 
-        if gift_config == True:
+        if gift_config is True:
             ui.notify("礼物数据更新完成", type="positive")
         # 如果本地礼物配置数据不存在，则直接初始化
-        elif gift_config == None:
+        elif gift_config is None:
             ui.notify("未检测到本地礼物数据，将初始化礼物数据...", type="info")
             await init_config()
             ui.notify("礼物数据初始化完成", type="positive")
@@ -2368,7 +2369,7 @@ def index():
                         urls[k] = v.replace("https://", "").replace("http://", "").split("/")[0]
                     server = await ping_server(urls)  # pyright: ignore[reportAssignmentType]
 
-                    if server == False:
+                    if server is False:
                         ui.notify("无法连接更新服务器", type="negative")
                         return
                 else:
@@ -2447,7 +2448,7 @@ def index():
             ui.notify("保存成功", type="positive")
 
         def save(key):
-            if key == None or key == "":
+            if key is None or key == "":
                 ui.notify("名称不能为空", type="negative")
                 return
             with open("data/time.json", "rb") as f:
@@ -2618,11 +2619,16 @@ def index():
                 show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: base_config.save(config))
                 show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
 
+                with ui.switch("倒计时结束后退出程序", value=True, on_change=lambda: base_config.save(config)) as exit_timer_switch:
+                    ui.tooltip(f"倒计时结束{base_config.get('num', 'exit_time', 0)}秒后是否退出程序，该值可在 config.toml -> num -> exit_time 处修改")
+                exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
+
             with ui.column(align_items="center").classes("gap-0"):
-                with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
-                    ui.tooltip("启用时预览界面倒计时将不显示边框，仅显示数字")
                 with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
                     ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
+
+                with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
+                    ui.tooltip("启用时预览界面倒计时将不显示边框，仅显示数字")
 
                 gift_challenge_switch = ui.switch("启用投喂挑战", value=False).props('color="btn"')
                 gift_challenge_switch.disable()

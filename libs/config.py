@@ -37,6 +37,7 @@ show_capture_gift_list = false # 是否启用收到礼物列表
 show_capture_rank_list = false # 是否启用排行榜
 short_list = false # 是否启用简洁模式
 borderless_cd = false # 倒计时是否无边框
+exit_timer = true # 是否启用倒计时结束后退出程序
 
 [num]
 short_time = 5 # 简洁模式滚动时间
