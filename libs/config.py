@@ -1,6 +1,3 @@
-from typing import Any
-
-
 import os
 import tomlkit
 from pathlib import Path
@@ -71,7 +68,7 @@ exit_time = 1800 # 倒计时结束后退出程序等待时间'''
             else:
                 tomlkit.dump(tomlkit.parse(data), f)
 
-    def get(self, table, value, default=None) -> Any | None:
+    def get(self, table, value, default=None):
         """
         使用dict.get()获取配置文件中的值，不支持嵌套table
 
