@@ -112,7 +112,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     if manager == "poetry":
         if nuitka == 'y':
             start_time = time.time()
-            os.system(f"poetry run python -m nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
+            os.system(f"poetry run python -m nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
@@ -121,7 +121,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     elif manager == "uv":
         if nuitka == 'y':
             start_time = time.time()
-            os.system(f"uv run nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
+            os.system(f"uv run nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
