@@ -5,7 +5,7 @@
 #define MyAppExeName "start.exe"
 
 [Setup]
-AppId={{F0EE1E7B-698C-45CC-84A3-8BC98330B8EB}
+AppId={{F0EE1E7B-698C-45CC-84A3-8BC98330B8EB}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
