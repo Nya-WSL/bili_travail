@@ -53,9 +53,10 @@ import itertools
 from typing import * # pyright: ignore[reportWildcardImportFromLibrary]
 from copy import deepcopy
 from nicegui import ui, app
+from itertools import islice
+from multiprocessing import freeze_support
 from packaging import version as pack_version
 from nicegui import __version__ as gui_version
-from itertools import islice
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
@@ -2897,6 +2898,7 @@ async def shutdown():
 # 运行NiceGUI
 if __name__ == "__main__":
     try:
+        freeze_support()
         logger.info("正在检查Edge WebView2 runtime...")
         asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
 

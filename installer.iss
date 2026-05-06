@@ -1,5 +1,5 @@
 #define MyAppName "bili_travail"
-#define MyAppVersion "1.39.042919"
+#define MyAppVersion "v1.39.050613"
 #define MyAppPublisher "Nya-WSL"
 #define MyAppURL "https://github.com/Nya-WSL/bili_travail"
 #define MyAppExeName "start.exe"
