@@ -2384,6 +2384,9 @@ def index():
             elif server in ["CN-QN", "hi168"]:
                 server = f'{source.get("url", {}).get(server)}/{status}.zip'
 
+            else:
+                server = source.get("url", {}).get(server)
+
             await travail_update.update(server) # 调用更新函数
 
         def version_dialog():
