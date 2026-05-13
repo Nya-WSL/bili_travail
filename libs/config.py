@@ -17,6 +17,7 @@ background_image = [
     "static/sample1.png",
     "static/sample2.png"
 ] # 背景图片
+check_sha256 = true # 是否启用更新包SHA256校验
 
 [api]
 server = "http://api.travail.nya-wsl.cn" # API地址
