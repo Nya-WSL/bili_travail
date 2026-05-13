@@ -1,10 +1,10 @@
 {
     "source": {
         "auto": "自动检测",
-        "hi168": "中国首选",
         "CN-HK": "中国香港",
         "CN-QN": "全球CDN",
-        "GitHub": "GitHub"
+        "GitHub": "GitHub",
+        "hi168_v2": "hi168"
     },
     "url": {
         "CN-QN": "https://domain/update",
