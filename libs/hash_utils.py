@@ -2,13 +2,13 @@ import hashlib
 
 
 def get_hash(file_path, save=False):
-    hash = hashlib.sha256()
+    hash_value = hashlib.sha256()
 
     with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
-            hash.update(chunk)
+            hash_value.update(chunk)
 
-    hex_digest = hash.hexdigest()
+    hex_digest = hash_value.hexdigest()
 
     if save:
         with open(f"{file_path}.sha256", "w") as f:

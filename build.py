@@ -3,13 +3,13 @@ import re
 import sys
 import time
 import json
-import hash
 import shutil
 import zipfile
 import datetime
 import traceback
 
 from pathlib import Path
+from libs import hash_utils
 from version import base_version
 from qiniu import Auth, put_file, etag
 
@@ -155,7 +155,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     shutil.rmtree(Path("dist", "update"))
 
     for file in Path("dist").glob("*.zip"):
-        hash.get_hash(file, save=True)
+        hash_utils.get_hash(file, save=True)
 
     if qiniu_status == 'y' or qiniu_status == '':
         upload(Path("dist", f"{version}.zip"), f"bili_travail/update/{version}.zip", "v1")

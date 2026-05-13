@@ -7,9 +7,8 @@ import asyncio
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) # 将上级目录加入路径，用于导入hash模块
 
-import hash
-
 from .log import logger
+from . import hash_utils
 from . import dns_resolver
 from . import config as travail_config
 
@@ -69,11 +68,9 @@ async def update(zipUrl):
 
         if base_config.get("general", "check_sha256", True):
             percent_dialog.set_text("正在校验SHA256...")
-            server_hash = await get_sha(url + ".sha256")
-            local_hash = hash.get_hash(save_path)
-            percent_dialog.set_text(f"""服务器返回SHA256：{server_hash if server_hash else "获取失败"}
-本地文件SHA256：{local_hash if local_hash else "计算失败"}""")
-            await asyncio.sleep(5)
+            server_hash = await get_sha(url + ".sha256").strip().lower()
+            local_hash = hash_utils.get_hash(save_path).strip().lower()
+
             if server_hash != local_hash:
                 ui.notify("更新失败：SHA256校验失败，请检查日志", type="negative")
                 logger.error(f"更新失败：SHA256校验失败, 服务器返回的SHA256：{server_hash}，本地文件的SHA256：{local_hash}")
