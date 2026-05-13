@@ -2381,8 +2381,11 @@ def index():
                 ui.notify("更新源为空，将尝试从Github获取更新", type="negative")
                 server = "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
 
-            elif server in ["CN-QN", "hi168"]:
+            elif server in ["CN-QN"]:
                 server = f'{source.get("url", {}).get(server)}/{status}.zip'
+
+            else:
+                server = source.get("url", {}).get(server)
 
             await travail_update.update(server) # 调用更新函数
 

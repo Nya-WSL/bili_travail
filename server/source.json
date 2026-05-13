@@ -8,7 +8,7 @@
     },
     "url": {
         "CN-QN": "https://domain/update",
-        "hi168": "https://s3.hi168.com/存储桶名称/bili_travail",
+        "hi168_v2": "https://www.hi168.com/api/v2/s3/api/public/share/dl/uuid",
         "CN-HK": "https://domain/update.zip",
         "GitHub": "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
     }

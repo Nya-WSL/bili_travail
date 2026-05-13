@@ -1,13 +1,29 @@
 import os
+import sys
+import traceback
 import aiohttp
 import zipfile
 import asyncio
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) # 将上级目录加入路径，用于导入hash模块
+
 from .log import logger
+from . import hash_utils
 from . import dns_resolver
+from . import config as travail_config
+
 from nicegui import ui, app
 
 file_name = "cache\\bili_travail_update.zip"
+base_config = travail_config.Config()
+
+async def get_sha(url: str):
+    async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
+        async with session.get(url) as response:
+            if response.status != 200:
+                logger.error(f'获取SHA256失败：{response.status} {response.reason}')
+                return None
+            return await response.text()
 
 async def update(zipUrl):
     if os.path.exists("update.bat"):
@@ -50,6 +66,17 @@ async def update(zipUrl):
                             await asyncio.sleep(1)
                             break
 
+        if base_config.get("general", "check_sha256", True):
+            percent_dialog.set_text("正在校验SHA256...")
+            server_hash = await get_sha(url + ".sha256").strip().lower()
+            local_hash = hash_utils.get_hash(save_path).strip().lower()
+
+            if server_hash != local_hash:
+                ui.notify("更新失败：SHA256校验失败，请检查日志", type="negative")
+                logger.error(f"更新失败：SHA256校验失败, 服务器返回的SHA256：{server_hash}，本地文件的SHA256：{local_hash}")
+                percent_dialog.set_text("更新失败：SHA256校验失败，请检查日志")
+                return
+
         Unzip = zipfile.ZipFile(file_name, mode='r')
         percent_dialog.set_text("正在解压更新包...")
         await asyncio.sleep(1)
@@ -83,5 +110,5 @@ timeout /t 1 /nobreak
             await download(zipUrl, file_name)
         except Exception as e:
             ui.notify(f"更新失败：{e}", type="negative")
-            logger.error(f"更新失败：{e}")
+            logger.error(f"更新失败：{traceback.format_exc()}")
             return
