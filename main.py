@@ -424,6 +424,29 @@ class BiliHandler(blivedm.BaseHandler):
                 login_status.set_text("未连接")
                 login_status.classes(replace="text-red")
 
+    async def _on_open_live_like(self, client: blivedm.OpenLiveClient, message: open_models.LikeMessage):
+        uname = message.uname
+        like_count = message.like_count
+        file_name = f"data/likes/{datetime.datetime.now().strftime('%Y%m%d')}.json"
+
+        if not os.path.exists(file_name):
+            with open(file_name, "wb+") as f:
+                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+
+        with open(file_name, "rb+") as f:
+            likes = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
+        likes[uname] = likes.get(uname, 0) + like_count
+
+        if len(likes[uname]) <= 1000:
+            await self._on_gift_play("点赞", like_count, uname, message, is_like=True)
+        else:
+            with cd_main_card:
+                ui.notify(f"{uname} 的当日点赞数已超1000，点赞无效", type="warning")
+
+        with open(file_name, "wb+") as f:
+            f.write(orjson.dumps(likes, option=orjson.OPT_INDENT_2))
+
     # 礼物数据
     async def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):  # pyright: ignore[reportIncompatibleMethodOverride]
         logger.debug("收到礼物")
@@ -498,7 +521,7 @@ class BiliHandler(blivedm.BaseHandler):
             f.write(orjson.dumps(count, option=orjson.OPT_INDENT_2))
 
     # 收到礼物后执行函数
-    async def _on_gift_play(self, gift, num, uname, message, price: int | float = 0):
+    async def _on_gift_play(self, gift, num, uname, message, price: int | float = 0, is_like = False):
         is_blind_box = False
 
         def blind_box_value(gift, num : int, price : int | float, box_name):
@@ -955,42 +978,74 @@ def cd_setting_dialog():
         with open("data/special.json", "rb") as f:
             special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-        if gift_name.value is None or time.value < 0:
-            if gift_name.value is None:
+        if gift_name.value is None or time.value < 0 or int(like_num.value) not in range(0, 1001):
+            if gift_name.value is None and like_num.value == 0:
                 ui.notify("请选择礼物", type="negative")
             if time.value < 0:
                 ui.notify("时间不能是负数", type="negative")
+            if int(like_num.value) not in range(0, 1001):
+                ui.notify("点赞数必须在0-1000之间", type="negative")
         else:
             if status.value == "add":
-                gifts[gift_name.value] = int(time.value)
-                if gift_name.value in special:
-                    special.pop(gift_name.value)
+                if like_num.value != 0:
+                    gifts["点赞"] = int(time.value)
+                    if "点赞" in special:
+                        special.pop("点赞")
+                if not gift_name.value is None:
+                    gifts[gift_name.value] = int(time.value)
+                    if gift_name.value in special:
+                        special.pop(gift_name.value)
             elif status.value == "sub":
-                gifts[gift_name.value] = float(f"-{time.value}")
-                if gift_name.value in special:
-                    special.pop(gift_name.value)
+                if like_num.value != 0:
+                    gifts["点赞"] = float(f"-{time.value}")
+                    if "点赞" in special:
+                        special.pop("点赞")
+                if not gift_name.value is None:
+                    gifts[gift_name.value] = float(f"-{time.value}")
+                    if gift_name.value in special:
+                        special.pop(gift_name.value)
             elif status.value == "double":
-                special[gift_name.value] = "double"
-                if gift_name.value in gifts:
-                    gifts.pop(gift_name.value)
+                if like_num.value != 0:
+                    special["点赞"] = "double"
+                    if "点赞" in gifts:
+                        gifts.pop("点赞")
+                if not gift_name.value is None:
+                    special[gift_name.value] = "double"
+                    if gift_name.value in gifts:
+                        gifts.pop(gift_name.value)
             elif status.value == "half":
-                special[gift_name.value] = "half"
-                if gift_name.value in gifts:
-                    gifts.pop(gift_name.value)
+                if like_num.value != 0:
+                    special["点赞"] = "half"
+                    if "点赞" in gifts:
+                        gifts.pop("点赞")
+                if not gift_name.value is None:
+                    special[gift_name.value] = "half"
+                    if gift_name.value in gifts:
+                        gifts.pop(gift_name.value)
             elif status.value == "clear":
-                special[gift_name.value] = "clear"
-                if gift_name.value in gifts:
-                    gifts.pop(gift_name.value)
+                if like_num.value != 0:
+                    special["点赞"] = "clear"
+                    if "点赞" in gifts:
+                        gifts.pop("点赞")
+                if not gift_name.value is None:
+                    special[gift_name.value] = "clear"
+                    if gift_name.value in gifts:
+                        gifts.pop(gift_name.value)
             elif status.value == "random":
                 try:
                     if min.value <= max.value:
-                        special[gift_name.value] = [int(min.value), int(max.value)]
+                        if like_num.value != 0:
+                            special["点赞"] = [int(min.value), int(max.value)]
+                            if "点赞" in gifts:
+                                gifts.pop("点赞")
+                        if not gift_name.value is None:
+                            special[gift_name.value] = [int(min.value), int(max.value)]
                     else:
                         ui.notify("随机的值必须最小数<=最大数", type="negative")
                         return
                 except TypeError:
                     ui.notify("随机的值为空", type="negative")
-                if gift_name.value in gifts:
+                if not gift_name.value is None and gift_name.value in gifts:
                     gifts.pop(gift_name.value)
 
             gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
@@ -1122,6 +1177,9 @@ def cd_setting_dialog():
 
         with ui.row(align_items="center"):
             gift_name = ui.select(label="礼物选择", options=list(gifts.keys()), with_input=True, clearable=True).style("width: 200px")
+            like_num = ui.number(label="点赞数量", value=0, min=0, max=1000, step=1).bind_value(app.storage.general, "like_num").style("width: 200px")
+            with like_num:
+                ui.tooltip("触发玩法的点赞数量(0-1000)，数量为0时禁用")
 
         status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
 
@@ -1809,7 +1867,7 @@ async def refresh_gift(heartbeat=False):
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail")
 async def capture():  # pyright: ignore[reportRedeclaration]
-    global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created
+    global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created, cd_main_card
 
     styles.page_styles() # 加载自定义样式
     # 检查是否需要刷新页面
@@ -1968,7 +2026,7 @@ async def capture():  # pyright: ignore[reportRedeclaration]
     # ui.query('body').style(f'background: url("{random.choice(config["general"]["background_image"])}") 0px 0px/cover')
 
     # 创建预览界面
-    with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"): # 居中、背景透明、取消卡片阴影、置顶居中
+    with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);") as cd_main_card: # 居中、背景透明、取消卡片阴影、置顶居中
         if not config['bool']['borderless_cd']:  # type: ignore[index]
             ui.badge(outline=True, color="", text_color=config['color']['time_color']).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl")  # type: ignore[arg-type]
         else:
