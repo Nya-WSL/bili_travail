@@ -107,7 +107,8 @@ async def update(zip_url, version):
                                 result = f"获取sha256失败:{error}，状态码: {response.status}"
                                 raise Exception(result)
                 else:
-                    server_hash = await get_sha(url + ".sha256", version).strip().lower()
+                    sha = await get_sha(url.replace('.zip', '.sha256'), version)
+                    server_hash = sha.strip().lower()
             except Exception:
                 logger.error(traceback.format_exc())
                 server_hash = None

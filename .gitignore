@@ -187,3 +187,5 @@ broadcast_code.py
 env.py
 config.toml
 stat.json
+/.idea
+/cache
