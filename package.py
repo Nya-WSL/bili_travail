@@ -1,6 +1,5 @@
 import argparse
 import os
-import shutil
 import platform
 import subprocess
 from pathlib import Path
