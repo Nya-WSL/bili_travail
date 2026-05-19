@@ -14,7 +14,8 @@ dependencies = [
     "python-multipart (>=0.0.20,<0.0.21)",
     "aiohttp (>=3.13.2,<4.0.0)",
     "orjson (>=3.11.5,<4.0.0)",
-    "aiodns (==3.6.1)"
+    "aiodns (==3.6.1)",
+    "minio>=7.2.20"
 ]
 
 [tool.poetry]

@@ -50,7 +50,6 @@ import datetime
 import traceback
 import itertools
 
-from typing import * # pyright: ignore[reportWildcardImportFromLibrary]
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
@@ -2176,7 +2175,7 @@ async def capture():
     capture_gift_is_created = True
 
     if not os.path.exists("data/gifts_count.json") or not os.path.exists("data/gift_img.json"):
-        if auth_code.value != None:
+        if not auth_code.value is None:
             await init_config()
 
     with open("data/gifts_count.json", "rb") as f:
@@ -2384,10 +2383,49 @@ def index():
             elif server in ["CN-QN"]:
                 server = f'{source.get("url", {}).get(server)}/{status}.zip'
 
+            elif server == "hi168_v2":
+                url = f'{base_config.get("api", "server", None)}/update'
+                try:
+                    timeout = aiohttp.ClientTimeout(total=10)  # 10秒超时
+
+                    params = {
+                        "version": status,
+                        "type": "zip"
+                    }
+
+                    async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
+                        async with session.get(url, params=params) as response:
+                            if response.status == 200:
+                                result = await response.json()
+                                server = result.get("url", None)
+                                if server is None:
+                                    result = f"获取直链失败: {result.get('message', '未知错误')}"
+                                    logger.error(result)
+                                    ui.notify(result, type="negative")
+                                    return
+                            else:
+                                error = await response.text()
+                                result = f"获取直链失败:{error}，状态码: {response.status}"
+                                logger.error(result)
+                                ui.notify(result, type="negative")
+                                return
+
+                except aiohttp.ClientError as e:
+                    result = f"获取直链失败，发生网络错误: {e}"
+                    logger.error(result + "\n" + traceback.format_exc())
+                    ui.notify(result, type="negative")
+                    return
+
+                except Exception as e:
+                    result = f"获取直链失败，发生错误: {e}"
+                    logger.error(result + "\n" + traceback.format_exc())
+                    ui.notify(result, type="negative")
+                    return
+
             else:
                 server = source.get("url", {}).get(server)
 
-            await travail_update.update(server) # 调用更新函数
+            await travail_update.update(server, status) # 调用更新函数
 
         def version_dialog():
             with ui.dialog() as dialog, ui.card(align_items="center"):

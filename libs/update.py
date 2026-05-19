@@ -2,6 +2,7 @@ import os
 import sys
 import traceback
 import aiohttp
+import aiofiles
 import zipfile
 import asyncio
 
@@ -17,19 +18,27 @@ from nicegui import ui, app
 file_name = "cache\\bili_travail_update.zip"
 base_config = travail_config.Config()
 
-async def get_sha(url: str):
+async def get_sha(url: str, version: str) -> str:
     async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
         async with session.get(url) as response:
             if response.status != 200:
                 logger.error(f'获取SHA256失败：{response.status} {response.reason}')
                 return None
-            return await response.text()
+            async with aiofiles.open(f"cache\\{version}.sha256", 'wb') as f:
+                while True:
+                    chunk = await response.content.read(1024)
+                    if not chunk:
+                        break
+                    await f.write(chunk)
 
-async def update(zipUrl):
+            with open(f"cache\\{version}.sha256", 'r') as f:
+                return f.read()
+
+async def update(zip_url, version):
     if os.path.exists("update.bat"):
         os.remove("update.bat")
 
-    async def download(url, save_path):
+    async def download(url, save_path, version):
         async def close_session():
             await session.close()
             dialog.close()
@@ -43,7 +52,7 @@ async def update(zipUrl):
 
         async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
             async with session.get(url) as response:
-                cancelButton.on_click(lambda: close_session())
+                cancel_button.on_click(lambda: close_session())
                 if response.status != 200:
 
                     ui.notify("更新失败", type="negative")
@@ -68,21 +77,54 @@ async def update(zipUrl):
 
         if base_config.get("general", "check_sha256", True):
             percent_dialog.set_text("正在校验SHA256...")
-            server_hash = await get_sha(url + ".sha256").strip().lower()
+            try:
+                if "hi168" in url:
+                    url = base_config.get("api", "server", None)
+
+                    if url is None:
+                        raise Exception("未配置API地址，无法获取SHA256")
+
+                    timeout = aiohttp.ClientTimeout(total=10)  # 10秒超时
+
+                    params = {
+                        "version": version,
+                        "type": "sha256"
+                    }
+
+                    async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
+                        async with session.get(f"{url}/update", params=params) as response:
+                            if response.status == 200:
+                                result = await response.json()
+                                server = result.get("url", None)
+                                sha = await get_sha(server, version)
+                                server_hash = sha.strip().lower()
+                                if server_hash is None:
+                                    result = f"获取sha256失败: {result.get('message', '未知错误')}"
+                                    logger.error(result)
+                                    return
+                            else:
+                                error = await response.text()
+                                result = f"获取sha256失败:{error}，状态码: {response.status}"
+                                raise Exception(result)
+                else:
+                    server_hash = await get_sha(url + ".sha256", version).strip().lower()
+            except Exception:
+                logger.error(traceback.format_exc())
+                server_hash = None
             local_hash = hash_utils.get_hash(save_path).strip().lower()
 
             if server_hash != local_hash:
-                ui.notify("更新失败：SHA256校验失败，请检查日志", type="negative")
-                logger.error(f"更新失败：SHA256校验失败, 服务器返回的SHA256：{server_hash}，本地文件的SHA256：{local_hash}")
-                percent_dialog.set_text("更新失败：SHA256校验失败，请检查日志")
+                ui.notify("更新失败：SHA256校验未通过，请检查日志", type="negative")
+                logger.error(f"更新失败：SHA256校验未通过, 服务器返回的SHA256：{server_hash}，本地文件的SHA256：{local_hash}")
+                percent_dialog.set_text("更新失败：SHA256校验未通过，请检查日志")
                 return
 
-        Unzip = zipfile.ZipFile(file_name, mode='r')
+        unzip = zipfile.ZipFile(file_name, mode='r')
         percent_dialog.set_text("正在解压更新包...")
         await asyncio.sleep(1)
-        for names in Unzip.namelist():
-            Unzip.extract(names, os.getcwd())
-        Unzip.close()
+        for names in unzip.namelist():
+            unzip.extract(names, os.getcwd())
+        unzip.close()
         percent_dialog.set_text("正在更新...")
         await asyncio.sleep(1)
         with open("update.bat", "w") as f:
@@ -105,9 +147,9 @@ timeout /t 1 /nobreak
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
         percent_dialog = ui.label("")
-        cancelButton = ui.button("取消")
+        cancel_button = ui.button("取消")
         try:
-            await download(zipUrl, file_name)
+            await download(zip_url, file_name, version)
         except Exception as e:
             ui.notify(f"更新失败：{e}", type="negative")
             logger.error(f"更新失败：{traceback.format_exc()}")
