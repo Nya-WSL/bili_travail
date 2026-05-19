@@ -8,7 +8,8 @@ import aiohttp
 import orjson
 import traceback
 
-from typing import List
+from typing import List, Literal
+from minio import Minio
 from pathlib import Path
 from pydantic import BaseModel
 from aiohttp.resolver import AsyncResolver
@@ -24,6 +25,9 @@ class StatRequest(BaseModel):
     version: str
     time: str
 
+class UpdateRequest(BaseModel):
+    version: str
+
 def bytes_to_kb(bytes_size: int) -> float:
     """将字节大小转换为 KB"""
     return round(bytes_size / 1024, 2)  # 保留两位小数
@@ -36,7 +40,12 @@ example_config = {
     "host": "0.0.0.0",
     "port": 65200,
     "save_path": os.getcwd() + "/logs/",
-    "SESSDATA": ""
+    "SESSDATA": "",
+    "endpoint": "s3.hi168.com",
+    "bucket_name": "",
+    "access_key": "",
+    "secret_key": "",
+    "region": "us-east-1"
 }
 
 def init_config():
@@ -242,6 +251,52 @@ async def index():
     except Exception as e:
         print(traceback.format_exc())
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@app.get("/update", status_code=status.HTTP_200_OK)
+async def index(version: str, type: Literal["zip", "sha256"]):
+    """_向S3兼容的储存桶请求直链_
+
+    Args:
+        version (str): _请求的版本_
+        type (Literal["zip", "sha256"]): _请求的文件类型_
+
+    Raises:
+        he: _HTTPException_
+
+    Returns:
+        _dict_: _包含code和url或message的字典_
+    """
+    try:
+        with open("config.json", "rb") as f:
+            config = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
+        endpoint = config.get("endpoint", "s3.hi168.com")
+        bucket_name = config.get("bucket_name", "")
+        access_key = config.get("access_key", "")
+        secret_key = config.get("secret_key", "")
+        region = config.get("region", "us-east-1")
+
+        client = Minio(
+            endpoint=endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            region=region,
+            secure=True
+        )
+
+        url = client.presigned_get_object(
+            bucket_name=bucket_name,
+            object_name=f"bili_travail/{version}.{type}"
+        )
+
+        return {"code": 0, "url": url}
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        print(traceback.format_exc())
+        return {"code": 1, "message": f"{e}"}
 
 if __name__ == "__main__":
     init_config()

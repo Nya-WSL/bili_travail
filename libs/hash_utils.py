@@ -11,7 +11,7 @@ def get_hash(file_path, save=False):
     hex_digest = hash_value.hexdigest()
 
     if save:
-        with open(f"{file_path}.sha256", "w") as f:
+        with open(f"{str(file_path).replace('zip','sha256')}", "w") as f:
             f.write(hex_digest)
 
     return hex_digest

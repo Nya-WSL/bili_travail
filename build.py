@@ -159,11 +159,11 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
 
     if qiniu_status == 'y' or qiniu_status == '':
         upload(Path("dist", f"{version}.zip"), f"bili_travail/update/{version}.zip", "v1")
-        upload(Path("dist", f"{version}.zip.sha256"), f"bili_travail/update/{version}.zip.sha256", "v1")
+        upload(Path("dist", f"{version}.sha256"), f"bili_travail/update/{version}.sha256", "v1")
 
     if upload_status == 'y' or upload_status == '':
         if env_data.get("scp_url", ""):
-            os.system(f'scp {Path("dist", "update.zip")} {Path("dist", "update.zip.sha256")} {env_data["scp_url"]}')
+            os.system(f'scp {Path("dist", "update.zip")} {Path("dist", "update.sha256")} {env_data["scp_url"]}')
         else:
             print("未配置scp_url，无法上传到服务器")
 
