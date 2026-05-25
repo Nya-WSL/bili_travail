@@ -1684,13 +1684,16 @@ async def get_notes():
     async def random_notes():
         result = await fetch_notes()
         local_notes = result.copy()
+        with open("data/gifts.json", "rb") as f:
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         for note in local_notes:
             for i in GiftManager.custom_gifts:
                 if i in note:
                     local_notes.pop(local_notes.index(note))
-                local_notes.append(
-                    f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
-                )
+                if i in gifts:
+                    local_notes.append(
+                        f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
+                    )
 
         if local_notes: # 如果公告列表不为空
             # 过滤掉所有空字符串占位符
