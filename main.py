@@ -2565,8 +2565,11 @@ def index():
             ui.separator()
 
             with ui.row():
-                short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"')
+                with ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"') as short_switch:
+                    ui.tooltip("存在bug，暂时禁用")
                 short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
+                short_switch.set_value(False)
+                short_switch.disable()
                 short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
                 if short_switch.value:
                     short_time.set_visibility(True)
