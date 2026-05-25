@@ -50,6 +50,7 @@ import datetime
 import traceback
 import itertools
 
+from icecream import ic
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
@@ -164,6 +165,7 @@ def init_storage():
     app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
     app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
     app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
+    app.storage.general["gift_cd_rate"] = app.storage.general.get("gift_cd_rate", {"nega": 0, "zero": 0, "posi": 0})
 
 # ================================
 # 初始化配置文件
@@ -597,8 +599,8 @@ class BiliHandler(blivedm.BaseHandler):
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
                             total_changed_num = 0
 
-                            for i in range(num):
-                                random_num = random.randint(special[gift][0], special[gift][1] + 1)
+                            for _ in range(num):
+                                random_num = random.randint(special[gift][0], special[gift][1])
                                 total_changed_num += random_num
 
                             changed_num = int(app.storage.general["gift_challenge_count"]) + total_changed_num
@@ -703,16 +705,34 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, "清空", message)
 
                         if type(special[gift]) == list:
+                            total_changed_time = 0
+                            rate = app.storage.general["gift_cd_rate"]
+
                             if gift in custom_gifts:
-                                total_changed_time = sum(
-                            random.randint(special[gift][0], special[gift][1] + 1) * float(app.storage.general["custom_gift_rate"][gift])
-                                    for _ in range(num)
-                                )
+                                custom_rate = float(app.storage.general["custom_gift_rate"][gift])
                             else:
-                                total_changed_time = sum(
-                                    random.randint(special[gift][0], special[gift][1] + 1)
-                                    for _ in range(num)
-                                )
+                                custom_rate = 1
+
+                            for _ in range(num):
+                                r = round(random.random(), 2)
+
+                                if r <= rate.get("nega", 0) and rate.get("nega", 0) != 0:
+                                    if special[gift][0] >= 0: # 如果下界>=0，为防止抛错将使用默认算法
+                                        total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
+                                    else:
+                                        total_changed_time += random.randint(special[gift][0], -1) * custom_rate
+
+                                elif r <= rate.get("zero", 0) + rate.get("nega", 0) and rate.get("zero", 0) != 0: # 如果r小于等于减时概率则会先进入减时的if语句，如果r大于减时概率但小于等于两者之和则会进入不变的elif语句
+                                    total_changed_time += 0
+
+                                elif r <= rate.get("posi", 0) + rate.get("nega", 0) + rate.get("zero", 0) and rate.get("posi", 0) != 0: # 同上
+                                    if special[gift][1] <= 0:# 如果上界<=0，为防止抛错将使用默认算法
+                                        total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
+                                    else:
+                                        total_changed_time += random.randint(1, special[gift][1]) * custom_rate
+
+                                else:
+                                    total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
 
                             new_seconds = current_seconds + total_changed_time
 
@@ -933,16 +953,27 @@ def cd_setting_dialog():
             time.set_visibility(True)
         else:
             time.set_visibility(False)
+
         if status.value == "random":
             min.set_visibility(True)
             max.set_visibility(True)
+            rate_column.set_visibility(True)
+            # rate_nega.set_visibility(True)
+            # rate_posi.set_visibility(True)
+            # rate_zero.set_visibility(True)
         else:
             min.set_visibility(False)
             max.set_visibility(False)
+            rate_column.set_visibility(False)
+            # rate_nega.set_visibility(False)
+            # rate_posi.set_visibility(False)
+            # rate_zero.set_visibility(False)
+
         if status.value == "double" or status.value == "clear" or status.value == "random" or status.value == "half":
             time.disable()
         else:
             time.enable()
+
         if status.value == "delete":
             time.disable()
 
@@ -1132,6 +1163,28 @@ def cd_setting_dialog():
             time.set_visibility(False)
             min.set_visibility(False)
             max.set_visibility(False)
+
+        with ui.column(align_items="center") as rate_column:
+            ui.label("随机玩法权重设置(设置会自动保存)")
+            ui.link("使用说明", "https://docs.travail.nya-wsl.com/guides/usage/play/#随机权重", True)
+
+        # rate_column.set_visibility(False)
+
+        def verify_rate():
+            if "rate_posi" in globals() or "rate_posi" in locals(): # 防止未创建输入框时调用函数导致报错
+                rate_posi_value = round(1 - rate_nega.value - rate_zero.value, 2)
+                if rate_posi_value < 0:
+                    rate_posi_value = 0
+                rate_posi.set_value(rate_posi_value)
+
+        # 概率输入框
+        with ui.row():
+            rate_nega = ui.number(label="减时概率", value=0, min=0, max=1, step=0.1, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "nega")
+            rate_zero = ui.number(label="零的概率", value=0, min=0, max=1, step=0.1, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "zero")
+            rate_posi = ui.number(label="加时概率", value=0, min=0, max=1, step=0.1, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "posi")
+            # rate_nega.set_visibility(False)
+            # rate_zero.set_visibility(False)
+            # rate_posi.set_visibility(False)
 
         # 按钮
         with ui.row():
