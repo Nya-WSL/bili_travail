@@ -691,7 +691,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
+                                capture_cd_gift_list_show(uname, gift, num, f"-2^{int(num)}倍", message)
 
                         if special[gift] == "clear":
                             new_seconds = 3
@@ -2014,6 +2014,12 @@ async def capture():  # pyright: ignore[reportRedeclaration]
                 with open("data/gift_img.json", "rb") as f:
                     gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
+                if "倍" in time:
+                    if re.search(r"-2\^(\d+)倍", time):
+                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] / 2}"))
+                    else:
+                        time = f"{format_seconds(app.storage.general['countdown_time'])}"
+
                 gift_history["cd"].append({
                     "name": name,
                     "gift": gift,
@@ -2060,10 +2066,6 @@ async def capture():  # pyright: ignore[reportRedeclaration]
                 if not isinstance(rule, str):
                     return None
                 rule = rule.strip() # 去除字符串首尾的空白字符
-
-                # 如果规则包含"倍"字，则返回None表示跳过
-                if "倍" in rule:
-                    return None
 
                 # 提取符号
                 sign = 1
