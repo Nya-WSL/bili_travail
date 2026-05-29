@@ -50,6 +50,7 @@ import datetime
 import traceback
 import itertools
 
+from icecream import ic
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
@@ -164,6 +165,7 @@ def init_storage():
     app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
     app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
     app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
+    app.storage.general["gift_cd_rate"] = app.storage.general.get("gift_cd_rate", {"nega": 0, "zero": 0, "posi": 0})
 
 # ================================
 # 初始化配置文件
@@ -425,7 +427,6 @@ class BiliHandler(blivedm.BaseHandler):
 
     # 礼物数据
     async def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):  # pyright: ignore[reportIncompatibleMethodOverride]
-        logger.debug("收到礼物")
         gift = message.gift_name
         num = message.gift_num
         uname = message.uname
@@ -597,8 +598,8 @@ class BiliHandler(blivedm.BaseHandler):
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
                             total_changed_num = 0
 
-                            for i in range(num):
-                                random_num = random.randint(special[gift][0], special[gift][1] + 1)
+                            for _ in range(num):
+                                random_num = random.randint(special[gift][0], special[gift][1])
                                 total_changed_num += random_num
 
                             changed_num = int(app.storage.general["gift_challenge_count"]) + total_changed_num
@@ -676,7 +677,7 @@ class BiliHandler(blivedm.BaseHandler):
                         new_seconds = current_seconds  # 初始化为当前剩余秒数
 
                         if special[gift] == "double":
-                            new_seconds = current_seconds * (2 ** num)
+                            new_seconds = current_seconds * (2 ** num) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -685,13 +686,13 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "half":
-                            new_seconds = current_seconds / (2 ** num)
+                            new_seconds = current_seconds / (2 ** num) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
+                                capture_cd_gift_list_show(uname, gift, num, f"-2^{int(num)}倍", message)
 
                         if special[gift] == "clear":
                             new_seconds = 3
@@ -703,16 +704,35 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, "清空", message)
 
                         if type(special[gift]) == list:
+                            total_changed_time = 0
+                            rate = app.storage.general["gift_cd_rate"]
+
                             if gift in custom_gifts:
-                                total_changed_time = sum(
-                            random.randint(special[gift][0], special[gift][1] + 1) * float(app.storage.general["custom_gift_rate"][gift])
-                                    for _ in range(num)
-                                )
+                                custom_rate = float(app.storage.general["custom_gift_rate"][gift])
                             else:
-                                total_changed_time = sum(
-                                    random.randint(special[gift][0], special[gift][1] + 1)
-                                    for _ in range(num)
-                                )
+                                custom_rate = 1
+
+                            for _ in range(num):
+                                r = round(random.random(), 2)
+                                logger.info(f"随机数: {r}, 负时概率: {rate.get('nega', 0)}, 不变概率: {rate.get('zero', 0)}, 正时概率: {rate.get('posi', 0)}")
+
+                                if r <= rate.get("nega", 0) and rate.get("nega", 0) != 0:
+                                    if special[gift][0] >= 0: # 如果下界>=0，为防止抛错将使用默认算法
+                                        total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
+                                    else:
+                                        total_changed_time += random.randint(special[gift][0], -1) * custom_rate
+
+                                elif r <= rate.get("zero", 0) + rate.get("nega", 0) and rate.get("zero", 0) != 0: # 如果r小于等于减时概率则会先进入减时的if语句，如果r大于减时概率但小于等于两者之和则会进入不变的elif语句
+                                    total_changed_time += 0
+
+                                elif r <= rate.get("posi", 0) + rate.get("nega", 0) + rate.get("zero", 0) and rate.get("posi", 0) != 0: # 同上
+                                    if special[gift][1] <= 0:# 如果上界<=0，为防止抛错将使用默认算法
+                                        total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
+                                    else:
+                                        total_changed_time += random.randint(1, special[gift][1]) * custom_rate
+
+                                else:
+                                    total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
 
                             new_seconds = current_seconds + total_changed_time
 
@@ -933,16 +953,27 @@ def cd_setting_dialog():
             time.set_visibility(True)
         else:
             time.set_visibility(False)
+
         if status.value == "random":
             min.set_visibility(True)
             max.set_visibility(True)
+            # rate_column.set_visibility(True)
+            # rate_nega.set_visibility(True)
+            # rate_posi.set_visibility(True)
+            # rate_zero.set_visibility(True)
         else:
             min.set_visibility(False)
             max.set_visibility(False)
+            # rate_column.set_visibility(False)
+            # rate_nega.set_visibility(False)
+            # rate_posi.set_visibility(False)
+            # rate_zero.set_visibility(False)
+
         if status.value == "double" or status.value == "clear" or status.value == "random" or status.value == "half":
             time.disable()
         else:
             time.enable()
+
         if status.value == "delete":
             time.disable()
 
@@ -1132,6 +1163,33 @@ def cd_setting_dialog():
             time.set_visibility(False)
             min.set_visibility(False)
             max.set_visibility(False)
+
+        with ui.column(align_items="center") as rate_column:
+            ui.label("随机玩法权重设置(设置会自动保存) - BETA")
+            ui.link("使用说明", "https://docs.travail.nya-wsl.com/guides/usage/play/#随机权重", True)
+
+        # rate_column.set_visibility(False)
+
+        def verify_rate():
+            if "rate_posi" in globals() or "rate_posi" in locals(): # 防止未创建输入框时调用函数导致报错
+                try:
+                    rate_posi_value = float(round(1 - rate_nega.value - rate_zero.value, 2))
+                except:
+                    logger.warning("概率修正出错，已忽略")
+                    rate_posi_value = rate_posi.value
+
+                if rate_posi_value < 0:
+                    rate_posi_value = 0
+                rate_posi.set_value(rate_posi_value)
+
+        # 概率输入框
+        with ui.row():
+            rate_nega = ui.number(label="减时概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "nega")
+            rate_zero = ui.number(label="零的概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "zero")
+            rate_posi = ui.number(label="加时概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "posi")
+            # rate_nega.set_visibility(False)
+            # rate_zero.set_visibility(False)
+            # rate_posi.set_visibility(False)
 
         # 按钮
         with ui.row():
@@ -1684,13 +1742,16 @@ async def get_notes():
     async def random_notes():
         result = await fetch_notes()
         local_notes = result.copy()
+        with open("data/gifts.json", "rb") as f:
+            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         for note in local_notes:
             for i in GiftManager.custom_gifts:
                 if i in note:
                     local_notes.pop(local_notes.index(note))
-                local_notes.append(
-                    f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
-                )
+                if i in gifts:
+                    local_notes.append(
+                        f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
+                    )
 
         if local_notes: # 如果公告列表不为空
             # 过滤掉所有空字符串占位符
@@ -2014,6 +2075,17 @@ async def capture():  # pyright: ignore[reportRedeclaration]
                 with open("data/gift_img.json", "rb") as f:
                     gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
+                if "倍" in time:
+                    tmp_time = app.storage.general["countdown_time"]
+                    if re.search(r"-2\^(\d+)倍", time):
+                        for _ in range(num):
+                            tmp_time -= tmp_time / 2
+                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"))
+                    else:
+                        for _ in range(num):
+                            tmp_time += tmp_time
+                        time = format_seconds(tmp_time - app.storage.general["countdown_time"])
+
                 gift_history["cd"].append({
                     "name": name,
                     "gift": gift,
@@ -2060,10 +2132,6 @@ async def capture():  # pyright: ignore[reportRedeclaration]
                 if not isinstance(rule, str):
                     return None
                 rule = rule.strip() # 去除字符串首尾的空白字符
-
-                # 如果规则包含"倍"字，则返回None表示跳过
-                if "倍" in rule:
-                    return None
 
                 # 提取符号
                 sign = 1
@@ -2560,8 +2628,11 @@ def index():
             ui.separator()
 
             with ui.row():
-                short_switch = ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"')
+                with ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"') as short_switch:
+                    ui.tooltip("存在bug，暂时禁用")
                 short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
+                short_switch.set_value(False)
+                short_switch.disable()
                 short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
                 if short_switch.value:
                     short_time.set_visibility(True)
