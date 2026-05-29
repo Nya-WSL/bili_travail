@@ -427,7 +427,6 @@ class BiliHandler(blivedm.BaseHandler):
 
     # 礼物数据
     async def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):  # pyright: ignore[reportIncompatibleMethodOverride]
-        logger.debug("收到礼物")
         gift = message.gift_name
         num = message.gift_num
         uname = message.uname
@@ -715,6 +714,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                             for _ in range(num):
                                 r = round(random.random(), 2)
+                                logger.info(f"随机数: {r}, 负时概率: {rate.get('nega', 0)}, 不变概率: {rate.get('zero', 0)}, 正时概率: {rate.get('posi', 0)}")
 
                                 if r <= rate.get("nega", 0) and rate.get("nega", 0) != 0:
                                     if special[gift][0] >= 0: # 如果下界>=0，为防止抛错将使用默认算法
@@ -1165,23 +1165,28 @@ def cd_setting_dialog():
             max.set_visibility(False)
 
         with ui.column(align_items="center") as rate_column:
-            ui.label("随机玩法权重设置(设置会自动保存)")
+            ui.label("随机玩法权重设置(设置会自动保存) - BETA")
             ui.link("使用说明", "https://docs.travail.nya-wsl.com/guides/usage/play/#随机权重", True)
 
         # rate_column.set_visibility(False)
 
         def verify_rate():
             if "rate_posi" in globals() or "rate_posi" in locals(): # 防止未创建输入框时调用函数导致报错
-                rate_posi_value = round(1 - rate_nega.value - rate_zero.value, 2)
+                try:
+                    rate_posi_value = float(round(1 - rate_nega.value - rate_zero.value, 2))
+                except:
+                    logger.warning("概率修正出错，已忽略")
+                    rate_posi_value = rate_posi.value
+
                 if rate_posi_value < 0:
                     rate_posi_value = 0
                 rate_posi.set_value(rate_posi_value)
 
         # 概率输入框
         with ui.row():
-            rate_nega = ui.number(label="减时概率", value=0, min=0, max=1, step=0.1, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "nega")
-            rate_zero = ui.number(label="零的概率", value=0, min=0, max=1, step=0.1, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "zero")
-            rate_posi = ui.number(label="加时概率", value=0, min=0, max=1, step=0.1, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "posi")
+            rate_nega = ui.number(label="减时概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "nega")
+            rate_zero = ui.number(label="零的概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "zero")
+            rate_posi = ui.number(label="加时概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "posi")
             # rate_nega.set_visibility(False)
             # rate_zero.set_visibility(False)
             # rate_posi.set_visibility(False)
