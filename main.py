@@ -50,7 +50,6 @@ import datetime
 import traceback
 import itertools
 
-from icecream import ic
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
