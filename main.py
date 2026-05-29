@@ -677,7 +677,7 @@ class BiliHandler(blivedm.BaseHandler):
                         new_seconds = current_seconds  # 初始化为当前剩余秒数
 
                         if special[gift] == "double":
-                            new_seconds = current_seconds * (2 ** num)
+                            new_seconds = current_seconds * (2 ** num) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -686,7 +686,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "half":
-                            new_seconds = current_seconds / (2 ** num)
+                            new_seconds = current_seconds / (2 ** num) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -957,14 +957,14 @@ def cd_setting_dialog():
         if status.value == "random":
             min.set_visibility(True)
             max.set_visibility(True)
-            rate_column.set_visibility(True)
+            # rate_column.set_visibility(True)
             # rate_nega.set_visibility(True)
             # rate_posi.set_visibility(True)
             # rate_zero.set_visibility(True)
         else:
             min.set_visibility(False)
             max.set_visibility(False)
-            rate_column.set_visibility(False)
+            # rate_column.set_visibility(False)
             # rate_nega.set_visibility(False)
             # rate_posi.set_visibility(False)
             # rate_zero.set_visibility(False)
@@ -2076,10 +2076,15 @@ async def capture():  # pyright: ignore[reportRedeclaration]
                     gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                 if "倍" in time:
+                    tmp_time = app.storage.general["countdown_time"]
                     if re.search(r"-2\^(\d+)倍", time):
-                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] / 2}"))
+                        for _ in range(num):
+                            tmp_time -= tmp_time / 2
+                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"))
                     else:
-                        time = f"{format_seconds(app.storage.general['countdown_time'])}"
+                        for _ in range(num):
+                            tmp_time += tmp_time
+                        time = format_seconds(tmp_time - app.storage.general["countdown_time"])
 
                 gift_history["cd"].append({
                     "name": name,
