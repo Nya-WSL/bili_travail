@@ -1,6 +1,6 @@
 [project]
 name = "bili-travail"
-version = "1.37"
+version = "1.40"
 description = "基于blivedm的B站直播加班姬"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -11,7 +11,7 @@ dependencies = [
     "brotli>=1.2.0",
     "icmplib>=3.0.4",
     "loguru>=0.7.3",
-    "nicegui==3.12.0",
+    "nicegui==3.13.0",
     "nuitka>=4.0.7",
     "pillow>=12.2.0",
     "psutil>=7.2.2",
