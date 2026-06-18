@@ -2673,7 +2673,11 @@ def index():
 
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
-        asyncio.create_task(check_update())
+        if base_config.get("bool", "check_update", True):
+            asyncio.create_task(check_update())
+        else:
+            ui.notify("已关闭自动检查更新", type="warning", timeout=3000)
+
         time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
 
         # 时间输入框
