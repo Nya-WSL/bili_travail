@@ -11,11 +11,7 @@ host = "127.0.0.1" # 监听地址
 port = 65000 # 监听端口
 auth_code = "" # 主播身份码
 background_image = [
-    "https://nya-wsl.com/images/image001.png",
-    "https://nya-wsl.com/images/image002.png",
-    "https://nya-wsl.com/images/image003.png",
-    "static/sample1.png",
-    "static/sample2.png"
+    "static/bg_vita.png"
 ] # 背景图片
 check_sha256 = true # 是否启用更新包SHA256校验
 

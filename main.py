@@ -180,6 +180,28 @@ host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
 btn_color = config["color"]["btn_color"]  # type: ignore[index]
 
+# 删除不再使用的背景图
+for i in [
+    "https://nya-wsl.com/images/image001.png",
+    "https://nya-wsl.com/images/image002.png",
+    "https://nya-wsl.com/images/image003.png",
+    "static/sample1.png",
+    "static/sample2.png"
+]:
+    if i in config["general"]["background_image"]:
+        config["general"]["background_image"].remove(i)
+
+if config["general"]["background_image"] == []:
+    config["general"]["background_image"].append("static/bg_vita.png")
+
+base_config.save(config)
+
+try:
+    os.remove("static/sample1.png")
+    os.remove("static/sample2.png")
+except FileNotFoundError:
+    pass
+
 # 需申请哔哩哔哩直播开放平台开发者账号并将id、key和app_id填入config.toml中，如需开箱即用请在 https://github.com/Nya-WSL/bili_travail/releases 下载
 bili_keys = env.get_key()
 
