@@ -13,7 +13,6 @@ auth_code = "" # 主播身份码
 background_image = [
     "static/bg_vita.png"
 ] # 背景图片
-check_sha256 = true # 是否启用更新包SHA256校验
 
 [api]
 server = "http://api.travail.nya-wsl.cn" # API地址
@@ -36,6 +35,7 @@ short_list = false # 是否启用简洁模式
 borderless_cd = false # 倒计时是否无边框
 exit_timer = true # 是否启用倒计时结束后退出程序
 check_update = true # 是否启用更新检查
+check_sha256 = true # 是否启用更新包SHA256校验
 
 [num]
 short_time = 5 # 简洁模式滚动时间
