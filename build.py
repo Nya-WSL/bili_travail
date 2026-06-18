@@ -103,9 +103,13 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
 
     version = create_version(True)
 
-    for directory in ['build', 'dist']:
-        if Path(directory).exists():
-            shutil.rmtree(Path(directory))
+    if nuitka == 'y':
+        if Path("dist", "start").exists():
+            shutil.rmtree(Path("dist", "start"))
+    else:
+        for directory in ['build', 'dist']:
+            if Path(directory).exists():
+                shutil.rmtree(Path(directory))
 
     if nuitka == 'y':
         os.makedirs(Path("dist", "start"), exist_ok=True)
