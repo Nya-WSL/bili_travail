@@ -180,13 +180,13 @@ host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
 btn_color = config["color"]["btn_color"]  # type: ignore[index]
 
-# 需申请哔哩哔哩直播开放平台开发者账号并将id、key和app_id填入config.json中，如需开箱即用请在 https://github.com/Nya-WSL/bili_travail/releases 下载
+# 需申请哔哩哔哩直播开放平台开发者账号并将id、key和app_id填入config.toml中，如需开箱即用请在 https://github.com/Nya-WSL/bili_travail/releases 下载
 bili_keys = env.get_key()
 
 if base_config.get("open_live", "ACCESS_KEY_ID", "") != "":
-    ACCESS_KEY_ID= base_config.get("open_live", "ACCESS_KEY_ID", "")
+    ACCESS_KEY_ID = base_config.get("open_live", "ACCESS_KEY_ID", "")
 else:
-    ACCESS_KEY_ID= bili_keys.get("ACCESS_KEY_ID", "")
+    ACCESS_KEY_ID = bili_keys.get("ACCESS_KEY_ID", "")
 
 if base_config.get("open_live", "ACCESS_KEY_SECRET", "") != "":
     ACCESS_KEY_SECRET = base_config.get("open_live", "ACCESS_KEY_SECRET", "")
@@ -340,7 +340,7 @@ def check_sys():
 
     return sys_info
 
-@ui.page("/debug")
+@ui.page("/debug", response_timeout=30)
 async def debug():
     ui.label(f"统计时间: {datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')}")
     for k, v in check_sys().items():
@@ -1866,7 +1866,7 @@ async def refresh_gift(heartbeat=False):
 
 
 # 倒计时预览
-@ui.page("/capture_cd", title="倒计时 | bili_travail")
+@ui.page("/capture_cd", title="倒计时 | bili_travail", response_timeout=30)
 async def capture():  # pyright: ignore[reportRedeclaration]
     global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created
 
@@ -2221,7 +2221,7 @@ async def capture():  # pyright: ignore[reportRedeclaration]
     ui.timer(5, callback=lambda: check_cd_refresh())
 
 # 投喂挑战预览
-@ui.page("/capture_gift", title="投喂挑战 | bili_travail")
+@ui.page("/capture_gift", title="投喂挑战 | bili_travail", response_timeout=30)
 async def capture():
     global capture_challenge_gift_list_show, capture_gift_is_created
     styles.page_styles() # 加载自定义样式
@@ -2375,7 +2375,7 @@ async def capture():
 
     ui.timer(5, callback=lambda: check_gift_refresh())
 
-@ui.page("/")
+@ui.page("/", response_timeout=30)
 def index():
     # ================================
     # 主界面GUI
@@ -2778,7 +2778,7 @@ def index():
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=15):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
-@ui.page('/count')
+@ui.page('/count', response_timeout=30)
 def _():
     styles.page_styles() # 加载自定义样式
     ui.query('body').style(f'background: url("static/bg_vita.png") fixed')
@@ -2810,7 +2810,7 @@ def _():
         ui.label(f"总计：{sum([value['num'] for value in count.values()])}个礼物 / {int(sum([value['price'] * value['num'] for value in count.values()]))}电池")
 
 # about页面
-@ui.page('/about')
+@ui.page('/about', response_timeout=30)
 async def _():
     styles.page_styles() # 加载自定义样式
     config = base_config.load()
