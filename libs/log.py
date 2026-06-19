@@ -3,7 +3,13 @@ import re
 import sys
 import datetime
 import traceback
+
+from pathlib import Path
 from loguru import logger
+
+if os.path.exists("livehime.exe"):
+    work_path = Path(os.path.expanduser("~"), r"AppData\Local\bililive\User Data\Game File\B站加班姬")
+    os.chdir(work_path)
 
 if not os.path.exists("logs"):
     os.mkdir("logs")

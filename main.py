@@ -50,6 +50,7 @@ import datetime
 import traceback
 import itertools
 
+from pathlib import Path
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
@@ -58,11 +59,21 @@ from packaging import version as pack_version
 from nicegui import __version__ as gui_version
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+origin_script_path = os.getcwd() # 记录原始工作目录
+
+# 如果通过直播姬唤起，工作目录为直播姬的安装目录，切换回脚本所在目录
+if os.path.exists("livehime.exe"):
+    work_path = Path(os.path.expanduser("~"), r"AppData\Local\bililive\User Data\Game File\B站加班姬")
+    os.chdir(work_path)
+
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
 version = f"{base_ver.base_version}.{ver_strftime}"
 
 logger = log.logger
 logger.debug("version: {}", version)
+
+if origin_script_path != os.getcwd(): # 如果是直播姬唤起的不会相等，在日志中记录一下
+    logger.info("检测到加班姬可能通过直播姬唤起")
 
 scheduler = AsyncIOScheduler() # 创建调度器
 
