@@ -1,20 +1,17 @@
-# third-party modules
 from nicegui import ui
 import os
 
-def check_font_file_exists():
-    formats = {
-        'ttf': 'truetype',
-        'woff2': 'woff2',
-        'woff': 'woff',
-    }
+_FORMATS = {
+    'ttf': 'truetype',
+    'woff2': 'woff2',
+    'woff': 'woff',
+}
 
-    fonts = {}
-
-    for extension, font_format in formats.items():
-        if os.path.exists(f'static/fonts/custom-font.{extension}'):
-            fonts[extension] = font_format
-    return fonts
+_FONT_SRC = ", ".join(
+    f"url('/static/fonts/custom-font.{ext}') format('{fmt}')"
+    for ext, fmt in _FORMATS.items()
+    if os.path.exists(f'static/fonts/custom-font.{ext}')
+)
 
 def page_styles():
     ui.add_head_html(
@@ -22,14 +19,14 @@ def page_styles():
         <style>
         @font-face {{
             font-family: 'Custom Font';
-            src: {", ".join(f"url('/static/fonts/custom-font.{extension}') format('{font_format}')" for extension, font_format in check_font_file_exists().items())};
-            font-display: swap; /* 优化加载体验 */
-            }}
+            src: {_FONT_SRC};
+            font-display: swap;
+        }}
 
         body {{
             font-family: "Custom Font", sans-serif;
-            }}
+        }}
         </style>
-    """,
+        """,
         shared=True,
     )
