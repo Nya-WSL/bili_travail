@@ -2877,7 +2877,7 @@ async def _():
         async def fetch_text(session, url):
             """异步获取文本内容"""
             try:
-                async with session.get(url, timeout=10) as response:
+                async with session.get(url, timeout=5) as response:
                     if response.status == 200:
                         return await response.json()
                     logger.warning(f"请求失败: {url} 状态码: {response.status}")
