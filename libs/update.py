@@ -75,7 +75,7 @@ async def update(zip_url, version):
                             await asyncio.sleep(1)
                             break
 
-        if base_config.get("general", "check_sha256", True):
+        if base_config.get("bool", "check_sha256", True):
             percent_dialog.set_text("正在校验SHA256...")
             try:
                 if "hi168" in url:

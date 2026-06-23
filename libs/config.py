@@ -11,13 +11,8 @@ host = "127.0.0.1" # 监听地址
 port = 65000 # 监听端口
 auth_code = "" # 主播身份码
 background_image = [
-    "https://nya-wsl.com/images/image001.png",
-    "https://nya-wsl.com/images/image002.png",
-    "https://nya-wsl.com/images/image003.png",
-    "static/sample1.png",
-    "static/sample2.png"
+    "static/bg_vita.png"
 ] # 背景图片
-check_sha256 = true # 是否启用更新包SHA256校验
 
 [api]
 server = "http://api.travail.nya-wsl.cn" # API地址
@@ -39,6 +34,8 @@ show_capture_rank_list = false # 是否启用排行榜
 short_list = false # 是否启用简洁模式
 borderless_cd = false # 倒计时是否无边框
 exit_timer = true # 是否启用倒计时结束后退出程序
+check_update = true # 是否启用更新检查
+check_sha256 = true # 是否启用更新包SHA256校验
 
 [num]
 short_time = 5 # 简洁模式滚动时间

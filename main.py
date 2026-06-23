@@ -1,6 +1,13 @@
-# Local Packages
-from libs import log
+import os
+from pathlib import Path
+origin_script_path = os.getcwd() # 记录原始工作目录
 
+# 如果通过直播姬唤起，工作目录为直播姬的安装目录，切换回脚本所在目录
+if os.path.exists("livehime.exe"):
+    work_path = Path(os.path.expanduser("~"), r"AppData\Local\bililive\User Data\Game File\B站加班姬")
+    os.chdir(work_path)
+
+# Local Packages
 try:
     # 该模块在打包时填入密钥后自动生成
     import env # type: ignore
@@ -22,6 +29,7 @@ import libs.config as travail_config
 import blivedm.blivedm.models.web as web_models
 import blivedm.blivedm.models.open_live as open_models
 
+from libs import log
 from libs import ping
 from libs import styles
 from libs import bili_api
@@ -36,7 +44,6 @@ from libs.changelog import changelog, get_log
 from blivedm import blivedm
 
 # Third Party Packages
-import os
 import re
 import orjson
 import shutil
@@ -63,6 +70,9 @@ version = f"{base_ver.base_version}.{ver_strftime}"
 
 logger = log.logger
 logger.debug("version: {}", version)
+
+if origin_script_path != os.getcwd(): # 如果是直播姬唤起的不会相等，在日志中记录一下
+    logger.info("检测到加班姬可能通过直播姬唤起")
 
 scheduler = AsyncIOScheduler() # 创建调度器
 
@@ -180,13 +190,35 @@ host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
 btn_color = config["color"]["btn_color"]  # type: ignore[index]
 
-# 需申请哔哩哔哩直播开放平台开发者账号并将id、key和app_id填入config.json中，如需开箱即用请在 https://github.com/Nya-WSL/bili_travail/releases 下载
+# 删除不再使用的背景图
+for i in [
+    "https://nya-wsl.com/images/image001.png",
+    "https://nya-wsl.com/images/image002.png",
+    "https://nya-wsl.com/images/image003.png",
+    "static/sample1.png",
+    "static/sample2.png"
+]:
+    if i in config["general"]["background_image"]:
+        config["general"]["background_image"].remove(i)
+
+if config["general"]["background_image"] == []:
+    config["general"]["background_image"].append("static/bg_vita.png")
+
+base_config.save(config)
+
+try:
+    os.remove("static/sample1.png")
+    os.remove("static/sample2.png")
+except FileNotFoundError:
+    pass
+
+# 需申请哔哩哔哩直播开放平台开发者账号并将id、key和app_id填入config.toml中，如需开箱即用请在 https://github.com/Nya-WSL/bili_travail/releases 下载
 bili_keys = env.get_key()
 
 if base_config.get("open_live", "ACCESS_KEY_ID", "") != "":
-    ACCESS_KEY_ID= base_config.get("open_live", "ACCESS_KEY_ID", "")
+    ACCESS_KEY_ID = base_config.get("open_live", "ACCESS_KEY_ID", "")
 else:
-    ACCESS_KEY_ID= bili_keys.get("ACCESS_KEY_ID", "")
+    ACCESS_KEY_ID = bili_keys.get("ACCESS_KEY_ID", "")
 
 if base_config.get("open_live", "ACCESS_KEY_SECRET", "") != "":
     ACCESS_KEY_SECRET = base_config.get("open_live", "ACCESS_KEY_SECRET", "")
@@ -340,7 +372,7 @@ def check_sys():
 
     return sys_info
 
-@ui.page("/debug")
+@ui.page("/debug", response_timeout=30)
 async def debug():
     ui.label(f"统计时间: {datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')}")
     for k, v in check_sys().items():
@@ -1866,7 +1898,7 @@ async def refresh_gift(heartbeat=False):
 
 
 # 倒计时预览
-@ui.page("/capture_cd", title="倒计时 | bili_travail")
+@ui.page("/capture_cd", title="倒计时 | bili_travail", response_timeout=30)
 async def capture():  # pyright: ignore[reportRedeclaration]
     global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created
 
@@ -2221,7 +2253,7 @@ async def capture():  # pyright: ignore[reportRedeclaration]
     ui.timer(5, callback=lambda: check_cd_refresh())
 
 # 投喂挑战预览
-@ui.page("/capture_gift", title="投喂挑战 | bili_travail")
+@ui.page("/capture_gift", title="投喂挑战 | bili_travail", response_timeout=30)
 async def capture():
     global capture_challenge_gift_list_show, capture_gift_is_created
     styles.page_styles() # 加载自定义样式
@@ -2375,7 +2407,7 @@ async def capture():
 
     ui.timer(5, callback=lambda: check_gift_refresh())
 
-@ui.page("/")
+@ui.page("/", response_timeout=30)
 def index():
     # ================================
     # 主界面GUI
@@ -2673,7 +2705,11 @@ def index():
 
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
-        asyncio.create_task(check_update())
+        if base_config.get("bool", "check_update", True):
+            asyncio.create_task(check_update())
+        else:
+            ui.notify("已关闭自动检查更新", type="warning", timeout=3000)
+
         time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
 
         # 时间输入框
@@ -2778,7 +2814,7 @@ def index():
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=15):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
-@ui.page('/count')
+@ui.page('/count', response_timeout=30)
 def _():
     styles.page_styles() # 加载自定义样式
     ui.query('body').style(f'background: url("static/bg_vita.png") fixed')
@@ -2810,7 +2846,7 @@ def _():
         ui.label(f"总计：{sum([value['num'] for value in count.values()])}个礼物 / {int(sum([value['price'] * value['num'] for value in count.values()]))}电池")
 
 # about页面
-@ui.page('/about')
+@ui.page('/about', response_timeout=30)
 async def _():
     styles.page_styles() # 加载自定义样式
     config = base_config.load()
@@ -2840,7 +2876,7 @@ async def _():
         async def fetch_text(session, url):
             """异步获取文本内容"""
             try:
-                async with session.get(url, timeout=10) as response:
+                async with session.get(url, timeout=5) as response:
                     if response.status == 200:
                         return await response.json()
                     logger.warning(f"请求失败: {url} 状态码: {response.status}")
