@@ -1,6 +1,13 @@
-# Local Packages
-from libs import log
+import os
+from pathlib import Path
+origin_script_path = os.getcwd() # 记录原始工作目录
 
+# 如果通过直播姬唤起，工作目录为直播姬的安装目录，切换回脚本所在目录
+if os.path.exists("livehime.exe"):
+    work_path = Path(os.path.expanduser("~"), r"AppData\Local\bililive\User Data\Game File\B站加班姬")
+    os.chdir(work_path)
+
+# Local Packages
 try:
     # 该模块在打包时填入密钥后自动生成
     import env # type: ignore
@@ -22,6 +29,7 @@ import libs.config as travail_config
 import blivedm.blivedm.models.web as web_models
 import blivedm.blivedm.models.open_live as open_models
 
+from libs import log
 from libs import ping
 from libs import styles
 from libs import bili_api
@@ -36,7 +44,6 @@ from libs.changelog import changelog, get_log
 from blivedm import blivedm
 
 # Third Party Packages
-import os
 import re
 import orjson
 import shutil
@@ -50,7 +57,6 @@ import datetime
 import traceback
 import itertools
 
-from pathlib import Path
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
@@ -58,13 +64,6 @@ from multiprocessing import freeze_support
 from packaging import version as pack_version
 from nicegui import __version__ as gui_version
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-origin_script_path = os.getcwd() # 记录原始工作目录
-
-# 如果通过直播姬唤起，工作目录为直播姬的安装目录，切换回脚本所在目录
-if os.path.exists("livehime.exe"):
-    work_path = Path(os.path.expanduser("~"), r"AppData\Local\bililive\User Data\Game File\B站加班姬")
-    os.chdir(work_path)
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
 version = f"{base_ver.base_version}.{ver_strftime}"
