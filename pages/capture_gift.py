@@ -14,11 +14,12 @@ capture_gift_is_created = False
 refresh_capture_gift = False
 
 
-async def capture_gift_page(get_notes_func, init_config_func, base_config, config):
+async def capture_gift_page(get_notes_func, init_config_func, base_config):
     """投喂挑战预览页面"""
     global capture_challenge_gift_list_show, capture_gift_is_created, refresh_capture_gift
 
     styles.page_styles()  # 加载自定义样式
+    config = base_config.load()
 
     def check_gift_refresh():
         global refresh_capture_gift

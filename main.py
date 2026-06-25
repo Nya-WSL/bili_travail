@@ -39,8 +39,9 @@ from libs import gift as get_gift
 from libs import update as travail_update
 from libs import gift_mapping as gift_map
 from libs.changelog import changelog, get_log
+from libs.format import format_cd, format_seconds, sort_dict
 
-from pages import count, about, capture_gift
+from pages import count, about, capture_gift, capture_cd
 
 from blivedm import blivedm
 
@@ -56,8 +57,6 @@ import aiohttp
 import requests
 import datetime
 import traceback
-import itertools
-
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
@@ -86,11 +85,9 @@ scheduler = AsyncIOScheduler() # 创建调度器
 app.storage.general.indent = True  # 格式化storage # type: ignore
 app.add_static_files('/static', 'static')   # 创建虚拟路径
 
-refresh_capture_cd = False  # 初始化倒计时刷新状态
 b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
 reset_inherit_status = False # 初始化重置继承倒计时状态
-capture_cd_is_created = False # 初始化倒计时页面状态
 
 # 检查data文件夹状态
 if not os.path.exists("data"):
@@ -122,46 +119,6 @@ if os.path.exists("data/blind_box_value.json"):
     if not os.path.exists("data/blind_box"):
         os.mkdir("data/blind_box")
     shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
-
-def format_seconds(seconds) -> str:
-    """
-    格式化时间
-
-    :param seconds: 秒数
-    """
-
-    # 如果输入不是数字，直接返回
-    if not isinstance(seconds, (int, float)):
-        logger.warning(f"{seconds} 不是int或float，跳过格式化")
-        return str(seconds)
-
-    # 处理符号：正数加 `+`，负数加 `-`，0 不加符号
-    if seconds > 0:
-        sign = "+"
-    elif seconds < 0:
-        sign = "-"
-    else:
-        sign = ""
-    # 取绝对值计算
-    seconds = abs(seconds)
-    # 转换为小时、分钟和秒，转化为整数型格式
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    seconds = int(seconds % 60)
-    # 格式化输出
-    parts = []
-    if hours > 0:
-        parts.append(f"{hours}小时")
-    if minutes > 0:  # 只有分钟 > 0 时才显示 "分"
-        parts.append(f"{minutes}分")
-    if seconds > 0 or (hours == 0 and minutes == 0):  # 有秒或时分均为 0 时，才显示秒
-        parts.append(f"{seconds}秒")
-    return sign + "".join(parts)  # 返回结果，注意是字符串形式
-
-def format_cd(seconds):
-    minute, second = divmod(seconds, 60)
-    hour, minute = divmod(minute, 60)
-    return ("%02d:%02d:%02d" % (hour, minute, second))
 
 # 检查storage状态
 def init_storage():
@@ -712,8 +669,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
+                            if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "half":
                             new_seconds = current_seconds / (2 ** num) # 新倒计时为浮点数，不能使用位运算
@@ -721,8 +678,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, f"-2^{int(num)}倍", message)
+                            if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, f"-2^{int(num)}倍", message)
 
                         if special[gift] == "clear":
                             new_seconds = 3
@@ -730,8 +687,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, "清空", message)
+                            if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, "清空", message)
 
                         if type(special[gift]) == list:
                             total_changed_time = 0
@@ -769,8 +726,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
+                            if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
 
                         countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
 
@@ -787,8 +744,8 @@ class BiliHandler(blivedm.BaseHandler):
                             gift = origin_gift
 
                         if gifts.get(gift, None) != None or is_blind_box:
-                            if show_capture_gift_list_switch.value and capture_cd_is_created:
-                                capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
+                            if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
 
                         countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
                 else:
@@ -935,40 +892,6 @@ class CountdownTimer:
                 cancel_button.set_text("停止")
                 cancel_button.disable()
 
-def sort_dict(dictionary, type_order=None, sort_within_type=False):
-    """
-    高级排序：先按类型排序，再按值排序
-
-    Args:
-        dictionary: 要排序的字典
-        type_order: 类型顺序, None: [int, str, list]
-        sort_within_type: 是否在同一类型内进行排序
-    """
-    if type_order is None:
-        type_order = [int, str, list]
-
-    type_priority = {t: i for i, t in enumerate(type_order)}
-
-    def sort_key(item):
-        key, value = item
-        value_type = type(value)
-        type_rank = type_priority.get(value_type, len(type_order))
-
-        if sort_within_type:
-            # 在同一类型内，按值排序
-            if value_type == int or value_type == str:
-                return (type_rank, value)
-            elif value_type == list:
-                return (type_rank, str(value))  # 列表转换为字符串进行比较
-            else:
-                return (type_rank, str(value))
-        else:
-            # 只按类型排序
-            return type_rank
-
-    sorted_items = sorted(dictionary.items(), key=sort_key)
-    return dict(sorted_items)
-
 # ================================
 # GUI
 # ================================
@@ -1009,7 +932,6 @@ def cd_setting_dialog():
 
     # 确定按钮
     def run():
-        global refresh_capture_cd
         with open("data/gifts.json", "rb+") as f:
             gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb") as f:
@@ -1060,18 +982,17 @@ def cd_setting_dialog():
             with open("data/special.json", "wb+") as f:
                 f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
 
-            refresh_capture_cd = True # 设置capture刷新状态
+            capture_cd.refresh_capture_cd = True # 设置capture刷新状态
             refresh_card()
 
     # 重置按钮
     def reset():
         def double_check():
-            global refresh_capture_cd
             with open("data/gifts.json", "wb+") as f:
                 f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
             with open("data/special.json", "wb+") as f:
                 f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-            refresh_capture_cd = True
+            capture_cd.refresh_capture_cd = True
             double_check_dialog.close()
             refresh_card()
 
@@ -1085,7 +1006,6 @@ def cd_setting_dialog():
         double_check_dialog.open()
 
     def delete():
-        global refresh_capture_cd
         with open("data/gifts.json", "rb+") as f:
             gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb+") as f:
@@ -1103,11 +1023,10 @@ def cd_setting_dialog():
         with open("data/special.json", "wb+") as f:
             f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
 
-        refresh_capture_cd = True # 设置capture刷新状态
+        capture_cd.refresh_capture_cd = True # 设置capture刷新状态
         refresh_card()
 
     def del_gift(is_special, k):
-        global refresh_capture_cd
         with open("data/gifts.json", "rb") as f:
             gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special.json", "rb") as f:
@@ -1123,7 +1042,7 @@ def cd_setting_dialog():
             with open("data/gifts.json", "wb+") as f:
                 f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
 
-        refresh_capture_cd = True
+        capture_cd.refresh_capture_cd = True
         refresh_card()
 
     def create_card():
@@ -1894,363 +1813,22 @@ async def refresh_gift(heartbeat=False):
 
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail", response_timeout=30)
-async def capture():  # pyright: ignore[reportRedeclaration]
-    global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created
-
-    styles.page_styles() # 加载自定义样式
-    # 检查是否需要刷新页面
-    def check_cd_refresh():
-        global refresh_capture_cd
-
-        if not base_config.get("bool", "show_capture_gift_list", False):
-            if scroll_card.visible:
-                scroll_card.set_visibility(False)
-        else:
-            scroll_card.set_visibility(True)
-
-        if refresh_capture_cd:
-            refresh_capture_cd = False
-            # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
-            ui.navigate.reload()
-
-    def change_gift_element(v_type, k, v):
-        '''
-        修改礼物列表UI元素
-        
-        :param v_type: 礼物类型：加减时为normal，随机为list，其它为special
-        :param k: 礼物名称
-        :param v: 设定礼物的值
-        '''
-
-        with open("data/gift_img.json", "rb") as f:
-            gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-        if v_type == "normal":
-            gift_img_avatar.set_source(gift_img.get(k, ""))
-            k_label.set_text(k)
-            if k in GiftManager.custom_gifts:
-                v_label.set_text(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]) + v)}")
-            else:
-                v_label.set_text(format_seconds(v))
-            k_label.classes(replace="text-3xl font-extrabold")
-            v_label.classes(replace="text-3xl font-extrabold")
-
-        if v_type == "list":
-            gift_img_avatar.set_source(gift_img.get(k, ""))
-            k_label.set_text(k)
-            v_label.set_text(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
-            k_label.classes(replace="text-base font-extrabold")
-            v_label.classes(replace="text-base font-extrabold")
-
-        if v_type == "special":
-            if v == "clear":
-                v = "清空"
-            if v == "double":
-                v = "加倍"
-            if v == "half":
-                v = "减半"
-
-            gift_img_avatar.set_source(gift_img.get(k, ""))
-            k_label.set_text(k)
-            v_label.set_text(v)
-            k_label.classes(replace="text-3xl font-extrabold")
-            v_label.classes(replace="text-3xl font-extrabold")
-
-    def short_gift_element():
-        '''
-        将礼物列表处理为简洁模式
-        '''
-        with open("data/gifts.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-        gifts.update(special) # 合并加减时和特殊玩法
-        gifts = sort_dict(dictionary=gifts, sort_within_type=True) # 对字典按值的类型排序
-        k = next(iter(gifts)) # 字典第一个礼物名称
-        v = gifts[k] # 字典第一个礼物的值
-        cycle_items = itertools.cycle(gifts.items())
-
-        def change(items):
-            k, v = next(items)
-            if type(v) == list:
-                change_gift_element("list", k, v)
-            elif isinstance(v, (int, float)):
-                change_gift_element("normal", k, v)
-            else:
-                change_gift_element("special", k, v)
-
-        # 初始化第一个礼物元素
-        if type(v) == list:
-            gift_element("list", k, v)
-        elif isinstance(v, (int, float)):
-            gift_element("normal", k, v)
-        else:
-            gift_element("special", k, v)
-
-        # 如果不将timer封装到函数中，在OBS的浏览器源中刷新页面后计时器会失效
-        def timer_handler() -> ui.timer:
-            timer = ui.timer(base_config.get("num", "short_time", 5), lambda: change(cycle_items))  # pyright: ignore[reportArgumentType]
-            return timer
-
-        timer_handler()
-        app.on_disconnect(lambda: timer_handler().cancel())
-
-    def gift_element(v_type, k, v):
-        global gift_img_avatar, k_label, v_label
-
-        if v_type == "normal":
-            with ui.row().classes('w-full'):
-                with ui.avatar(color=None):
-                    gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                ui.space()
-                if k in GiftManager.custom_gifts:
-                    v_label = ui.label(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]) + v)}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                else:
-                    v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-
-        if v_type == "list":
-            with ui.row().classes('w-full'):
-                with ui.avatar(color=None):
-                    gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                ui.space()
-                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-
-        if v_type == "special":
-            with ui.row().classes('w-full'):
-                with ui.avatar(color=None):
-                    gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                ui.space()
-                if v == "clear":
-                    v = "清空"
-                if v == "double":
-                    v = "加倍"
-                if v == "half":
-                    v = "减半"
-                v_label = ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-
-
-    capture_cd_is_created = True
-
-    if not os.path.exists("data/gifts.json") or not os.path.exists("data/gift_img.json"):
-        if base_config.get("general", "auth_code") != None:
-            await init_config()
-
-    with open("data/gifts.json", "rb") as f:
-        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-    with open("data/gift_img.json", "rb") as f:
-        gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-
-    if os.path.exists("data/special.json"):
-        with open("data/special.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-    else:
-        special = {}
-    # ui.query('body').style(f'background: url("{random.choice(config["general"]["background_image"])}") 0px 0px/cover')
-
-    # 创建预览界面
-    with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"): # 居中、背景透明、取消卡片阴影、置顶居中
-        if not config['bool']['borderless_cd']:  # type: ignore[index]
-            ui.badge(outline=True, color="", text_color=config['color']['time_color']).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl")  # type: ignore[arg-type]
-        else:
-            ui.label().bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl").style(f"color: {config['color']['time_color']}")  # type: ignore[index]
-
-        ui.separator() # 分割线
-
-        await get_notes() # 获取公告信息
-
-        # 创建礼物列表
-        if not base_config.get("bool", "short_list", False):
-            if gifts != {}:
-                gifts = sort_dict(dictionary=gifts, sort_within_type=True)
-                for k,v in gifts.items():
-                    gift_element("normal", k, v)
-
-            if special != {}:
-                special = sort_dict(dictionary=special, type_order=[str, list], sort_within_type=True)
-                for k,v in special.items():
-                    if type(v) == list:
-                        gift_element("list", k, v)
-                    else:
-                        gift_element("special", k, v)
-        else:
-            short_gift_element()
-
-        def capture_cd_gift_list_show(name, gift, num, time, message):
-            if not base_config.get("bool", "show_capture_gift_list", False):
-                scroll_card.set_visibility(False)
-            else:
-                scroll_card.set_visibility(True)
-                capture_gift_scroll.clear()
-
-                if not os.path.exists("data/gift_history.json"):
-                    gift_history = {
-                        "cd": [],
-                        "challenge": []
-                    }
-                    with open("data/gift_history.json", "wb+") as f:
-                        f.write(orjson.dumps(gift_history, option=orjson.OPT_INDENT_2))
-
-                with open("data/gift_history.json", "rb") as f:
-                    gift_history = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-                with open("data/gift_img.json", "rb") as f:
-                    gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-                if "倍" in time:
-                    tmp_time = app.storage.general["countdown_time"]
-                    if re.search(r"-2\^(\d+)倍", time):
-                        for _ in range(num):
-                            tmp_time -= tmp_time / 2
-                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"))
-                    else:
-                        for _ in range(num):
-                            tmp_time += tmp_time
-                        time = format_seconds(tmp_time - app.storage.general["countdown_time"])
-
-                gift_history["cd"].append({
-                    "name": name,
-                    "gift": gift,
-                    "num": num,
-                    "rule": time,
-                    "url": message.gift_icon if message else gifts.get(gift, ""),
-                    "time": datetime.datetime.now().strftime('%H:%M:%S')
-                })
-
-                with open("data/gift_history.json", "wb+") as f:
-                    f.write(orjson.dumps(gift_history, option=orjson.OPT_INDENT_2))
-
-                with capture_gift_scroll:
-                    for data in gift_history["cd"][-int(config["num"]["capture_gift_list_number"]):]:  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                        with ui.row().classes("w-full"):
-                            gift_user = data["name"]
-                            gift_num = data["num"]
-                            gift_rule = data["rule"]
-                            gift_name = data["gift"]
-                            gift_img = data["url"]
-                            gift_time = data["time"]
-
-                            ui.label(f"{gift_time}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                            ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                            with ui.avatar(color="").classes("w-6 h-6"):
-                                if gift_name not in ["舰长", "提督", "总督"]:
-                                    if message:
-                                        ui.image(gift_img)
-                                    else:
-                                        ui.image(gifts.get(gift_name, ""))
-                                else:
-                                    ui.image(gifts.get(gift_name, ""))
-                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                            ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-
-                capture_gift_scroll.scroll_to(percent=1, duration=0.5)
-                capture_cd_rank_list_show() # 每次有新礼物时更新排行榜
-
-        def capture_cd_rank_list_show():
-            def rule_to_seconds(rule):
-                """将规则字符串转换为秒数，处理小时、分钟、秒，并跳过包含'倍'的规则"""
-
-                # 首先检查输入是否为字符串，如果不是则返回None
-                if not isinstance(rule, str):
-                    return None
-                rule = rule.strip() # 去除字符串首尾的空白字符
-
-                # 提取符号
-                sign = 1
-                if rule.startswith('-'):
-                    sign = -1
-                    rule = rule[1:]  # 移除负号
-                elif rule.startswith('+'):
-                    rule = rule[1:]  # 移除正号
-
-                # 初始化时间单位
-                hours = 0
-                minutes = 0
-                seconds = 0
-
-                # 使用正则表达式匹配小时、分钟、秒
-                # 匹配小时（支持"小时"或"时"）
-                hour_match = re.search(r'(\d+)(?:小时|时)', rule)
-                if hour_match:
-                    hours = int(hour_match.group(1))
-                    rule = rule.replace(hour_match.group(0), '')  # 移除已匹配部分
-
-                # 匹配分钟
-                minute_match = re.search(r'(\d+)分', rule)
-                if minute_match:
-                    minutes = int(minute_match.group(1))
-                    rule = rule.replace(minute_match.group(0), '')  # 移除已匹配部分
-
-                # 匹配秒
-                second_match = re.search(r'(\d+)秒', rule)
-                if second_match:
-                    seconds = int(second_match.group(1))
-                    rule = rule.replace(second_match.group(0), '')  # 移除已匹配部分
-
-                # 如果规则字符串中只有数字（可能是单独的秒数，如"+30"表示30秒）
-                remaining = rule.strip()
-                if remaining.isdigit():
-                    seconds += int(remaining)
-
-                # 计算总秒数
-                total_seconds = hours * 3600 + minutes * 60 + seconds
-
-                return sign * total_seconds
-
-            if not base_config.get("bool", "show_capture_rank_list", False):
-                rank_card.set_visibility(False)
-            else:
-                rank_card.set_visibility(True)
-                capture_rank_scroll.clear()
-
-            # 如果礼物历史数据不存在，直接返回
-            if not os.path.exists("data/gift_history.json"):
-                return
-
-            with open("data/gift_history.json", "rb") as f:
-                gift_history = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-            rank_dict = {}
-
-            for i in gift_history["cd"]:
-                if not i["name"] in rank_dict:
-                    rank_dict[i["name"]] = 0
-                seconds = rule_to_seconds(i["rule"])
-                if seconds is not None:
-                    rank_dict[i["name"]] += seconds
-
-            with capture_rank_scroll:
-                trophy_color = ["#FFD43B", "#C0C0C0", "#CD7F32"]
-                for name, seconds in sorted(rank_dict.items(), key=lambda x: x[1], reverse=True)[:3]:
-                    with ui.row().classes("w-full"):
-                        ui.icon("emoji_events",size="30px", color=trophy_color[0])
-                        trophy_color.pop(0)
-                        ui.label(f"{name}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        ui.space()
-                        ui.label(format_seconds(seconds)).classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-
-            capture_rank_scroll.scroll_to(percent=1, duration=0.5)
-
-        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as rank_card:
-            with ui.scroll_area().classes('h-40 w-full') as capture_rank_scroll:
-                ui.label().set_visibility(False)
-
-        capture_cd_rank_list_show()
-
-        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
-            with ui.scroll_area().classes('h-32 w-full') as capture_gift_scroll:
-                ui.label().set_visibility(False)
-
-    ui.timer(5, callback=lambda: check_cd_refresh())
+async def _():
+    await capture_cd.capture_cd_page(get_notes, init_config, base_config)
 
 # 投喂挑战预览
 @ui.page("/capture_gift", title="投喂挑战 | bili_travail", response_timeout=30)
 async def _():
-    await capture_gift.capture_gift_page(get_notes, init_config, base_config, config)
+    await capture_gift.capture_gift_page(get_notes, init_config, base_config)
+
+@ui.page('/count', response_timeout=30)
+def _():
+    count.count_page()
+
+# about页面
+@ui.page('/about', response_timeout=30)
+async def _():
+    await about.about_page()
 
 @ui.page("/", response_timeout=30)
 def index():
@@ -2258,7 +1836,7 @@ def index():
     # 主界面GUI
     # ================================
 
-    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch, custom_gift_rate
+    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
 
     styles.page_styles() # 加载自定义样式
     async def ping_server(servers):
@@ -2658,15 +2236,6 @@ def index():
     # about按钮
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=15):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
-
-@ui.page('/count', response_timeout=30)
-def _():
-    count.count_page()
-
-# about页面
-@ui.page('/about', response_timeout=30)
-async def _():
-    await about.about_page()
 
 @app.on_startup
 async def create_job():
