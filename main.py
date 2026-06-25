@@ -89,39 +89,39 @@ b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
 reset_inherit_status = False # 初始化重置继承倒计时状态
 
-# 检查data文件夹状态
-if not os.path.exists("data"):
-    os.mkdir("data")
-
-if not os.path.exists("data/blind_box_data.json"):
-    with open("data/blind_box_data.json", "wb+") as f:
-        f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-
-if not os.path.exists("data/time.json"):
-    with open("data/time.json", "wb+") as f:
-        f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-
-# 移除残留的更新包
-if os.path.exists("update.bat"):
-    os.remove("update.bat")
-if os.path.exists("cache"):
-    shutil.rmtree("cache")
-
-if os.path.exists("data/gift_history.json"):
-    if not os.path.exists("data/history"):
-        os.mkdir("data/history")
-    shutil.move("data/gift_history.json", f"data/history/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
-if os.path.exists("data/gift_statistics.json"):
-    if not os.path.exists("data/statistics"):
-        os.mkdir("data/statistics")
-    shutil.move("data/gift_statistics.json", f"data/statistics/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
-if os.path.exists("data/blind_box_value.json"):
-    if not os.path.exists("data/blind_box"):
-        os.mkdir("data/blind_box")
-    shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
-
 # 检查storage状态
 def init_storage():
+    # 移除残留的更新包
+    if os.path.exists("update.bat"):
+        os.remove("update.bat")
+    if os.path.exists("cache"):
+        shutil.rmtree("cache")
+
+    # 检查data文件夹状态
+    if not os.path.exists("data"):
+        os.mkdir("data")
+
+    if not os.path.exists("data/blind_box_data.json"):
+        with open("data/blind_box_data.json", "wb+") as f:
+            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+
+    if not os.path.exists("data/time.json"):
+        with open("data/time.json", "wb+") as f:
+            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+
+    if os.path.exists("data/gift_history.json"):
+        if not os.path.exists("data/history"):
+            os.mkdir("data/history")
+        shutil.move("data/gift_history.json", f"data/history/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+    if os.path.exists("data/gift_statistics.json"):
+        if not os.path.exists("data/statistics"):
+            os.mkdir("data/statistics")
+        shutil.move("data/gift_statistics.json", f"data/statistics/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+    if os.path.exists("data/blind_box_value.json"):
+        if not os.path.exists("data/blind_box"):
+            os.mkdir("data/blind_box")
+        shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+
     app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
     app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
     app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_challenge_text", "")

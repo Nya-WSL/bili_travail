@@ -8,7 +8,7 @@ from libs import styles
 
 logger = log.logger
 
-# Module-level variables shared with main.py
+# 与main.py共享的模块级变量
 capture_challenge_gift_list_show = None
 capture_gift_is_created = False
 refresh_capture_gift = False

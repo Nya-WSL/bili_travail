@@ -13,7 +13,7 @@ from libs.format import format_cd, format_seconds, sort_dict
 logger = log.logger
 GiftManager = get_gift.BiliGiftManager()
 
-# Module-level variables shared with main.py
+# 与main.py共享的模块级变量
 capture_cd_gift_list_show = None
 capture_cd_rank_list_show = None
 capture_cd_is_created = False
