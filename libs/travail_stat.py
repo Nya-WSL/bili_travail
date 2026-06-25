@@ -1,9 +1,8 @@
 import aiohttp
 
-import libs.config as travail_config
-
 from .log import logger
 from . import dns_resolver
+from . import config as travail_config
 
 async def stat(room_id: int, uid: int, version: str, time: str) -> bool:
     base_config = travail_config.Config()
