@@ -40,7 +40,7 @@ from libs import update as travail_update
 from libs import gift_mapping as gift_map
 from libs.changelog import changelog, get_log
 
-from pages import count, about
+from pages import count, about, capture_gift
 
 from blivedm import blivedm
 
@@ -87,12 +87,10 @@ app.storage.general.indent = True  # 格式化storage # type: ignore
 app.add_static_files('/static', 'static')   # 创建虚拟路径
 
 refresh_capture_cd = False  # 初始化倒计时刷新状态
-refresh_capture_gift = False  # 初始化投喂挑战刷新状态
 b_connect_status = False # 初始化弹幕服务器连接状态
 cd_status = False  # 初始化倒计时状态
 reset_inherit_status = False # 初始化重置继承倒计时状态
 capture_cd_is_created = False # 初始化倒计时页面状态
-capture_gift_is_created = False # 初始化投喂挑战页面状态
 
 # 检查data文件夹状态
 if not os.path.exists("data"):
@@ -606,8 +604,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
+                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
+                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
 
                         if special[gift] == "half": # 减半挑战
                             changed_num = int(app.storage.general["gift_challenge_count"]) >> int(num)
@@ -615,8 +613,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, f"2^(-{int(num)})倍", message)
+                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
+                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, f"2^(-{int(num)})倍", message)
 
                         if special[gift] == "clear": # 清空挑战
                             changed_num = 0
@@ -624,8 +622,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, "清空", message)
+                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
+                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, "清空", message)
 
                         if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
                             total_changed_num = 0
@@ -640,8 +638,8 @@ class BiliHandler(blivedm.BaseHandler):
                             if is_blind_box:
                                 gift = origin_gift
 
-                            if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
+                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
+                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
                         app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
 
@@ -654,8 +652,8 @@ class BiliHandler(blivedm.BaseHandler):
                             gift = origin_gift
 
                         if gifts.get(gift, None) != None or is_blind_box:
-                            if show_capture_gift_list_switch.value and capture_gift_is_created:
-                                capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
+                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
+                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
 
                         app.storage.general["gift_challenge_count"] = changed_num
                 else:
@@ -1323,7 +1321,6 @@ def gift_count_setting_dialog():
             number.disable()
 
     def run():
-        global refresh_capture_gift
         with open("data/gifts_count.json", "rb+") as f:
             gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb") as f:
@@ -1373,17 +1370,16 @@ def gift_count_setting_dialog():
             with open("data/special_count.json", "wb+") as f:
                 f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
 
-            refresh_capture_gift = True
+            capture_gift.refresh_capture_gift = True
             refresh_card()
 
     def reset():
         def double_check():
-            global refresh_capture_gift
             with open("data/gifts_count.json", "wb+") as f:
                 f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
             with open("data/special_count.json", "wb+") as f:
                 f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-            refresh_capture_gift = True
+            capture_gift.refresh_capture_gift = True
             double_check_dialog.close()
             refresh_card()
 
@@ -1397,7 +1393,6 @@ def gift_count_setting_dialog():
         double_check_dialog.open()
 
     def delete():
-        global refresh_capture_gift
         with open("data/gifts_count.json", "rb+") as f:
             gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb+") as f:
@@ -1415,11 +1410,10 @@ def gift_count_setting_dialog():
         with open("data/special_count.json", "wb+") as f:
             f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
 
-        refresh_capture_gift = True # 设置capture刷新状态
+        capture_gift.refresh_capture_gift = True # 设置capture刷新状态
         refresh_card()
 
     def del_gift(is_special, k):
-        global refresh_capture_gift
         with open("data/gifts_count.json", "rb") as f:
             gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
         with open("data/special_count.json", "rb") as f:
@@ -1434,7 +1428,7 @@ def gift_count_setting_dialog():
             with open("data/gifts_count.json", "wb+") as f:
                 f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
 
-        refresh_capture_gift = True
+        capture_gift.refresh_capture_gift = True
         refresh_card()
 
     def create_card():
@@ -2255,158 +2249,8 @@ async def capture():  # pyright: ignore[reportRedeclaration]
 
 # 投喂挑战预览
 @ui.page("/capture_gift", title="投喂挑战 | bili_travail", response_timeout=30)
-async def capture():
-    global capture_challenge_gift_list_show, capture_gift_is_created
-    styles.page_styles() # 加载自定义样式
-    def check_gift_refresh():
-        global refresh_capture_gift
-
-        if not base_config.get("bool", "show_capture_gift_list", False):
-            if scroll_card.visible:
-                scroll_card.set_visibility(False)
-        else:
-            scroll_card.set_visibility(True)
-
-        if refresh_capture_gift:
-            refresh_capture_gift = False
-            # ui.run_javascript(f'window.location.href += "?{refresh_time}";')
-            ui.navigate.reload()
-
-    capture_gift_is_created = True
-
-    if not os.path.exists("data/gifts_count.json") or not os.path.exists("data/gift_img.json"):
-        if not base_config.get("general", "auth_code") is None:
-            await init_config()
-
-    with open("data/gifts_count.json", "rb") as f:
-        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-    with open("data/gift_img.json", "rb") as f:
-        gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-    if os.path.exists("data/special_count.json"):
-        with open("data/special_count.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-    else:
-        special = {}
-    # ui.query('body').style(f'background: url("{random.choice(config["background_image"])}") 0px 0px/cover')
-    with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
-        with ui.row():
-            ui.label("总计").classes("text-4xl").style(f"color: {config['color']['text_color']}").classes("text-5xl")  # type: ignore[index]
-            ui.label().bind_text_from(app.storage.general, "gift_challenge_count").style(f"color: {config['color']['text_color']}").classes("text-5xl")  # type: ignore[index]
-            ui.label().bind_text_from(app.storage.general, "gift_challenge_unit").style(f"color: {config['color']['text_color']}").classes("text-5xl")  # type: ignore[index]
-            ui.label().bind_text_from(app.storage.general, "gift_challenge_text").style(f"color: {config['color']['text_color']}").classes("text-5xl")  # type: ignore[index]
-
-        ui.separator()
-
-        await get_notes() # 获取公告信息
-
-        if gifts != {}:
-            for k,v in gifts.items():
-                with ui.row().classes('w-full'):
-                    with ui.avatar(color=None):
-                        ui.image().bind_source_from(gift_img, k)
-                    ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                    ui.space()
-                    if v < 0:
-                        ui.label(f"{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                    else:
-                        ui.label(f"+{int(v)}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-
-        if special != {}:
-            for k,v in special.items():
-                if type(v) == list:
-                    with ui.row().classes('w-full'):
-                        with ui.avatar(color=None):
-                            ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        ui.space()
-                        if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general['gift_challenge_unit']}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                else:
-                    with ui.row().classes('w-full'):
-                        with ui.avatar(color=None):
-                            ui.image().bind_source_from(gift_img, k)
-                        ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                        ui.space()
-                        if v == "clear":
-                            v = "清空"
-                        if v == "double":
-                            v = "加倍"
-                        if v == "half":
-                            v = "减半"
-                        ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-
-        def capture_challenge_gift_list_show(name, gift, num, time, message):
-            if not base_config.get("bool", "show_capture_gift_list", False):
-                scroll_card.set_visibility(False)
-            else:
-                scroll_card.set_visibility(True)
-                capture_gift_scroll.clear()
-
-                if not os.path.exists("data/gift_history.json"):
-                    gift_history = {
-                        "cd": [],
-                        "challenge": []
-                    }
-                    with open("data/gift_history.json", "wb+") as f:
-                        f.write(orjson.dumps(gift_history, option=orjson.OPT_INDENT_2))
-
-                with open("data/gift_history.json", "rb") as f:
-                    gift_history = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-                with open("data/gift_img.json", "rb") as f:
-                    gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-                gift_history["challenge"].append({
-                    "name": name,
-                    "gift": gift,
-                    "num": num,
-                    "rule": time,
-                    "url": message.gift_icon if message else gifts.get(gift, ""),
-                    "time": datetime.datetime.now().strftime('%H:%M:%S')
-                })
-
-                with open("data/gift_history.json", "wb+") as f:
-                    f.write(orjson.dumps(gift_history, option=orjson.OPT_INDENT_2))
-
-                with capture_gift_scroll:
-                    for data in gift_history["challenge"][-int(config["num"]["capture_gift_list_number"]):]:  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                        with ui.row().classes("w-full"):
-                            gift_user = data["name"]
-                            gift_num = data["num"]
-                            gift_rule = data["rule"]
-                            gift_name = data["gift"]
-                            gift_img = data["url"]
-
-                            ui.label(f"{gift_user}").classes("text-xl font-extrabold")
-                            with ui.avatar(color="").classes("w-6 h-6"):
-                                if gift_name not in ["舰长", "提督", "总督"]:
-                                    if message:
-                                        ui.image(gift_img)
-                                    else:
-                                        ui.image(gifts.get(gift_name, ""))
-                                else:
-                                    ui.image(gifts.get(gift_name, ""))
-                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold")
-                            ui.label(gift_rule).classes("text-xl font-extrabold")
-
-                capture_gift_scroll.scroll_to(percent=1, duration=0.5)
-
-        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
-            with ui.scroll_area().classes('h-32 w-full') as capture_gift_scroll:
-                ui.label().set_visibility(False)
-
-    ui.timer(5, callback=lambda: check_gift_refresh())
+async def _():
+    await capture_gift.capture_gift_page(get_notes, init_config, base_config, config)
 
 @ui.page("/", response_timeout=30)
 def index():
