@@ -181,18 +181,19 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
         await get_notes_func()
 
         if not base_config.get("bool", "short_list", False):
-            if gifts != {}:
-                gifts = sort_dict(dictionary=gifts, sort_within_type=True)
-                for k, v in gifts.items():
-                    gift_element("normal", k, v)
+            with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; max-width: 710px;") as gift_card:
+                if gifts != {}:
+                    gifts = sort_dict(dictionary=gifts, sort_within_type=True)
+                    for k, v in gifts.items():
+                        gift_element("normal", k, v)
 
-            if special != {}:
-                special = sort_dict(dictionary=special, type_order=[str, list], sort_within_type=True)
-                for k, v in special.items():
-                    if type(v) == list:
-                        gift_element("list", k, v)
-                    else:
-                        gift_element("special", k, v)
+                if special != {}:
+                    special = sort_dict(dictionary=special, type_order=[str, list], sort_within_type=True)
+                    for k, v in special.items():
+                        if type(v) == list:
+                            gift_element("list", k, v)
+                        else:
+                            gift_element("special", k, v)
         else:
             short_gift_element()
 
