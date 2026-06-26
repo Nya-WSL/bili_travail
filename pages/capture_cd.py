@@ -32,14 +32,15 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
     def check_cd_refresh():
         global refresh_capture_cd
 
-        if not base_config.get("bool", "show_capture_gift_list", False):
-            if scroll_card.visible:
-                scroll_card.set_visibility(False)
-        else:
-            scroll_card.set_visibility(True)
-
         if refresh_capture_cd:
+            if not base_config.get("bool", "show_capture_gift_list", False):
+                if scroll_card.visible:
+                    scroll_card.set_visibility(False)
+            else:
+                scroll_card.set_visibility(True)
+
             refresh_capture_cd = False
+            timer.cancel()
             ui.navigate.reload()
 
     def change_gift_element(v_type, k, v):
@@ -163,16 +164,13 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
     with open("data/gifts.json", "rb") as f:
         gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-    with open("data/gift_img.json", "rb") as f:
-        gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
     if os.path.exists("data/special.json"):
         with open("data/special.json", "rb") as f:
             special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
     else:
         special = {}
 
-    with ui.card(align_items="center").classes("bg-transparent").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
+    with ui.card(align_items="center").classes("bg-transparent w-full").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
         if not config['bool']['borderless_cd']:  # type: ignore[index]
             ui.badge(outline=True, color="", text_color=config['color']['time_color']).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl")  # type: ignore[arg-type]
         else:
@@ -350,4 +348,4 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
             with ui.scroll_area().classes('h-32 w-full') as capture_gift_scroll:
                 ui.label().set_visibility(False)
 
-    ui.timer(5, callback=lambda: check_cd_refresh())
+    timer = ui.timer(5, callback=lambda: check_cd_refresh())
