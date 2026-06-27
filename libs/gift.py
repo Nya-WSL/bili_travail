@@ -150,6 +150,7 @@ class BiliGiftManager:
                     data = await response.json()
                     if data["code"] == 0:
                         # 只有一个值一般是红包，大概率还未下发自定义礼物数据，继续等待；最多等待3次避免无限递归；如果房间号为3可能未输入身份码，不可能获取到自定义礼物，直接跳过
+                        # 部分直播间可能有红包和人气票两个值，目前没想到啥办法，暂不处理
                         if len(data["data"]["gift_config"]["room_config"]) == 1 and self.wait_num < 3 and self.room_id != 3:
                             self.wait_num += 1
                             logger.warning(f"房间{self.room_id}的自定义礼物数据可能还未下发，继续等待...")
