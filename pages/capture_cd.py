@@ -1,17 +1,17 @@
 import os
 import re
 import orjson
-import itertools
 import datetime
+import itertools
 
 from nicegui import ui, app
+
 from libs import log
+from libs import gift
 from libs import styles
-from libs import gift as get_gift
 from libs.format import format_cd, format_seconds, sort_dict
 
 logger = log.logger
-GiftManager = get_gift.BiliGiftManager()
 
 # 与main.py共享的模块级变量
 capture_cd_gift_list_show = None
@@ -19,8 +19,7 @@ capture_cd_rank_list_show = None
 capture_cd_is_created = False
 refresh_capture_cd = False
 
-
-async def capture_cd_page(get_notes_func, init_config_func, base_config):
+async def capture_cd_page(get_notes_func, init_config_func, base_config, gift_manager: gift.BiliGiftManager):
     """倒计时预览页面"""
     global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created, refresh_capture_cd
 
@@ -40,8 +39,30 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 scroll_card.set_visibility(True)
 
             refresh_capture_cd = False
-            timer.cancel()
-            ui.navigate.reload()
+            gift_card.clear()
+
+            with gift_card:
+                with open("data/gifts.json", "rb") as f:
+                    gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
+                if os.path.exists("data/special.json"):
+                    with open("data/special.json", "rb") as f:
+                        special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+                else:
+                    special = {}
+
+                if gifts != {}:
+                    gifts = sort_dict(dictionary=gifts, sort_within_type=True)
+                    for k, v in gifts.items():
+                        gift_element("normal", k, v)
+
+                if special != {}:
+                    special = sort_dict(dictionary=special, type_order=[str, list], sort_within_type=True)
+                    for k, v in special.items():
+                        if type(v) == list:
+                            gift_element("list", k, v)
+                        else:
+                            gift_element("special", k, v)
 
     def change_gift_element(v_type, k, v):
         """修改礼物列表UI元素"""
@@ -51,7 +72,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
         if v_type == "normal":
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
-            if k in GiftManager.custom_gifts:
+            if k in gift_manager.custom_gifts:
                 v_label.set_text(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]) + v)}")
             else:
                 v_label.set_text(format_seconds(v))
@@ -128,7 +149,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
                 k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
                 ui.space()
-                if k in GiftManager.custom_gifts:
+                if k in gift_manager.custom_gifts:
                     v_label = ui.label(f"{format_seconds(v)} 暴击{format_seconds(v * abs(1 - app.storage.general['custom_gift_rate'][k]) + v)}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
                 else:
                     v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
@@ -261,6 +282,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
                             ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                            ui.space()
                             ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
 
                 capture_gift_scroll.scroll_to(percent=1, duration=0.5)
@@ -339,14 +361,14 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
 
             capture_rank_scroll.scroll_to(percent=1, duration=0.5)
 
-        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as rank_card:
+        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None; max-width: 350px;") as rank_card:
             with ui.scroll_area().classes('h-40 w-full') as capture_rank_scroll:
                 ui.label().set_visibility(False)
 
         capture_cd_rank_list_show()
 
-        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None;") as scroll_card:
+        with ui.card(align_items="stretch").classes("bg-transparent w-full").style("box-shadow: None; max-width: 450px;") as scroll_card:
             with ui.scroll_area().classes('h-32 w-full') as capture_gift_scroll:
                 ui.label().set_visibility(False)
 
-    timer = ui.timer(5, callback=lambda: check_cd_refresh())
+    ui.timer(5, callback=lambda: check_cd_refresh())

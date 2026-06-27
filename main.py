@@ -1708,7 +1708,7 @@ async def refresh_gift(heartbeat=False):
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail", response_timeout=30)
 async def _():
-    await capture_cd.capture_cd_page(get_notes, init_config, base_config)
+    await capture_cd.capture_cd_page(get_notes, init_config, base_config, GiftManager)
 
 # 投喂挑战预览
 @ui.page("/capture_gift", title="投喂挑战 | bili_travail", response_timeout=30)
