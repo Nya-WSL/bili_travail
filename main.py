@@ -1966,62 +1966,18 @@ def index():
         load_dialog.open()
         load_dialog.on("hide", lambda: load_dialog.delete())
 
-    # 礼物设置弹窗
-    def gift_setting_dialog() -> ui.dialog:
-        with ui.dialog() as gift_setting_dialog, ui.card(align_items="center"):
-            ui.label("自定义礼物暴击倍率")
-            for custom_gift in GiftManager.custom_gifts:
-                ui.number(custom_gift, min=1, step=0.01, value=1.5).style("width: 150px").bind_value(app.storage.general["custom_gift_rate"], custom_gift)
-
-            ui.separator()
-
-            with ui.row():
-                with ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"') as short_switch:
-                    ui.tooltip("存在bug，暂时禁用")
-                short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
-                short_switch.set_value(False)
-                short_switch.disable()
-                short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
-                if short_switch.value:
-                    short_time.set_visibility(True)
-                else:
-                    short_time.set_visibility(False)
-            with ui.row():
-                ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-                ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
-                ui.button("更新礼物", on_click=lambda: refresh_gift())
-            ui.button("关闭", on_click=lambda: gift_setting_dialog.close())
-
-        return gift_setting_dialog
-
     def changelog_dialog() -> ui.dialog:
         with ui.dialog() as changelog_dialog, ui.card(align_items="center"):
             changelog()
 
         return changelog_dialog
 
-    # 统计相关弹窗
-    with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
-        with ui.row():
-            ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
-            ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
-        ui.button("关闭", on_click=lambda: gift_count_dialog.close())
-
-    with ui.dialog() as color_dialog, ui.card(align_items="center"):
-        # 颜色输入框
-        with ui.row():
-            ui.color_input(label="预览颜色", value="#5a85ad", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-            ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-            ui.color_input(label="文字颜色", value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 120px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-        ui.button("关闭", on_click=lambda: color_dialog.close())
-
-
     if app.storage.general["version"] != version: # 如果版本号不一致
         app.storage.general["version"] = version # 更新版本号
         changelog_dialog().open() # 打开更新日志弹窗
 
     # 创建主界面
-    with ui.card(align_items="center").classes("absolute-center").style("width: 95%") as main_card:
+    with ui.card(align_items="center").classes("absolute-center").style("width: 95%; height: 720px") as main_card:
         if base_config.get("bool", "check_update", True):
             asyncio.create_task(check_update())
         else:
@@ -2067,55 +2023,93 @@ def index():
 
         ui.separator()
 
-        with ui.row(align_items="center"):
-            with ui.column(align_items="center").classes("gap-0"):
-                # 身份码
-                auth_code = ui.input("身份码", on_change=lambda: base_config.save(config), password=True, password_toggle_button=True).style("width: 120px")
-                auth_code.bind_value(config["general"], "auth_code") # 实时写入身份码到配置文件
-                with ui.row().classes("gap-0"):
-                    ui.label("房间号：")
-                    login_status = ui.label("未连接").classes("text-red")
-                b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+        content = {"1": "账号设置", "2": "礼物设置", "3": "显示设置", "4": "外观设置", "5": "统计相关", "6": "程序设置"} # 所有tab的标题
 
-            with ui.column(align_items="center").classes("gap-0"):
-                show_capture_rank_list_switch = ui.switch("OBS显示排行榜", value=False, on_change=lambda: base_config.save(config))
-                show_capture_rank_list_switch.bind_value(config["bool"], "show_capture_rank_list").props('color="btn"')
+        # 创建标签页
+        with ui.tabs() as tabs:
+            for title, label in content.items():
+                ui.tab(title, label)
 
-                show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: base_config.save(config))
-                show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
+        # 创建标签页内容
+        with ui.tab_panels(tabs, value="1").classes('w-full'):
+            # 1 内容
+            with ui.tab_panel("1").classes("items-center").style("height: 160px;"):
+                with ui.row(align_items="center"):
+                    with ui.column(align_items="center").classes("gap-0"):
+                        # 身份码
+                        auth_code = ui.input("身份码", on_change=lambda: base_config.save(config), password=True, password_toggle_button=True).style("width: 120px")
+                        auth_code.bind_value(config["general"], "auth_code") # 实时写入身份码到配置文件
+                        with ui.row().classes("gap-0"):
+                            ui.label("房间号：")
+                            login_status = ui.label("未连接").classes("text-red")
 
-                with ui.switch("倒计时结束后退出程序", value=True, on_change=lambda: base_config.save(config)) as exit_timer_switch:
-                    ui.tooltip(f"倒计时结束{base_config.get('num', 'exit_time', 0)}秒后是否退出程序，该值可在 config.toml -> num -> exit_time 处修改")
-                exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
+                    with ui.column(align_items="start").classes("gap-0"):
+                        with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
+                            ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
+                        b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
 
-            with ui.column(align_items="center").classes("gap-0"):
-                with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
-                    ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
+            # 2 内容
+            with ui.tab_panel("2").classes("items-center").style("height: 160px;"):
+                # with ui.row():
+                #     with ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"') as short_switch:
+                #         ui.tooltip("存在bug，暂时禁用")
+                #     short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
+                #     short_switch.set_value(False)
+                #     short_switch.disable()
+                #     short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
+                #     if short_switch.value:
+                #         short_time.set_visibility(True)
+                #     else:
+                #         short_time.set_visibility(False)
 
-                with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
-                    ui.tooltip("启用时预览界面倒计时将不显示边框，仅显示数字")
+                with ui.row():
+                    ui.button("加班设置", on_click=lambda: cd_setting_dialog())
+                    ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
+                    ui.button("更新礼物", on_click=lambda: refresh_gift())
 
-                gift_challenge_switch = ui.switch("启用投喂挑战", value=False).props('color="btn"')
-                gift_challenge_switch.disable()
+                # Preview page button
+                ui.button("界面预览", on_click=lambda: open_capture())
 
-        ui.separator()
+            with ui.tab_panel("3").classes("items-center").style("height: 160px;"):
+                with ui.row(align_items="center").classes("gap-0"):
+                    show_capture_rank_list_switch = ui.switch("OBS显示排行榜", value=False, on_change=lambda: base_config.save(config))
+                    show_capture_rank_list_switch.bind_value(config["bool"], "show_capture_rank_list").props('color="btn"')
 
-        # 按钮组
-        with ui.row():
-            ui.button("礼物设置", on_click=lambda: gift_setting_dialog().open())
-            ui.button("颜色设置", on_click=lambda: color_dialog.open())
-            ui.button("统计相关", on_click=lambda: gift_count_dialog.open())
-            # Preview page button
-            ui.button("界面预览", on_click=lambda: open_capture())
+                    show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: base_config.save(config))
+                    show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
 
-        with ui.row():
-            # Login bilibili button
-            ui.button("登录账号", on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
-            # Update version button
-            ui.button("检查更新", on_click=lambda: check_update())
-            # Changelog button
-            ui.button("更新日志", on_click=lambda: changelog_dialog().open())
-            ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
+                    with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
+                        ui.tooltip("启用时OBS页面倒计时将不显示边框，仅显示数字")
+
+                with ui.row(align_items="center"):
+                    gift_challenge_switch = ui.switch("启用投喂挑战", value=False).props('color="btn"')
+                    gift_challenge_switch.disable()
+
+            with ui.tab_panel("4").classes("items-center").style("height: 160px;"):
+                with ui.row():
+                    ui.color_input(label="计时颜色", value="#5a85ad", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="文字颜色", value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 120px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+
+            with ui.tab_panel("5").classes("items-center").style("height: 160px;"):
+                with ui.row():
+                    ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
+                    ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
+
+            # 3 内容
+            with ui.tab_panel("6").classes("items-center").style("height: 160px;"):
+                with ui.row():
+                    # Login bilibili button
+                    ui.button("登录账号", on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
+                    # Update version button
+                    ui.button("检查更新", on_click=lambda: check_update())
+                    # Changelog button
+                    ui.button("更新日志", on_click=lambda: changelog_dialog().open())
+                    ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
+                with ui.row(align_items="center"):
+                    with ui.switch("倒计时结束后退出程序", value=True, on_change=lambda: base_config.save(config)) as exit_timer_switch:
+                        ui.tooltip(f"倒计时结束{base_config.get('num', 'exit_time', 0)}秒后是否退出程序，该值可在 config.toml -> num -> exit_time 处修改")
+                    exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
 
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
