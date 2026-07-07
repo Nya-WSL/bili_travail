@@ -1589,7 +1589,7 @@ def index():
         changelog_dialog().open() # 打开更新日志弹窗
 
     # 创建主界面
-    with ui.card(align_items="center").classes("absolute-center").style("width: 95%; height: 720px") as main_card:
+    with ui.card(align_items="center").classes("absolute-center").style("width: 95%; height: 730px") as main_card:
         if base_config.get("bool", "check_update", True):
             asyncio.create_task(check_update())
         else:
@@ -1644,7 +1644,7 @@ def index():
 
         # 创建标签页内容
         with ui.tab_panels(tabs, value="1").classes('w-full'):
-            with ui.tab_panel("1").classes("items-center").style("height: 160px;"):
+            with ui.tab_panel("1").classes("items-center").style("height: 210px;"):
                 with ui.row(align_items="center"):
                     with ui.column(align_items="center").classes("gap-0"):
                         # 身份码
@@ -1654,12 +1654,32 @@ def index():
                             ui.label("房间号：")
                             login_status = ui.label("未连接").classes("text-red")
 
-                    with ui.column(align_items="start").classes("gap-0"):
+                with ui.column(align_items="center").classes("gap-0"):
+                    b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+
+                    with ui.row(align_items="center"):
                         with ui.switch("忽略倒计时", value=app.storage.general.get("ignore_cd", False), on_change=lambda e: change_ignore_cd("ignore_cd", e.value)).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
                             ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时，与倒计时结束后断开连接互斥")
-                        b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
 
-            with ui.tab_panel("2").classes("items-center").style("height: 160px;"):
+                        with ui.switch("倒计时结束后断开连接", value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)) as exit_timer_switch:
+                            ui.tooltip(f"倒计时结束后是否断开弹幕服务器连接，与忽略倒计时互斥")
+                        exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
+                        exit_timer_switch.on_value_change(lambda e: exit_timer_delay.set_visibility(e.value))
+                        exit_timer_switch.on_value_change(lambda e: change_ignore_cd("exit_timer", e.value))
+
+                        # 启动时恢复退出前的互斥状态
+                        if exit_timer_switch.value:
+                            change_ignore_cd("exit_timer", True)
+                        elif ignore_cd_switch.value:
+                            change_ignore_cd("ignore_cd", True)
+
+                        with ui.number(value=base_config.get("num", "exit_time", 0), min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "exit_time") as exit_timer_delay:
+                            ui.tooltip("倒计时结束后断开连接的延迟时间，单位为秒")
+                        exit_timer_delay.style("width: 60px")
+                        exit_timer_delay.set_visibility(exit_timer_switch.value)
+
+
+            with ui.tab_panel("2").classes("items-center").style("height: 210px;"):
                 # with ui.row():
                 #     with ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"') as short_switch:
                 #         ui.tooltip("存在bug，暂时禁用")
@@ -1676,7 +1696,7 @@ def index():
                     ui.button("设置礼物", on_click=lambda: cd_setting_dialog())
                     ui.button("更新礼物", on_click=lambda: refresh_gift())
 
-            with ui.tab_panel("3").classes("items-center").style("height: 160px;"):
+            with ui.tab_panel("3").classes("items-center").style("height: 210px;"):
                 with ui.row(align_items="center").classes("gap-0"):
                     show_capture_rank_list_switch = ui.switch("OBS显示排行榜", value=False, on_change=lambda: base_config.save(config))
                     show_capture_rank_list_switch.bind_value(config["bool"], "show_capture_rank_list").props('color="btn"')
@@ -1687,18 +1707,18 @@ def index():
                     with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
                         ui.tooltip("启用时OBS页面倒计时将不显示边框，仅显示数字")
 
-            with ui.tab_panel("4").classes("items-center").style("height: 160px;"):
+            with ui.tab_panel("4").classes("items-center").style("height: 210px;"):
                 with ui.row():
                     ui.color_input(label="计时颜色", value="#5a85ad", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
                     ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
                     ui.color_input(label="文字颜色", value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 120px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
 
-            with ui.tab_panel("5").classes("items-center").style("height: 160px;"):
+            with ui.tab_panel("5").classes("items-center").style("height: 210px;"):
                 with ui.row():
                     ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
                     ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
 
-            with ui.tab_panel("6").classes("items-center gap-1").style("height: 160px;"):
+            with ui.tab_panel("6").classes("items-center gap-1").style("height: 210px;"):
                 with ui.row():
                     # Login bilibili button
                     ui.button("登录账号", on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
@@ -1711,24 +1731,6 @@ def index():
                 with ui.row(align_items="center"):
                     ui.switch("自动检查更新", value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
 
-                with ui.row(align_items="center"):
-                    with ui.switch("倒计时结束后断开连接", value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)) as exit_timer_switch:
-                        ui.tooltip(f"倒计时结束后是否断开弹幕服务器连接，与忽略倒计时互斥")
-                    exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
-                    exit_timer_switch.on_value_change(lambda e: exit_timer_delay.set_visibility(e.value))
-                    exit_timer_switch.on_value_change(lambda e: change_ignore_cd("exit_timer", e.value))
-
-                    # 启动时恢复退出前的互斥状态
-                    if exit_timer_switch.value:
-                        change_ignore_cd("exit_timer", True)
-                    elif ignore_cd_switch.value:
-                        change_ignore_cd("ignore_cd", True)
-
-                    with ui.number(value=base_config.get("num", "exit_time", 0), min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "exit_time") as exit_timer_delay:
-                        ui.tooltip("倒计时结束后断开连接的延迟时间，单位为秒")
-                    exit_timer_delay.style("width: 60px")
-                    exit_timer_delay.set_visibility(exit_timer_switch.value)
-
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
             ui.tooltip("OBS & 直播姬浏览器源URL，单击可复制至剪贴板")
@@ -1738,7 +1740,7 @@ def index():
         init_task()
 
     # about按钮
-    with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=15):
+    with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
         ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @app.on_startup
