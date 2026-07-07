@@ -128,7 +128,6 @@ def init_storage():
     app.storage.general["version"] = app.storage.general.get("version", version)
     app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
     app.storage.general["ignore_cd"] = app.storage.general.get("ignore_cd", False)
-    app.storage.general["custom_gift_rate"] = app.storage.general.get("custom_gift_rate", {})
     app.storage.general["gift_cd_rate"] = app.storage.general.get("gift_cd_rate", {"nega": 0, "zero": 0, "posi": 0})
 
 # ================================
@@ -514,7 +513,6 @@ class BiliHandler(blivedm.BaseHandler):
                     with open("data/special.json", "rb") as f:
                         special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-                    custom_gifts = GiftManager.custom_gifts
                     current_seconds = countdown_timer.remaining_seconds
 
                     if gift not in gifts and gift not in special:
@@ -585,32 +583,27 @@ class BiliHandler(blivedm.BaseHandler):
                             total_changed_time = 0
                             rate = app.storage.general["gift_cd_rate"]
 
-                            if gift in custom_gifts:
-                                custom_rate = float(app.storage.general["custom_gift_rate"][gift])
-                            else:
-                                custom_rate = 1
-
                             for _ in range(num):
                                 r = round(random.random(), 2)
                                 logger.info(f"随机数: {r}, 负时概率: {rate.get('nega', 0)}, 不变概率: {rate.get('zero', 0)}, 正时概率: {rate.get('posi', 0)}")
 
                                 if r <= rate.get("nega", 0) and rate.get("nega", 0) != 0:
                                     if special[gift][0] >= 0: # 如果下界>=0，为防止抛错将使用默认算法
-                                        total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
+                                        total_changed_time += random.randint(special[gift][0], special[gift][1])
                                     else:
-                                        total_changed_time += random.randint(special[gift][0], -1) * custom_rate
+                                        total_changed_time += random.randint(special[gift][0], -1)
 
                                 elif r <= rate.get("zero", 0) + rate.get("nega", 0) and rate.get("zero", 0) != 0: # 如果r小于等于减时概率则会先进入减时的if语句，如果r大于减时概率但小于等于两者之和则会进入不变的elif语句
                                     total_changed_time += 0
 
                                 elif r <= rate.get("posi", 0) + rate.get("nega", 0) + rate.get("zero", 0) and rate.get("posi", 0) != 0: # 同上
                                     if special[gift][1] <= 0:# 如果上界<=0，为防止抛错将使用默认算法
-                                        total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
+                                        total_changed_time += random.randint(special[gift][0], special[gift][1])
                                     else:
-                                        total_changed_time += random.randint(1, special[gift][1]) * custom_rate
+                                        total_changed_time += random.randint(1, special[gift][1])
 
                                 else:
-                                    total_changed_time += random.randint(special[gift][0], special[gift][1]) * custom_rate
+                                    total_changed_time += random.randint(special[gift][0], special[gift][1])
 
                             new_seconds = current_seconds + total_changed_time
 
@@ -624,9 +617,6 @@ class BiliHandler(blivedm.BaseHandler):
 
                     if gift in gifts:
                         delta_seconds = gifts[gift] * int(num)
-
-                        if gift in custom_gifts:
-                            delta_seconds = delta_seconds * float(app.storage.general["custom_gift_rate"][gift])
 
                         new_seconds = countdown_timer.remaining_seconds + delta_seconds
                         gift_list_show_time = delta_seconds
@@ -1217,16 +1207,6 @@ async def get_notes():
     async def random_notes():
         result = await fetch_notes()
         local_notes = result.copy()
-        with open("data/gifts.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        for note in local_notes:
-            for i in GiftManager.custom_gifts:
-                if i in note:
-                    local_notes.pop(local_notes.index(note))
-                if i in gifts:
-                    local_notes.append(
-                        f'赠送{i}可触发{app.storage.general["custom_gift_rate"].get(i, None)}倍暴击！'
-                    )
 
         if local_notes: # 如果公告列表不为空
             # 过滤掉所有空字符串占位符
@@ -1316,8 +1296,6 @@ async def refresh_gift(heartbeat=False):
         return
 
     with ui.dialog() as check_dialog, ui.card(align_items="center"):
-        ui.label("请不要在倒计时和投喂挑战功能运行时更新。")
-        ui.label("更新礼物数据前，请先暂停倒计时与投喂挑战。")
         ui.label("是否进行更新？")
 
         with ui.row():
@@ -1753,7 +1731,7 @@ def index():
 
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
-            ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
+            ui.tooltip("OBS & 直播姬浏览器源URL，单击可复制至剪贴板")
         with ui.link("使用文档", "https://docs.travail.nya-wsl.com", True):
             ui.tooltip("点击查看使用说明书")
 

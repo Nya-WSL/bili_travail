@@ -40,7 +40,6 @@ check_sha256 = true # 是否启用更新包SHA256校验
 [num]
 short_time = 5 # 简洁模式滚动时间
 capture_gift_list_number = 3 # 收到礼物列表显示数量
-custom_gift_rate = 1.5 # 自定义礼物暴击倍率
 exit_time = 1800 # 倒计时结束后退出程序等待时间'''
 
         self.visited = set()  # 用于检测循环引用
