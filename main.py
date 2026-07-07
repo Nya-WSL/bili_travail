@@ -678,7 +678,6 @@ def update_btn_state(state: str):
         input_second.set_value(0)
 
 
-
 # ================================
 # GUI
 # ================================
@@ -1770,8 +1769,12 @@ async def create_job():
 
 @app.on_shutdown
 async def shutdown():
-    await client.stop_and_close()
-    logger.info('ws connect shut down')
+    if "client" in globals() and client is not None:
+        await client.stop_and_close() # 彻底断开弹幕服务器ws连接
+        logger.info("[shutdown] 弹幕服务器ws连接已断开")
+    else:
+        logger.warning("[shutdown] 弹幕服务器ws连接未建立，跳过断开")
+
     scheduler.shutdown()
 
 # 运行NiceGUI
