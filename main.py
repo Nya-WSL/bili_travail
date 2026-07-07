@@ -1536,6 +1536,7 @@ async def check_b_connect_status():
         if b_connect_status:
             start_button.enable()
             gift_challenge_switch.enable()
+            countdown_timer.update_element(b_connect_switch) # 更新倒计时的开关对象，用于倒计时结束后断开连接
         else:
             b_connect_switch.set_value("null")
 
@@ -1972,6 +1973,21 @@ def index():
 
         return changelog_dialog
 
+    def change_ignore_cd(switch: str | None = None, value: bool = False):
+        """倒计时结束后断开连接与忽略倒计时互斥规则"""
+        if switch == "exit_timer":
+            if value:
+                ignore_cd_switch.set_value(False)
+                ignore_cd_switch.disable()
+            else:
+                ignore_cd_switch.enable()
+        elif switch == "ignore_cd":
+            if value:
+                exit_timer_switch.set_value(False)
+                exit_timer_switch.disable()
+            else:
+                exit_timer_switch.enable()
+
     if app.storage.general["version"] != version: # 如果版本号不一致
         app.storage.general["version"] = version # 更新版本号
         changelog_dialog().open() # 打开更新日志弹窗
@@ -2044,8 +2060,8 @@ def index():
                             login_status = ui.label("未连接").classes("text-red")
 
                     with ui.column(align_items="start").classes("gap-0"):
-                        with ui.switch("忽略倒计时", value=False).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
-                            ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时")
+                        with ui.switch("忽略倒计时", value=app.storage.general.get("ignore_cd", False), on_change=lambda e: change_ignore_cd("ignore_cd", e.value)).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
+                            ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时，与倒计时结束后断开连接互斥")
                         b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
 
             # 2 内容
@@ -2107,9 +2123,22 @@ def index():
                     ui.button("更新日志", on_click=lambda: changelog_dialog().open())
                     ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
                 with ui.row(align_items="center"):
-                    with ui.switch("倒计时结束后退出程序", value=True, on_change=lambda: base_config.save(config)) as exit_timer_switch:
-                        ui.tooltip(f"倒计时结束{base_config.get('num', 'exit_time', 0)}秒后是否退出程序，该值可在 config.toml -> num -> exit_time 处修改")
+                    with ui.switch("倒计时结束后断开连接", value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)) as exit_timer_switch:
+                        ui.tooltip(f"倒计时结束{base_config.get('num', 'exit_time', 0)}秒后是否断开弹幕服务器连接，与忽略倒计时互斥")
                     exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
+                    exit_timer_switch.on_value_change(lambda e: exit_timer_delay.set_visibility(e.value))
+                    exit_timer_switch.on_value_change(lambda e: change_ignore_cd("exit_timer", e.value))
+
+                    # 启动时恢复退出前的互斥状态
+                    if exit_timer_switch.value:
+                        change_ignore_cd("exit_timer", True)
+                    elif ignore_cd_switch.value:
+                        change_ignore_cd("ignore_cd", True)
+
+                    with ui.number(value=base_config.get("num", "exit_time", 0), min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "exit_time") as exit_timer_delay:
+                        ui.tooltip("倒计时结束后断开连接的延迟时间，单位为秒")
+                    exit_timer_delay.style("width: 60px")
+                    exit_timer_delay.set_visibility(exit_timer_switch.value)
 
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):

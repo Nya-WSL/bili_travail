@@ -1,6 +1,8 @@
 import asyncio
 import datetime
+
 from nicegui import ui, app
+
 from libs.log import logger
 import libs.config as travail_config
 
@@ -22,10 +24,18 @@ class CountdownTimer:
         self.exit_timer = None
         self._update_btn_state = update_btn_state_func
         self._cancel_button = cancel_button_ref
+        self._b_connect_switch: ui.switch = None # 初始化blivedm连接状态开关对象
+
+    def update_element(self, b_connect_switch):
+        """更新b_connect_switch对象"""
+        self._b_connect_switch = b_connect_switch
 
     def exit_func(self):
-        logger.info("计时器结束，退出程序")
-        app.shutdown()
+        if self._b_connect_switch:
+            self._b_connect_switch.set_value(False)
+            logger.info("计时器结束")
+        else:
+            logger.error("计时器结束，客户端为空")
 
     @property
     def remaining_seconds(self) -> float:
@@ -50,6 +60,9 @@ class CountdownTimer:
 
             if self.remaining_seconds <= 0:
                 self.stop()
+                if not self.exit_timer and base_config.get("bool", "exit_timer", True):
+                    logger.info("倒计时停止，启动计时器")
+                    self.exit_timer = app.timer(base_config.get("num", "exit_time", 1800), lambda: self.exit_func(), once=True)  # pyright: ignore[reportArgumentType]
                 break
 
             self.remaining_time = datetime.timedelta(seconds=self.remaining_seconds)
@@ -107,9 +120,6 @@ class CountdownTimer:
             self.remaining_time = datetime.timedelta(0)
             self._update_btn_state("stop")  # 更新按钮状态
             cd_status = False
-            if not self.exit_timer and base_config.get("bool", "exit_timer", True):
-                logger.info("倒计时停止，启动计时器")
-                self.exit_timer = app.timer(base_config.get("num", "exit_time", 1800), lambda: self.exit_func(), once=True)  # pyright: ignore[reportArgumentType]
         else:
             if reset_inherit_status:
                 app.storage.general["countdown_time"] = 0
