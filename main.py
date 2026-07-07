@@ -42,7 +42,7 @@ from libs.changelog import changelog, get_log
 from libs.format import format_cd, format_seconds, sort_dict
 
 from libs import countdown_timer as ct
-from pages import count, about, capture_gift, capture_cd
+from pages import count, about, capture_cd
 
 from blivedm import blivedm
 
@@ -507,114 +507,6 @@ class BiliHandler(blivedm.BaseHandler):
                 f.write(orjson.dumps(box_value, option=orjson.OPT_INDENT_2))
 
         if b_connect_status:  # True则已连接至弹幕服务器
-            if gift_challenge_switch.value:  # True则为投喂挑战开关为开状态
-                # 检查投喂挑战数据文件是否存在
-                if os.path.exists("data/gifts_count.json"):
-                    with open("data/gifts_count.json", "rb") as f:
-                        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-                    with open("data/special_count.json", "rb") as f:
-                        special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-                    # 如果礼物数据没有该礼物则写入
-                    if gift not in gifts and gift not in special:
-                        with open("data/gift_img.json", "rb") as f:
-                            gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-                        gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
-                        with open("data/gift_img.json", "wb+") as f:
-                            f.write(orjson.dumps(gift_img, option=orjson.OPT_INDENT_2))
-
-                    # 初始化盲盒数据
-                    with open("data/blind_box_data.json", "rb") as f:
-                        blind_box = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-                    blind_box_gifts = []
-
-                    if blind_box == {}:
-                        logger.error("初始化盲盒失败，将使用默认数据")
-                        blind_box = gift_map.blind_box
-
-                    for v in blind_box.values():
-                        for blind_gift in v:
-                            blind_box_gifts.append(blind_gift)
-
-                    # 如果礼物在盲盒中，将礼物设定为盲盒id
-                    origin_gift = None
-                    if gift in blind_box_gifts:
-                        for box_name, gifts_name in blind_box.items():
-                            if gift in gifts_name:
-                                if gifts.get(box_name, None) != None or special.get(box_name, None) != None:
-                                    origin_gift = gift
-                                    if gift not in special and gifts.get(gift, None) is None:
-                                        is_blind_box = True
-                                        gift = box_name
-
-                                    blind_box_value(origin_gift, num, price, box_name) # 盲盒价值
-
-                    # 如果收到的礼物在special.json中
-                    if gift in special:
-                        changed_num = int(app.storage.general["gift_challenge_count"])  # 初始化为当前计数
-
-                        if special[gift] == "double": # 加倍挑战
-                            changed_num = int(app.storage.general["gift_challenge_count"]) << int(num)
-
-                            if is_blind_box:
-                                gift = origin_gift
-
-                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
-                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
-
-                        if special[gift] == "half": # 减半挑战
-                            changed_num = int(app.storage.general["gift_challenge_count"]) >> int(num)
-
-                            if is_blind_box:
-                                gift = origin_gift
-
-                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
-                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, f"2^(-{int(num)})倍", message)
-
-                        if special[gift] == "clear": # 清空挑战
-                            changed_num = 0
-
-                            if is_blind_box:
-                                gift = origin_gift
-
-                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
-                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, "清空", message)
-
-                        if type(special[gift]) == list: # 随机挑战，只有随机的类型为list
-                            total_changed_num = 0
-
-                            for _ in range(num):
-                                random_num = random.randint(special[gift][0], special[gift][1])
-                                total_changed_num += random_num
-
-                            changed_num = int(app.storage.general["gift_challenge_count"]) + total_changed_num
-                            gift_list_show_num = str(total_changed_num)
-
-                            if is_blind_box:
-                                gift = origin_gift
-
-                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
-                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
-
-                        app.storage.general["gift_challenge_count"] = changed_num  # 重设投喂挑战数据
-
-                    # 如果收到的礼物不在special.json中
-                    elif gift in gifts:
-                        changed_num = (gifts[gift] * int(num)) + int(app.storage.general["gift_challenge_count"]) # （设定的值 * 礼物数量） + 目前总数
-                        gift_list_show_num = str(int(gifts[gift] * int(num)))
-
-                        if is_blind_box:
-                            gift = origin_gift
-
-                        if gifts.get(gift, None) != None or is_blind_box:
-                            if show_capture_gift_list_switch.value and capture_gift.capture_gift_is_created:
-                                capture_gift.capture_challenge_gift_list_show(uname, gift, num, gift_list_show_num + app.storage.general["gift_challenge_unit"], message)
-
-                        app.storage.general["gift_challenge_count"] = changed_num
-                else:
-                    logger.error("投喂挑战失败，未找到礼物数据文件")
-
             if ct.cd_status or app.storage.general.get("ignore_cd", False):  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
                     with open("data/gifts.json", "rb") as f:
@@ -1112,260 +1004,6 @@ def blind_box_value_dialog():
     value_dialog.open()
 
 
-# 投喂挑战弹窗
-def gift_count_setting_dialog():
-    global gift_play_unit
-    global gift_play_text
-    def show():
-        if status.value == "add" or status.value == "sub":
-            number.set_visibility(True)
-        else:
-            number.set_visibility(False)
-        if status.value == "random":
-            min.set_visibility(True)
-            max.set_visibility(True)
-        else:
-            min.set_visibility(False)
-            max.set_visibility(False)
-        if status.value == "double" or status.value == "clear" or status.value == "random" or status.value == "half":
-            number.disable()
-        else:
-            number.enable()
-        if status.value == "delete":
-            number.disable()
-
-    def run():
-        with open("data/gifts_count.json", "rb+") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special_count.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        if gift_name.value is None or number.value < 0:
-            if gift_name.value is None:
-                ui.notify("请选择礼物", type="negative")
-            if number.value < 0:
-                ui.notify("数量不能是负数", type="negative")
-        else:
-            if status.value == "add":
-                gifts[gift_name.value] = int(number.value)
-                if gift_name.value in special:
-                    special.pop(gift_name.value)
-            elif status.value == "sub":
-                gifts[gift_name.value] = float(f"-{number.value}")
-                if gift_name.value in special:
-                    special.pop(gift_name.value)
-            elif status.value == "double":
-                special[gift_name.value] = "double"
-                if gift_name.value in gifts:
-                    gifts.pop(gift_name.value)
-            elif status.value == "half":
-                special[gift_name.value] = "half"
-                if gift_name.value in gifts:
-                    gifts.pop(gift_name.value)
-            elif status.value == "clear":
-                special[gift_name.value] = "clear"
-                if gift_name.value in gifts:
-                    gifts.pop(gift_name.value)
-            elif status.value == "random":
-                try:
-                    if min.value <= max.value:
-                        special[gift_name.value] = [int(min.value), int(max.value)]
-                    else:
-                        ui.notify("随机的值必须最小数<=最大数", type="negative")
-                        return
-                except TypeError:
-                    ui.notify("随机的值为空", type="negative")
-                if gift_name.value in gifts:
-                    gifts.pop(gift_name.value)
-
-            gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
-
-            with open("data/gifts_count.json", "wb+") as f:
-                f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
-            with open("data/special_count.json", "wb+") as f:
-                f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
-
-            capture_gift.refresh_capture_gift = True
-            refresh_card()
-
-    def reset():
-        def double_check():
-            with open("data/gifts_count.json", "wb+") as f:
-                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-            with open("data/special_count.json", "wb+") as f:
-                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-            capture_gift.refresh_capture_gift = True
-            double_check_dialog.close()
-            refresh_card()
-
-        with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
-            ui.label("是否确认重置所有礼物？")
-
-            with ui.row():
-                ui.button("确认重置", on_click=lambda: double_check())
-                ui.button("取消重置", on_click=lambda: double_check_dialog.close())
-
-        double_check_dialog.open()
-
-    def delete():
-        with open("data/gifts_count.json", "rb+") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special_count.json", "rb+") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-        if gift_name.value in gifts:
-            gifts.pop(gift_name.value)
-        if gift_name.value in special:
-            special.pop(gift_name.value)
-
-        gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
-
-        with open("data/gifts_count.json", "wb+") as f:
-            f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
-        with open("data/special_count.json", "wb+") as f:
-            f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
-
-        capture_gift.refresh_capture_gift = True # 设置capture刷新状态
-        refresh_card()
-
-    def del_gift(is_special, k):
-        with open("data/gifts_count.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special_count.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-        if is_special:
-            special.pop(k)
-            with open("data/special_count.json", "wb+") as f:
-                f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
-        else:
-            gifts.pop(k)
-            with open("data/gifts_count.json", "wb+") as f:
-                f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
-
-        capture_gift.refresh_capture_gift = True
-        refresh_card()
-
-    def create_card():
-        with open("data/gifts_count.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special_count.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-        if gifts != {}:
-            for k,v in gifts.items():
-                with ui.row().classes('w-full'):
-                    ui.label(k)
-                    ui.space()
-                    if v < 0:
-                        ui.label(f"{int(v)}{app.storage.general["gift_challenge_unit"]}")
-                    elif v > 0:
-                        ui.label(f"+{int(v)}{app.storage.general["gift_challenge_unit"]}")
-                    ui.button("删除", on_click=lambda k = k: del_gift(False, k))
-
-        if special != {}:
-            for k,v in special.items():
-                if type(v) == list:
-                    with ui.row().classes('w-full'):
-                        ui.label(k)
-                        ui.space()
-                        if v[1] < 0:
-                            ui.label(f"{int(v[0])} ~ {int(v[1])}{app.storage.general["gift_challenge_unit"]}")
-                        elif v[0] < 0 and v[1] != 0:
-                            ui.label(f"{int(v[0])} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}")
-                        elif v[0] < 0 and v[1] == 0:
-                            ui.label(f"{int(v[0])} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}")
-                        elif v[0] == 0 and v[1] == 0:
-                            ui.label(f"{v[0]} ~ {v[1]}{app.storage.general["gift_challenge_unit"]}")
-                        elif v[0] == 0 and v[1] != 0:
-                            ui.label(f"{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}")
-                        else:
-                            ui.label(f"+{v[0]} ~ +{v[1]}{app.storage.general["gift_challenge_unit"]}")
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
-                else:
-                    with ui.row().classes('w-full'):
-                        ui.label(k)
-                        ui.space()
-                        if v == "clear":
-                            v = "清空"
-                        if v == "double":
-                            v = "加倍"
-                        if v == "half":
-                            v = "减半"
-                        ui.label(v)
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
-
-    def refresh_card():
-        gift_card.clear()  # 清空卡片内容
-        with gift_card:
-            create_card()
-
-    with ui.dialog() as gift_count_dialog, ui.card(align_items="center"):
-        with open("data/gift_img.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-
-        ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
-
-        with ui.card().classes("w-full") as gift_card:
-            create_card()
-
-        ui.separator()
-
-        with ui.row(align_items="center"):
-            gift_name = ui.select(label="礼物选择", options=list(gifts.keys()), with_input=True, clearable=True).style("width: 200px")
-
-        status = ui.toggle(options={"add": "加", "sub": "减", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
-        with ui.row():
-            min = ui.number("随机最小数", value=0)
-            max = ui.number("随机最大数", value=0)
-            number = ui.number(label="数量", value=0, min=0).style("width: 150px")
-
-            # 自定义单位、项目输入框
-            if app.storage.general["gift_challenge_unit"] != "":
-                gift_play_unit = ui.input("单位").bind_value(app.storage.general, "gift_challenge_unit")
-            else:
-                gift_play_unit = ui.input("单位").bind_value(app.storage.general, "gift_challenge_unit")
-            if app.storage.general["gift_challenge_text"] != "":
-                gift_play_text = ui.input("项目").bind_value(app.storage.general, "gift_challenge_text")
-            else:
-                gift_play_text = ui.input("项目").bind_value(app.storage.general, "gift_challenge_text")
-
-            number.set_visibility(False)
-            min.set_visibility(False)
-            max.set_visibility(False)
-
-        def change_challenge_count(status):
-            def double_check():
-                if status == "add":
-                    app.storage.general["gift_challenge_count"] += 1
-                elif status == "sub":
-                    if app.storage.general["gift_challenge_count"] > 0:
-                        app.storage.general["gift_challenge_count"] -= 1
-                elif status == "reset":
-                    app.storage.general["gift_challenge_count"] = 0
-
-                double_check_dialog.close()
-
-            with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
-                ui.label("是否确认重置计数？")
-
-                with ui.row():
-                    ui.button("确认重置", on_click=lambda: double_check())
-                    ui.button("取消重置", on_click=lambda: double_check_dialog.close())
-
-            double_check_dialog.open()
-
-        with ui.row():
-            ui.button('提交', on_click=lambda: run())
-            ui.button("删除", on_click=lambda: delete())
-            ui.button("重置全部", on_click=lambda: reset())
-            ui.button("重置计数", on_click=lambda: change_challenge_count("reset"))
-            # ui.button("加1", on_click=lambda: change_challenge_count("add"))
-            # ui.button("减1", on_click=lambda: change_challenge_count("sub"))
-            ui.button('关闭', on_click=lambda: gift_count_dialog.close())
-
-    gift_count_dialog.open()
-
-
 def init_task():
     global countdown_timer
     countdown_timer = ct.CountdownTimer(update_btn_state, cancel_button)
@@ -1492,7 +1130,6 @@ async def check_b_connect_status():
 
         # 断开连接
         start_button.disable()
-        gift_challenge_switch.disable()
         b_connect_status = False
 
         if "client" in globals() and client is not None:
@@ -1535,7 +1172,6 @@ async def check_b_connect_status():
 
         if b_connect_status:
             start_button.enable()
-            gift_challenge_switch.enable()
             countdown_timer.update_element(b_connect_switch) # 更新倒计时的开关对象，用于倒计时结束后断开连接
         else:
             b_connect_switch.set_value("null")
@@ -1606,19 +1242,6 @@ async def get_notes():
         .style(f"color: {config['color']['text_color']}")  # pyright: ignore[reportIndexIssue]
     )
     app.timer(5, random_notes)  # 每5秒随机切换公告内容
-
-
-# 打开界面预览弹窗
-def open_capture():
-    with ui.dialog() as dialog, ui.card(align_items="center"):
-        ui.label("使用OBS捕捉浏览器源时请关闭预览窗口")
-        ui.label("如OBS未刷新，请点击：浏览器源 → 刷新当前页面缓存")
-        with ui.row():
-            ui.button("加班预览", on_click=lambda: ui.navigate.to("/capture_cd", new_tab=True)).on(type="click", handler=lambda: dialog.close())
-            ui.button("挑战预览", on_click=lambda: ui.navigate.to("/capture_gift", new_tab=True)).on(type="click", handler=lambda: dialog.close())
-            ui.button("关闭", on_click=lambda: dialog.close())
-
-    dialog.open()
 
 
 async def refresh_gift_loop():
@@ -1711,11 +1334,7 @@ async def refresh_gift(heartbeat=False):
 async def _():
     await capture_cd.capture_cd_page(get_notes, init_config, base_config, GiftManager)
 
-# 投喂挑战预览
-@ui.page("/capture_gift", title="投喂挑战 | bili_travail", response_timeout=30)
-async def _():
-    await capture_gift.capture_gift_page(get_notes, init_config, base_config)
-
+# 统计页面
 @ui.page('/count', response_timeout=30)
 def _():
     count.count_page()
@@ -1731,7 +1350,7 @@ def index():
     # 主界面GUI
     # ================================
 
-    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, gift_challenge_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
+    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
 
     styles.page_styles() # 加载自定义样式
     async def ping_server(servers):
@@ -2079,12 +1698,8 @@ def index():
                 #         short_time.set_visibility(False)
 
                 with ui.row():
-                    ui.button("加班设置", on_click=lambda: cd_setting_dialog())
-                    ui.button("挑战设置", on_click=lambda: gift_count_setting_dialog())
+                    ui.button("设置礼物", on_click=lambda: cd_setting_dialog())
                     ui.button("更新礼物", on_click=lambda: refresh_gift())
-
-                # Preview page button
-                ui.button("界面预览", on_click=lambda: open_capture())
 
             with ui.tab_panel("3").classes("items-center").style("height: 160px;"):
                 with ui.row(align_items="center").classes("gap-0"):
@@ -2096,10 +1711,6 @@ def index():
 
                     with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
                         ui.tooltip("启用时OBS页面倒计时将不显示边框，仅显示数字")
-
-                with ui.row(align_items="center"):
-                    gift_challenge_switch = ui.switch("启用投喂挑战", value=False).props('color="btn"')
-                    gift_challenge_switch.disable()
 
             with ui.tab_panel("4").classes("items-center").style("height: 160px;"):
                 with ui.row():
@@ -2143,8 +1754,6 @@ def index():
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
             ui.tooltip("OBS倒计时浏览器源URL，单击可复制至剪贴板")
-        with ui.label(f"http://{host}:{port}/capture_gift").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_gift")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
-            ui.tooltip("OBS投喂挑战浏览器源URL，单击可复制至剪贴板")
         with ui.link("使用文档", "https://docs.travail.nya-wsl.com", True):
             ui.tooltip("点击查看使用说明书")
 
