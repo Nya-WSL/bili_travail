@@ -1666,7 +1666,6 @@ def index():
 
         # 创建标签页内容
         with ui.tab_panels(tabs, value="1").classes('w-full'):
-            # 1 内容
             with ui.tab_panel("1").classes("items-center").style("height: 160px;"):
                 with ui.row(align_items="center"):
                     with ui.column(align_items="center").classes("gap-0"):
@@ -1682,7 +1681,6 @@ def index():
                             ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时，与倒计时结束后断开连接互斥")
                         b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
 
-            # 2 内容
             with ui.tab_panel("2").classes("items-center").style("height: 160px;"):
                 # with ui.row():
                 #     with ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"') as short_switch:
@@ -1722,8 +1720,7 @@ def index():
                     ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
                     ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
 
-            # 3 内容
-            with ui.tab_panel("6").classes("items-center").style("height: 160px;"):
+            with ui.tab_panel("6").classes("items-center gap-1").style("height: 160px;"):
                 with ui.row():
                     # Login bilibili button
                     ui.button("登录账号", on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
@@ -1732,9 +1729,13 @@ def index():
                     # Changelog button
                     ui.button("更新日志", on_click=lambda: changelog_dialog().open())
                     ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
+
+                with ui.row(align_items="center"):
+                    ui.switch("自动检查更新", value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
+
                 with ui.row(align_items="center"):
                     with ui.switch("倒计时结束后断开连接", value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)) as exit_timer_switch:
-                        ui.tooltip(f"倒计时结束{base_config.get('num', 'exit_time', 0)}秒后是否断开弹幕服务器连接，与忽略倒计时互斥")
+                        ui.tooltip(f"倒计时结束后是否断开弹幕服务器连接，与忽略倒计时互斥")
                     exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
                     exit_timer_switch.on_value_change(lambda e: exit_timer_delay.set_visibility(e.value))
                     exit_timer_switch.on_value_change(lambda e: change_ignore_cd("exit_timer", e.value))
