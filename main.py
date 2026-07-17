@@ -88,6 +88,9 @@ app.add_static_files('/static', 'static')   # 创建虚拟路径
 
 b_connect_status = False # 初始化弹幕服务器连接状态
 
+gift_statistics_lock = asyncio.Lock() # 初始化礼物统计锁
+blind_box_lock = asyncio.Lock() # 初始化盲盒锁
+
 # 检查storage状态
 def init_storage():
     # 移除残留的更新包
@@ -487,23 +490,33 @@ class BiliHandler(blivedm.BaseHandler):
         is_blind_box = False
 
         def blind_box_value(gift, num : int, price : int | float, box_name):
-            if not os.path.exists("data/blind_box_value.json"):
-                with open("data/blind_box_value.json", "wb+") as f:
-                    f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+            asyncio.run_coroutine_threadsafe(
+                _save_blind_box_value(gift, num, price, box_name),
+                asyncio.get_event_loop()
+            )
 
-            with open("data/blind_box_value.json", "rb") as f:
-                box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        async def _save_blind_box_value(gift, num, price, box_name):
+            async with blind_box_lock:
+                try:
+                    if not os.path.exists("data/blind_box_value.json"):
+                        with open("data/blind_box_value.json", "wb+") as f:
+                            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
 
-            if box_value.get(box_name, None) is None:
-                box_value[box_name] = {}
+                    with open("data/blind_box_value.json", "rb") as f:
+                        box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-            if box_value[box_name].get(gift, None) is None:
-                box_value[box_name][gift] = {"num": 0, "price": 0}
+                    if box_value.get(box_name, None) is None:
+                        box_value[box_name] = {}
 
-            box_value[box_name][gift] = {"num": box_value[box_name][gift]["num"] + num, "price": price}
+                    if box_value[box_name].get(gift, None) is None:
+                        box_value[box_name][gift] = {"num": 0, "price": 0}
 
-            with open("data/blind_box_value.json", "wb+") as f:
-                f.write(orjson.dumps(box_value, option=orjson.OPT_INDENT_2))
+                    box_value[box_name][gift] = {"num": box_value[box_name][gift]["num"] + num, "price": price}
+
+                    with open("data/blind_box_value.json", "wb+") as f:
+                        f.write(orjson.dumps(box_value, option=orjson.OPT_INDENT_2))
+                except:
+                    logger.error(f"保存盲盒价值数据失败: {traceback.format_exc()}")
 
         if b_connect_status:  # True则已连接至弹幕服务器
             if ct.cd_status or app.storage.general.get("ignore_cd", False):  # True则倒计时为启动状态
