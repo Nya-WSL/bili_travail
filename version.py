@@ -1,1 +1,1 @@
-base_version = "1.40"
+base_version = "2.40"
