@@ -89,7 +89,6 @@ app.add_static_files('/static', 'static')   # 创建虚拟路径
 b_connect_status = False # 初始化弹幕服务器连接状态
 
 gift_statistics_lock = asyncio.Lock() # 初始化礼物统计锁
-blind_box_lock = asyncio.Lock() # 初始化盲盒锁
 
 # 检查storage状态
 def init_storage():
@@ -461,29 +460,40 @@ class BiliHandler(blivedm.BaseHandler):
     def _on_open_live_enter_room(self, client: blivedm.OpenLiveClient, message: open_models.RoomEnterMessage):
         logger.info(f'{message.uname} 进入 {message.room_id}')
 
-    def _on_gift_statistics(self, gift, num, uname, price: int | float = 0):
-        if not os.path.exists("data/gift_statistics.json"):
-            with open("data/gift_statistics.json", "wb+") as f:
-                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+    async def _on_gift_statistics(self, gift, num, uname, price: int | float = 0):
+        async with gift_statistics_lock:  # 异步锁保护
+            try:
+                count = {}
+                try:
+                    with open("data/gift_statistics.json", "rb") as f:
+                        content = f.read()
+                        count = orjson.loads(content.decode("utf-8").encode("utf-8")) if content else {}
+                except (FileNotFoundError, EOFError, orjson.JSONDecodeError):
+                    count = {}
 
-        with open("data/gift_statistics.json", "rb") as f:
-            count = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+                count.setdefault(gift, {"num": 0, "price": 0, "user": []})
+                users = count[gift]["user"]
 
-        count.setdefault(gift, {"num": 0, "price": 0, "user": []})
-        users = count[gift]["user"]
+                if uname not in users:
+                    users.append(uname)
 
-        if uname not in users:
-            users.append(uname)
+                num += count[gift]["num"]
 
-        num += count[gift]["num"]
+                if gift == "辣条":
+                    price = 0
 
-        if gift == "辣条":
-            price = 0
+                count[gift] = {"num": num, "price": price, "user": users}
 
-        count[gift] = {"num": num, "price": price, "user": users}
+            except:
+                logger.error(f"保存礼物统计失败: {traceback.format_exc()}")
+                raise
 
+        # 重新打开文件写入
         with open("data/gift_statistics.json", "wb+") as f:
-            f.write(orjson.dumps(count, option=orjson.OPT_INDENT_2))
+            try:
+                f.write(orjson.dumps(count, option=orjson.OPT_INDENT_2))
+            except:
+                logger.error(f"写入礼物统计文件失败: {traceback.format_exc()}")
 
     # 收到礼物后执行函数
     async def _on_gift_play(self, gift, num, uname, message, price: int | float = 0):
