@@ -86,49 +86,52 @@ async def get_blind_box(gift_ids: list, version: str | None) -> dict:
 
     blind_box = {}
 
-    for gift_id in gift_ids:
-        url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
-        params = {
-            "gift_id": gift_id
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
-            "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
-        }
+    resolver = AsyncResolver(nameservers=["8.8.8.8", "114.114.114.114"])
+    connector = aiohttp.TCPConnector(resolver=resolver)
 
-        # 创建自定义解析器
-        resolver = AsyncResolver(
-            nameservers=["8.8.8.8", "114.114.114.114"]
-        )
+    async with aiohttp.ClientSession(connector=connector) as session:
+        for gift_id in gift_ids:
+            url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
+            params = {
+                "gift_id": gift_id
+            }
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+                "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
+            }
 
-        # 创建连接器并设置解析器
-        connector = aiohttp.TCPConnector(resolver=resolver)
-
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.get(url, params=params, headers=headers) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data['code'] == 0:
-                        for gift in data['data']['gifts']:
-                            if data['data']['blind_gift_name'] not in blind_box:
+            try:
+                async with session.get(url, params=params, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data['code'] == 0:
+                            for gift in data['data']['gifts']:
+                                if data['data']['blind_gift_name'] not in blind_box:
+                                    if version is not None and version > "1.38.041001" and version != "1.38.0":
+                                        blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
+                                    else:
+                                        blind_box[data['data']['blind_gift_name']] = []
                                 if version is not None and version > "1.38.041001" and version != "1.38.0":
-                                    blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
+                                    blind_box[data['data']['blind_gift_name']]['gifts'].append({
+                                        'gift': gift['gift_name'], 
+                                        "gift_img": gift['gift_img']
+                                    })
                                 else:
-                                    blind_box[data['data']['blind_gift_name']] = []
-                            if version is not None and version > "1.38.041001" and version != "1.38.0":
-                                blind_box[data['data']['blind_gift_name']]['gifts'].append({
-                                    'gift': gift['gift_name'], 
-                                    "gift_img": gift['gift_img']
-                                })
-                            else:
-                                blind_box[data['data']['blind_gift_name']].append({
-                                    'gift': gift['gift_name'], 
-                                    "gift_img": gift['gift_img']
-                                })
+                                    blind_box[data['data']['blind_gift_name']].append({
+                                        'gift': gift['gift_name'], 
+                                        "gift_img": gift['gift_img']
+                                    })
+                        else:
+                            print(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
                     else:
-                        print(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
-                else:
-                    print(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
+                        print(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
+
+            except aiohttp.ClientError as e:
+                print(f"网络请求失败({gift_id}): {traceback.format_exc()}")
+                continue
+            except Exception as e:
+                print(f"获取盲盒礼物列表({gift_id})失败: {traceback.format_exc()}")
+                continue
 
     return blind_box
 
