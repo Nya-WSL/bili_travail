@@ -1,6 +1,6 @@
 [project]
 name = "bili-travail"
-version = "1.40"
+version = "2.40"
 description = "基于blivedm的B站直播加班姬"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -29,4 +29,12 @@ dev = [
     "icecream>=2.2.0",
     "pyinstaller>=6.19.0",
     "qiniu>=7.17.0",
+]
+server = [
+    "uvicorn (>=0.38.0,<1.0.0)",
+    "fastapi (>=0.115.11,<1.0.0)",
+    "aiohttp (>=3.13.2,<4.0.0)",
+    "orjson (>=3.11.5,<4.0.0)",
+    "aiodns (>=3.6.1)",
+    "minio>=7.2.20",
 ]

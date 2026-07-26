@@ -13,7 +13,7 @@ from minio import Minio
 from pathlib import Path
 from pydantic import BaseModel
 from aiohttp.resolver import AsyncResolver
-from fastapi import FastAPI, UploadFile, File, HTTPException, status, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, status
 
 class GiftIdsRequest(BaseModel):
     gift_ids: List[int]
