@@ -3,7 +3,7 @@ name = "bili-travail"
 version = "2.40"
 description = "基于blivedm的B站直播加班姬"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "==3.13.5"
 dependencies = [
     "aiodns>=4.0.3",
     "aiohttp>=3.13.3",
@@ -39,3 +39,7 @@ server = [
     "minio>=7.2.20",
     "packaging>=24.0",
 ]
+
+[[tool.uv.index]]
+url = "https://mirrors.ustc.edu.cn/pypi/simple"
+default = true
