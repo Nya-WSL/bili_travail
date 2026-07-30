@@ -1,7 +1,7 @@
 import os
 import tomlkit
 from pathlib import Path
-from tomlkit import document, table, array
+from tomlkit import document, table, array, item
 
 def _build_default_config() -> tomlkit.TOMLDocument:
     """使用 tomlkit API 构建默认配置，避免硬编码 TOML 字符串"""
@@ -12,7 +12,7 @@ def _build_default_config() -> tomlkit.TOMLDocument:
     general["room_id"].comment("房间号")
     general.add("host", "127.0.0.1")
     general["host"].comment("监听地址")
-    general.add("port", 65000)
+    general.add("port", item(65000))
     general["port"].comment("监听端口")
     general.add("auth_code", "")
     general["auth_code"].comment("主播身份码")
@@ -32,7 +32,7 @@ def _build_default_config() -> tomlkit.TOMLDocument:
     open_live["ACCESS_KEY_ID"].comment("开放平台 access_key_id")
     open_live.add("ACCESS_KEY_SECRET", "")
     open_live["ACCESS_KEY_SECRET"].comment("开放平台 access_key_secred")
-    open_live.add("APP_ID", 0)
+    open_live.add("APP_ID", item(0))
     open_live["APP_ID"].comment("开放平台 项目ID")
     doc.add("open_live", open_live)
 
@@ -46,30 +46,39 @@ def _build_default_config() -> tomlkit.TOMLDocument:
     doc.add("color", color)
 
     bool_tbl = table()
-    bool_tbl.add("remote_text", True)
-    bool_tbl["remote_text"].comment("about页面对话框内容是否从服务器获取")
-    bool_tbl.add("show_capture_gift_list", False)
-    bool_tbl["show_capture_gift_list"].comment("是否启用收到礼物列表")
-    bool_tbl.add("show_capture_rank_list", False)
-    bool_tbl["show_capture_rank_list"].comment("是否启用排行榜")
-    bool_tbl.add("short_list", False)
-    bool_tbl["short_list"].comment("是否启用简洁模式")
-    bool_tbl.add("borderless_cd", False)
-    bool_tbl["borderless_cd"].comment("倒计时是否无边框")
-    bool_tbl.add("exit_timer", True)
-    bool_tbl["exit_timer"].comment("是否启用倒计时结束后退出程序")
-    bool_tbl.add("check_update", True)
-    bool_tbl["check_update"].comment("是否启用更新检查")
-    bool_tbl.add("check_sha256", True)
-    bool_tbl["check_sha256"].comment("是否启用更新包SHA256校验")
+    # 使用 raw_append 以保留 Bool item 上的 comment（tomlkit 的 add/__setitem__ 会解包 bool）
+    _remote_text = item(True)
+    _remote_text.comment("about页面对话框内容是否从服务器获取")
+    bool_tbl.raw_append("remote_text", _remote_text)
+    _show_capture_gift_list = item(False)
+    _show_capture_gift_list.comment("是否启用收到礼物列表")
+    bool_tbl.raw_append("show_capture_gift_list", _show_capture_gift_list)
+    _show_capture_rank_list = item(False)
+    _show_capture_rank_list.comment("是否启用排行榜")
+    bool_tbl.raw_append("show_capture_rank_list", _show_capture_rank_list)
+    _short_list = item(False)
+    _short_list.comment("是否启用简洁模式")
+    bool_tbl.raw_append("short_list", _short_list)
+    _borderless_cd = item(False)
+    _borderless_cd.comment("倒计时是否无边框")
+    bool_tbl.raw_append("borderless_cd", _borderless_cd)
+    _exit_timer = item(True)
+    _exit_timer.comment("是否启用倒计时结束后退出程序")
+    bool_tbl.raw_append("exit_timer", _exit_timer)
+    _check_update = item(True)
+    _check_update.comment("是否启用更新检查")
+    bool_tbl.raw_append("check_update", _check_update)
+    _check_sha256 = item(True)
+    _check_sha256.comment("是否启用更新包SHA256校验")
+    bool_tbl.raw_append("check_sha256", _check_sha256)
     doc.add("bool", bool_tbl)
 
     num = table()
-    num.add("short_time", 5)
+    num.add("short_time", item(5))
     num["short_time"].comment("简洁模式滚动时间")
-    num.add("capture_gift_list_number", 3)
+    num.add("capture_gift_list_number", item(3))
     num["capture_gift_list_number"].comment("收到礼物列表显示数量")
-    num.add("exit_time", 1800)
+    num.add("exit_time", item(1800))
     num["exit_time"].comment("倒计时结束后退出程序等待时间")
     doc.add("num", num)
 
