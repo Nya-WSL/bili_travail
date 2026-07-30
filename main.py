@@ -11,7 +11,7 @@ if os.path.exists("livehime.exe"):
 try:
     # 该模块在打包时填入密钥后自动生成
     import env # type: ignore
-except:
+except ImportError:
     with open("env.py", "w+", encoding="utf-8") as f:
         f.write(f"""
 def get_key():
@@ -88,7 +88,9 @@ app.add_static_files('/static', 'static')   # 创建虚拟路径
 
 b_connect_status = False # 初始化弹幕服务器连接状态
 
+b_connect_status_lock = asyncio.Lock() # 连接状态锁
 gift_statistics_lock = asyncio.Lock() # 初始化礼物统计锁
+blind_box_lock = asyncio.Lock() # 初始化盲盒价值锁
 
 # 检查storage状态
 def init_storage():
@@ -283,7 +285,13 @@ async def init_config():
         with open("data/special_count.json", "wb+") as f:
             f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
 
-asyncio.run(init_config())
+try:
+    loop = asyncio.get_running_loop()
+    # 如果已有运行中的事件循环（如NiceGUI环境），创建任务执行
+    loop.create_task(init_config())
+except RuntimeError:
+    # 没有运行中的事件循环，直接执行
+    asyncio.run(init_config())
 
 def get_pid_info(pid):
     p = psutil.Process(pid)
@@ -378,9 +386,7 @@ class BiliHandler(blivedm.BaseHandler):
         logger.info("触发心跳")
         if self.heart_count == 1:
             room_id = client.room_id
-            if room_id != None:
-                room_id = room_id
-            else:
+            if room_id is None:
                 room_id = 3
 
             config = base_config.load()
@@ -394,7 +400,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                 try:
                     await refresh_gift(True) # 刷新礼物数据
-                except: # type: ignore
+                except Exception:
                     ui.notify("获取礼物数据失败，可能导致部分功能异常", type="warning")
 
             logger.info(f"已连接至{room_id}")
@@ -405,7 +411,8 @@ class BiliHandler(blivedm.BaseHandler):
                 await travail_stat.stat(room_id, uid, version, now_time)
                 login_status.set_text(room_id)  # pyright: ignore[reportArgumentType]
                 login_status.classes("text-green")
-                b_connect_status = True # 在第一次心跳时设置状态为已连接至弹幕服务器
+                async with b_connect_status_lock:
+                    b_connect_status = True # 在第一次心跳时设置状态为已连接至弹幕服务器
                 b_connect_switch.set_value(True)
                 b_connect_switch.set_text("已连接弹幕服务器")
             else:
@@ -484,7 +491,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                 count[gift] = {"num": num, "price": price, "user": users}
 
-            except:
+            except Exception:
                 logger.error(f"保存礼物统计失败: {traceback.format_exc()}")
                 raise
 
@@ -492,7 +499,7 @@ class BiliHandler(blivedm.BaseHandler):
         with open("data/gift_statistics.json", "wb+") as f:
             try:
                 f.write(orjson.dumps(count, option=orjson.OPT_INDENT_2))
-            except:
+            except Exception:
                 logger.error(f"写入礼物统计文件失败: {traceback.format_exc()}")
 
     # 收到礼物后执行函数
@@ -525,7 +532,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                     with open("data/blind_box_value.json", "wb+") as f:
                         f.write(orjson.dumps(box_value, option=orjson.OPT_INDENT_2))
-                except:
+                except Exception:
                     logger.error(f"保存盲盒价值数据失败: {traceback.format_exc()}")
 
         if b_connect_status:  # True则已连接至弹幕服务器
@@ -922,7 +929,7 @@ def cd_setting_dialog():
             if "rate_posi" in globals() or "rate_posi" in locals(): # 防止未创建输入框时调用函数导致报错
                 try:
                     rate_posi_value = float(round(1 - rate_nega.value - rate_zero.value, 2))
-                except:
+                except (TypeError, ValueError):
                     logger.warning("概率修正出错，已忽略")
                     rate_posi_value = rate_posi.value
 
@@ -1099,7 +1106,7 @@ async def upload_log(room_id):
             async with session.post(url, data=data) as response:
                 if response.status == 201:
                     result = await response.json()
-                    ui.notify(f"日志上传成功，状态码：{result.get("status", None)}", type="positive")
+                    ui.notify(f"日志上传成功，状态码：{result.get('status', None)}", type="positive")
                     logger.info(f"日志上传成功：{result}")
                 else:
                     error = await response.text()
@@ -1142,7 +1149,8 @@ async def check_b_connect_status():
 
         # 断开连接
         start_button.disable()
-        b_connect_status = False
+        async with b_connect_status_lock:
+            b_connect_status = False
 
         if "client" in globals() and client is not None:
             client.stop() # 断开弹幕服务器ws连接
@@ -1350,7 +1358,7 @@ def index():
     # 主界面GUI
     # ================================
 
-    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, start_button, pause_button, resume_button, add_button, sub_button, short_switch
+    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, pause_button, resume_button, add_button, sub_button, short_switch
 
     styles.page_styles() # 加载自定义样式
     async def ping_server(servers):
