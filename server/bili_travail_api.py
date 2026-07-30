@@ -29,6 +29,13 @@ class StatRequest(BaseModel):
 class UpdateRequest(BaseModel):
     version: str
 
+class TicketRequest(BaseModel):
+    type: str
+    title: str
+    description: str
+    version: str
+    room_id: int | None = None
+
 def bytes_to_kb(bytes_size: int) -> float:
     """将字节大小转换为 KB"""
     return round(bytes_size / 1024, 2)  # 保留两位小数
@@ -227,6 +234,91 @@ async def post_stat(request: StatRequest):
 
         with open("stat.json", "wb+") as f:
             f.write(orjson.dumps(stat_data, option=orjson.OPT_INDENT_2))
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        print(traceback.format_exc())
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@app.post("/ticket", status_code=status.HTTP_201_CREATED)
+async def post_ticket(request: TicketRequest):
+    try:
+        import datetime
+
+        ticket_file = Path("tickets.json")
+
+        if ticket_file.exists():
+            with open(ticket_file, "rb") as f:
+                tickets = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        else:
+            tickets = []
+
+        now = datetime.datetime.now().isoformat()
+
+        ticket = {
+            "id": len(tickets) + 1,
+            "type": request.type,
+            "title": request.title,
+            "description": request.description,
+            "version": request.version,
+            "room_id": request.room_id,
+            "status": "pending",
+            "admin_comment": "",
+            "created_at": now,
+            "viewed_at": None,
+            "updated_at": now,
+        }
+
+        tickets.append(ticket)
+
+        with open(ticket_file, "wb+") as f:
+            f.write(orjson.dumps(tickets, option=orjson.OPT_INDENT_2))
+
+        return {"status": status.HTTP_201_CREATED, "ticket": ticket}
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        print(traceback.format_exc())
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@app.get("/tickets", status_code=status.HTTP_200_OK)
+async def get_tickets(room_id: int | None = None):
+    try:
+        import datetime
+
+        ticket_file = Path("tickets.json")
+
+        if not ticket_file.exists():
+            return {"tickets": []}
+
+        with open(ticket_file, "rb") as f:
+            all_tickets = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
+        if room_id is not None:
+            result = [t for t in all_tickets if t.get("room_id") == room_id]
+        else:
+            result = all_tickets
+
+        # 按创建时间倒序排列
+        result.sort(key=lambda t: t.get("created_at", ""), reverse=True)
+
+        # 标记匹配的工单为已查看（基于全量列表原地修改）
+        updated = False
+        for t in all_tickets:
+            if room_id is None or t.get("room_id") == room_id:
+                if t.get("viewed_at") is None:
+                    t["viewed_at"] = datetime.datetime.now().isoformat()
+                    updated = True
+
+        if updated:
+            with open(ticket_file, "wb+") as f:
+                f.write(orjson.dumps(all_tickets, option=orjson.OPT_INDENT_2))
+
+        return {"tickets": result}
 
     except HTTPException as he:
         raise he

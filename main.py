@@ -1053,6 +1053,95 @@ def sub_time():
         ui.notify("请先开始计时", type="negative")
 
 
+async def submit_ticket(ticket_type: str, title: str, description: str, room_id: int) -> tuple[bool, str, str]:
+    '''
+    提交工单到服务器
+    返回 (success, message, notify_type)
+    '''
+    if not title.strip():
+        return False, "请输入工单标题", "warning"
+
+    if not description.strip():
+        return False, "请输入工单描述", "warning"
+
+    url = base_config.get("api", "server", None)
+
+    if url is None or url == "":
+        result = "未配置服务器地址，提交工单失败"
+        logger.error(result)
+        return False, result, "negative"
+
+    url = f"{url}/ticket"
+
+    try:
+        payload = {
+            "type": ticket_type,
+            "title": title.strip(),
+            "description": description.strip(),
+            "version": version,
+            "room_id": room_id,
+        }
+
+        timeout = aiohttp.ClientTimeout(total=30)
+
+        async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
+            async with session.post(url, json=payload) as response:
+                if response.status == 201:
+                    result = await response.json()
+                    logger.info(f"工单提交成功：{result}")
+                    return True, "工单提交成功，感谢您的反馈！", "positive"
+                else:
+                    error = await response.text()
+                    result = f"工单提交失败，状态码: {response.status}"
+                    logger.error(f"{result}, 服务器返回: {error}")
+                    return False, result, "negative"
+
+    except aiohttp.ClientError as e:
+        result = "工单提交失败，发生网络错误: "
+        logger.error(result + traceback.format_exc())
+        return False, result + str(e), "negative"
+
+    except Exception as e:
+        result = "工单提交失败，发生错误: "
+        logger.error(result + traceback.format_exc())
+        return False, result + str(e), "negative"
+
+
+async def fetch_tickets(room_id: int) -> tuple[list[dict], str | None, str | None]:
+    '''
+    从服务器获取工单列表
+    返回 (tickets, error_message, notify_type)
+    '''
+    url = base_config.get("api", "server", None)
+
+    if url is None or url == "":
+        return [], "未配置服务器地址，无法获取工单", "negative"
+
+    url = f"{url}/tickets"
+
+    try:
+        params = {"room_id": room_id}
+        timeout = aiohttp.ClientTimeout(total=30)
+
+        async with aiohttp.ClientSession(timeout=timeout, connector=await dns_resolver.connector()) as session:
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get("tickets", []), None, None
+                else:
+                    error = await response.text()
+                    logger.error(f"获取工单失败: {error}")
+                    return [], f"获取工单列表失败，状态码: {response.status}", "negative"
+
+    except aiohttp.ClientError as e:
+        logger.error("获取工单网络错误: " + traceback.format_exc())
+        return [], "获取工单列表失败，发生网络错误: " + str(e), "negative"
+
+    except Exception as e:
+        logger.error("获取工单错误: " + traceback.format_exc())
+        return [], "获取工单列表失败，发生错误: " + str(e), "negative"
+
+
 async def upload_log(room_id):
     '''
     发送日志到服务器
@@ -1591,6 +1680,102 @@ def index():
 
         return changelog_dialog
 
+    def ticket_dialog() -> ui.dialog:
+        with ui.dialog() as ticket_dialog, ui.card(align_items="center").style("min-width: 400px; max-width: 500px;"):
+            ui.label("提交工单").classes("text-h6 text-bold")
+
+            ticket_type_select = ui.select(
+                options={"bug": "Bug反馈", "feature": "功能请求"},
+                label="工单类型",
+                value="bug",
+            ).style("width: 100%")
+
+            title_input = ui.input(
+                label="标题",
+                placeholder="请输入工单标题",
+            ).style("width: 100%").props("clearable")
+
+            description_textarea = ui.textarea(
+                label="详细描述",
+                placeholder="请详细描述您遇到的问题或期望的功能...",
+            ).style("width: 100%").props("clearable rows=5")
+
+            async def do_submit():
+                room_id = base_config.get("general", "room_id", 3)
+                success, msg, notify_type = await submit_ticket(
+                    ticket_type=ticket_type_select.value,
+                    title=title_input.value or "",
+                    description=description_textarea.value or "",
+                    room_id=int(room_id) if room_id else 0,
+                )
+                with ticket_dialog:
+                    ui.notify(msg, type=notify_type)
+                    if success:
+                        ticket_dialog.close()
+
+            with ui.row().classes("justify-end w-full mt-2"):
+                ui.button("取消", on_click=lambda: ticket_dialog.close())
+                ui.button("提交", on_click=lambda: asyncio.create_task(do_submit()), color=base_config.get("color", "btn_color", "btn"))
+
+        return ticket_dialog
+
+    STATUS_MAP = {
+        "pending": ("待处理", "orange"),
+        "processing": ("处理中", "blue"),
+        "resolved": ("已解决", "green"),
+        "closed": ("已关闭", "grey"),
+    }
+
+    def ticket_list_dialog() -> ui.dialog:
+        with ui.dialog() as ticket_list_dialog, ui.card(align_items="center").style("min-width: 550px; max-width: 650px; max-height: 70vh;"):
+            with ui.row().classes("items-center justify-between w-full"):
+                ui.label("我的工单").classes("text-h6 text-bold")
+                ui.button(icon="refresh", on_click=lambda: asyncio.create_task(refresh_list())).props("flat round")
+
+            tickets_container = ui.column().classes("w-full gap-3 overflow-auto").style("max-height: 50vh;")
+
+            async def refresh_list():
+                room_id = base_config.get("general", "room_id", 3)
+                tickets, error_msg, notify_type = await fetch_tickets(int(room_id) if room_id else 0)
+
+                with tickets_container:
+                    tickets_container.clear()
+
+                    if error_msg:
+                        ui.notify(error_msg, type=notify_type)
+
+                    if not tickets:
+                        ui.label("暂无工单记录").classes("text-grey q-pa-lg")
+                        return
+
+                    for t in tickets:
+                        status_label, status_color = STATUS_MAP.get(t.get("status", "pending"), ("未知", "grey"))
+                        type_label = "Bug反馈" if t.get("type") == "bug" else "功能请求"
+
+                        with ui.card().classes("w-full").style("padding: 12px;"):
+                            with ui.row().classes("items-center justify-between w-full"):
+                                with ui.row().classes("items-center gap-2"):
+                                    ui.badge(f"#{t.get('id', '')}", color="grey")
+                                    ui.badge(type_label, color="secondary")
+                                    ui.badge(status_label, color=status_color)
+                                ui.label(t.get("created_at", "")[:16].replace("T", " ")).classes("text-caption text-grey")
+
+                            with ui.row().classes("items-center w-full mt-1"):
+                                ui.label(t.get("title", "")).classes("text-subtitle2 text-bold")
+
+                            if t.get("admin_comment"):
+                                with ui.row().classes("w-full mt-1"):
+                                    ui.icon("reply").classes("text-grey")
+                                    ui.label(t["admin_comment"]).classes("text-caption text-grey")
+
+            # 初始加载
+            asyncio.create_task(refresh_list())
+
+            with ui.row().classes("justify-end w-full mt-2"):
+                ui.button("关闭", on_click=lambda: ticket_list_dialog.close())
+
+        return ticket_list_dialog
+
     def change_ignore_cd(switch: str | None = None, value: bool = False):
         """倒计时结束后断开连接与忽略倒计时互斥规则"""
         if switch == "exit_timer":
@@ -1761,9 +1946,12 @@ def index():
 
         init_task()
 
-    # about按钮
+    # 右下角悬浮按钮组
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
-        ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
+        with ui.column().classes("gap-1"):
+            ui.button(on_click=lambda: ticket_dialog().open(), icon='bug_report').props('fab').tooltip("提交工单")
+            ui.button(on_click=lambda: ticket_list_dialog().open(), icon='inbox').props('fab').tooltip("查看工单")
+            ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @app.on_startup
 async def create_job():
