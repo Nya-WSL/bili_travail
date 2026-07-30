@@ -24,7 +24,7 @@ def webview2_check():
             winreg.OpenKey(hive, path)
             logger.info(f"检测到 Edge WebView2 runtime 注册表项: {hive}\\{path}")
             return True
-        except:
+        except Exception:
             continue
 
     # pywebview似乎也是检测的注册表，所以不检测安装路径
@@ -55,7 +55,7 @@ async def download_webview2():
                 else:
                     logger.error(f"Edge WebView2 runtime 常青在线安装程序请求失败，状态码: {response.status}")
                     return False
-    except:
+    except Exception:
         logger.error("Edge WebView2 runtime 常青在线安装程序下载失败:")
         logger.error(traceback.format_exc())
         return False
@@ -78,7 +78,7 @@ async def check_runtime():
                 else:
                     logger.error("使用 winget 安装 Edge WebView2 runtime 失败，错误代码: {winget_status}")
                     raise Exception("winget 安装失败")
-        except:
+        except Exception:
             logger.warning("未检测到 winget，尝试使用在线安装程序安装...")
             download_status = await download_webview2()
             if download_status:

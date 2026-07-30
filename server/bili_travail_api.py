@@ -13,6 +13,7 @@ from minio import Minio
 from pathlib import Path
 from pydantic import BaseModel
 from aiohttp.resolver import AsyncResolver
+from packaging.version import parse as parse_version
 from fastapi import FastAPI, UploadFile, File, HTTPException, status
 
 class GiftIdsRequest(BaseModel):
@@ -107,11 +108,11 @@ async def get_blind_box(gift_ids: list, version: str | None) -> dict:
                         if data['code'] == 0:
                             for gift in data['data']['gifts']:
                                 if data['data']['blind_gift_name'] not in blind_box:
-                                    if version is not None and version > "1.38.041001" and version != "1.38.0":
+                                    if version is not None and parse_version(version) > parse_version("1.38.041001") and parse_version(version) != parse_version("1.38.0"):
                                         blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
                                     else:
                                         blind_box[data['data']['blind_gift_name']] = []
-                                if version is not None and version > "1.38.041001" and version != "1.38.0":
+                                if version is not None and parse_version(version) > parse_version("1.38.041001") and parse_version(version) != parse_version("1.38.0"):
                                     blind_box[data['data']['blind_gift_name']]['gifts'].append({
                                         'gift': gift['gift_name'], 
                                         "gift_img": gift['gift_img']
@@ -136,7 +137,7 @@ async def get_blind_box(gift_ids: list, version: str | None) -> dict:
     return blind_box
 
 @app.post("/gift/get_blind_boxes", status_code=status.HTTP_200_OK)
-async def index(request: GiftIdsRequest):  # pyright: ignore[reportRedeclaration]
+async def get_blind_boxes(request: GiftIdsRequest):
     try:
         blind_box = await get_blind_box(request.gift_ids, request.version)
 
@@ -213,7 +214,7 @@ async def hook(room_id: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/stat", status_code=status.HTTP_200_OK)
-async def index(request: StatRequest):  # pyright: ignore[reportRedeclaration]
+async def post_stat(request: StatRequest):
     try:
         if not Path("stat.json").exists():
             with open("stat.json", "wb+") as f:
@@ -235,7 +236,7 @@ async def index(request: StatRequest):  # pyright: ignore[reportRedeclaration]
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.get("/notes", status_code=status.HTTP_200_OK)
-async def index():
+async def get_notes():
     try:
         if not Path("notes.json").exists():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="公告不存在")
@@ -256,7 +257,7 @@ async def index():
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.get("/update", status_code=status.HTTP_200_OK)
-async def index(version: str, type: Literal["zip", "sha256"]):
+async def get_update(version: str, type: Literal["zip", "sha256"]):
     """_向S3兼容的储存桶请求直链_
 
     Args:

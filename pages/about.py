@@ -110,7 +110,7 @@ async def about_page():
                     # 显示本地消息
                     ui.chat_message(
                         text_a,
-                        avatar=bili_api.get_bili_img(AVATAR_A),
+                        avatar=await bili_api.get_bili_img(AVATAR_A),
                         name=NAME_A,
                         text_html=True,
                         sent=True,
@@ -118,7 +118,7 @@ async def about_page():
                     )
                     ui.chat_message(
                         text_b,
-                        avatar=bili_api.get_bili_img(AVATAR_B),
+                        avatar=await bili_api.get_bili_img(AVATAR_B),
                         name=NAME_B,
                         text_html=True,
                         sanitize=False,
@@ -131,8 +131,8 @@ async def about_page():
 
         async def display_message_pair(msg):
             """显示一对聊天消息"""
-            avatar_a = bili_api.get_bili_img(AVATAR_A)
-            avatar_b = bili_api.get_bili_img(AVATAR_B)
+            avatar_a = await bili_api.get_bili_img(AVATAR_A)
+            avatar_b = await bili_api.get_bili_img(AVATAR_B)
 
             ui.chat_message(
                 msg.get("text_a", "默认消息A"),
@@ -176,7 +176,7 @@ async def about_page():
                         ):
                             with ui.avatar():
                                 ui.image(
-                                    bili_api.get_bili_img(
+                                    await bili_api.get_bili_img(
                                         "https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"
                                     )
                                 )
@@ -187,7 +187,7 @@ async def about_page():
                         ):
                             with ui.avatar():
                                 ui.image(
-                                    bili_api.get_bili_img(
+                                    await bili_api.get_bili_img(
                                         "https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"
                                     )
                                 )
@@ -203,7 +203,7 @@ async def about_page():
                         ):
                             with ui.avatar():
                                 ui.image(
-                                    bili_api.get_bili_img(
+                                    await bili_api.get_bili_img(
                                         "https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"
                                     )
                                 )
@@ -214,7 +214,7 @@ async def about_page():
                         ):
                             with ui.avatar():
                                 ui.image(
-                                    bili_api.get_bili_img(
+                                    await bili_api.get_bili_img(
                                         "https://i1.hdslb.com/bfs/face/316685ff90898018d3bb0eb7f0649db73e109e9b.jpg"
                                     )
                                 )
@@ -225,7 +225,7 @@ async def about_page():
                         ):
                             with ui.avatar():
                                 ui.image(
-                                    bili_api.get_bili_img(
+                                    await bili_api.get_bili_img(
                                         "https://i1.hdslb.com/bfs/face/29b2132e3371d0c9a90a21edf6a0ad87a122a831.jpg"
                                     )
                                 )
@@ -236,7 +236,7 @@ async def about_page():
                         ):
                             with ui.avatar():
                                 ui.image(
-                                    bili_api.get_bili_img(
+                                    await bili_api.get_bili_img(
                                         "https://i0.hdslb.com/bfs/face/7b2a5c03e0caaa516dda9e238a82ebeef0e2f56d.jpg"
                                     )
                                 )

@@ -3,20 +3,22 @@
 import os
 import json
 import base64
-import requests
+import aiohttp
 
-def get_b64(url):
-    response = requests.get(url)
-    response.raise_for_status()  # 检查请求是否成功
+async def _get_b64(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            response.raise_for_status()
+            content = await response.read()
     # 将图片数据转换为 Base64
-    bili_img = base64.b64encode(response.content).decode('utf-8')
+    bili_img = base64.b64encode(content).decode('utf-8')
     return bili_img
 
 # GET方式请求B站图片数据并转换为base64
-def get_bili_img(url):
+async def get_bili_img(url):
     """
     获取B站图片数据并转换为Base64格式
-    
+
     :param url: 图片url
     """
 
@@ -31,7 +33,7 @@ def get_bili_img(url):
             bili_img_data = json.load(f)
 
         if url not in bili_img_data.keys():
-            bili_img = get_b64(url)
+            bili_img = await _get_b64(url)
             bili_img_data[url] = bili_img
             status = True
         else:

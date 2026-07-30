@@ -1,46 +1,85 @@
 import os
 import tomlkit
 from pathlib import Path
+from tomlkit import document, table, array
+
+def _build_default_config() -> tomlkit.TOMLDocument:
+    """使用 tomlkit API 构建默认配置，避免硬编码 TOML 字符串"""
+    doc = document()
+
+    general = table()
+    general.add("room_id", "")
+    general["room_id"].comment("房间号")
+    general.add("host", "127.0.0.1")
+    general["host"].comment("监听地址")
+    general.add("port", 65000)
+    general["port"].comment("监听端口")
+    general.add("auth_code", "")
+    general["auth_code"].comment("主播身份码")
+    bg = array()
+    bg.append("static/bg_vita.png")
+    general.add("background_image", bg)
+    general["background_image"].comment("背景图片")
+    doc.add("general", general)
+
+    api = table()
+    api.add("server", "http://api.travail.nya-wsl.cn")
+    api["server"].comment("API地址")
+    doc.add("api", api)
+
+    open_live = table()
+    open_live.add("ACCESS_KEY_ID", "")
+    open_live["ACCESS_KEY_ID"].comment("开放平台 access_key_id")
+    open_live.add("ACCESS_KEY_SECRET", "")
+    open_live["ACCESS_KEY_SECRET"].comment("开放平台 access_key_secred")
+    open_live.add("APP_ID", 0)
+    open_live["APP_ID"].comment("开放平台 项目ID")
+    doc.add("open_live", open_live)
+
+    color = table()
+    color.add("time_color", "#fcefe8")
+    color["time_color"].comment("倒计时颜色")
+    color.add("btn_color", "#fcefe8")
+    color["btn_color"].comment("按钮颜色")
+    color.add("text_color", "#000000")
+    color["text_color"].comment("文字颜色")
+    doc.add("color", color)
+
+    bool_tbl = table()
+    bool_tbl.add("remote_text", True)
+    bool_tbl["remote_text"].comment("about页面对话框内容是否从服务器获取")
+    bool_tbl.add("show_capture_gift_list", False)
+    bool_tbl["show_capture_gift_list"].comment("是否启用收到礼物列表")
+    bool_tbl.add("show_capture_rank_list", False)
+    bool_tbl["show_capture_rank_list"].comment("是否启用排行榜")
+    bool_tbl.add("short_list", False)
+    bool_tbl["short_list"].comment("是否启用简洁模式")
+    bool_tbl.add("borderless_cd", False)
+    bool_tbl["borderless_cd"].comment("倒计时是否无边框")
+    bool_tbl.add("exit_timer", True)
+    bool_tbl["exit_timer"].comment("是否启用倒计时结束后退出程序")
+    bool_tbl.add("check_update", True)
+    bool_tbl["check_update"].comment("是否启用更新检查")
+    bool_tbl.add("check_sha256", True)
+    bool_tbl["check_sha256"].comment("是否启用更新包SHA256校验")
+    doc.add("bool", bool_tbl)
+
+    num = table()
+    num.add("short_time", 5)
+    num["short_time"].comment("简洁模式滚动时间")
+    num.add("capture_gift_list_number", 3)
+    num["capture_gift_list_number"].comment("收到礼物列表显示数量")
+    num.add("exit_time", 1800)
+    num["exit_time"].comment("倒计时结束后退出程序等待时间")
+    doc.add("num", num)
+
+    return doc
+
 
 class Config:
     def __init__(self) -> None:
         self.file = Path("config.toml")
-        self.default_data = '''[general]
-room_id = "" # 房间号
-host = "127.0.0.1" # 监听地址
-port = 65000 # 监听端口
-auth_code = "" # 主播身份码
-background_image = [
-    "static/bg_vita.png"
-] # 背景图片
-
-[api]
-server = "http://api.travail.nya-wsl.cn" # API地址
-
-[open_live]
-ACCESS_KEY_ID = "" # 开放平台 access_key_id
-ACCESS_KEY_SECRET = "" # 开放平台 access_key_secred
-APP_ID = 0 # 开放平台 项目ID
-
-[color]
-time_color = "#fcefe8" # 倒计时颜色
-btn_color = "#fcefe8" # 按钮颜色
-text_color = "#000000" # 文字颜色
-
-[bool]
-remote_text = true # about页面对话框内容是否从服务器获取
-show_capture_gift_list = false # 是否启用收到礼物列表
-show_capture_rank_list = false # 是否启用排行榜
-short_list = false # 是否启用简洁模式
-borderless_cd = false # 倒计时是否无边框
-exit_timer = true # 是否启用倒计时结束后退出程序
-check_update = true # 是否启用更新检查
-check_sha256 = true # 是否启用更新包SHA256校验
-
-[num]
-short_time = 5 # 简洁模式滚动时间
-capture_gift_list_number = 3 # 收到礼物列表显示数量
-exit_time = 1800 # 倒计时结束后退出程序等待时间'''
+        self.default_data = _build_default_config()
 
         self.visited = set()  # 用于检测循环引用
         if not os.path.exists(self.file):
@@ -49,7 +88,7 @@ exit_time = 1800 # 倒计时结束后退出程序等待时间'''
     def default(self):
         "初始化配置文件"
         with open("config.toml", "w+", encoding="utf-8") as f:
-            tomlkit.dump(tomlkit.parse(self.default_data), f)
+            tomlkit.dump(self.default_data, f)
 
     def load(self):
         "加载配置文件"
@@ -81,9 +120,9 @@ exit_time = 1800 # 倒计时结束后退出程序等待时间'''
         else:
             return data.get(table, {}).get(value, default)
 
-    def sync_config(self, config, example_config):
+    def sync_config(self):
         "检查配置文件是否有缺失或多余项"
-        example_config = tomlkit.parse(self.default_data)
+        example_config = self.default_data
         config = self.load()
 
         for example_table, example_data in example_config.items():

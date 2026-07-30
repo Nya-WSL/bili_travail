@@ -37,4 +37,5 @@ server = [
     "orjson (>=3.11.5,<4.0.0)",
     "aiodns (>=3.6.1)",
     "minio>=7.2.20",
+    "packaging>=24.0",
 ]

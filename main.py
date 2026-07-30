@@ -58,19 +58,50 @@ import aiohttp
 import requests
 import datetime
 import traceback
+
 from copy import deepcopy
 from nicegui import ui, app
 from itertools import islice
+from zoneinfo import ZoneInfo
 from multiprocessing import freeze_support
 from packaging import version as pack_version
 from nicegui import __version__ as gui_version
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-ver_strftime = env.get_key().get("version", datetime.datetime.now().strftime("%y%m%d%H%M"))
+ver_strftime = env.get_key().get("version", datetime.datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%y%m%d%H%M"))
 version = f"{base_ver.base_version}.{ver_strftime}"
 
 logger = log.logger
 logger.debug("version: {}", version)
+
+# ================================
+# JSON文件缓存，减少高频率文件IO
+# ================================
+_json_cache = {}
+
+def _read_json_cached(path: str):
+    """带缓存的JSON读取，优先从内存缓存返回"""
+    if path in _json_cache:
+        return _json_cache[path]
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        _json_cache[path] = data
+        return data
+    return None
+
+def _write_json_cached(path: str, data) -> None:
+    """写入JSON并同步更新内存缓存"""
+    with open(path, "wb+") as f:
+        f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+    _json_cache[path] = data
+
+def _invalidate_json_cache(path: str | None = None) -> None:
+    """清除缓存: 传入path清除指定文件缓存, 不传则清除全部"""
+    if path is None:
+        _json_cache.clear()
+    else:
+        _json_cache.pop(path, None)
 
 if origin_script_path != os.getcwd(): # 如果是直播姬唤起的不会相等，在日志中记录一下
     logger.info("检测到加班姬可能通过直播姬唤起")
@@ -105,8 +136,7 @@ def init_storage():
         os.mkdir("data")
 
     if not os.path.exists("data/blind_box_data.json"):
-        with open("data/blind_box_data.json", "wb+") as f:
-            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+        _write_json_cached("data/blind_box_data.json", {})
 
     if not os.path.exists("data/time.json"):
         with open("data/time.json", "wb+") as f:
@@ -141,7 +171,7 @@ def init_storage():
 init_storage()
 
 base_config = travail_config.Config()
-base_config.sync_config(base_config.load(), base_config.default_data)
+base_config.sync_config()
 config = base_config.load()
 
 host = config["general"]["host"]  # type: ignore[index]
@@ -241,11 +271,9 @@ async def create_blind_box():
         for gift in box_gifts["gifts"]:
             blind_box[box].append(gift['gift'])
 
-    with open("data/blind_box_data.json", "wb+") as f:
-        f.write(orjson.dumps(blind_box, option=orjson.OPT_INDENT_2))
+    _write_json_cached("data/blind_box_data.json", blind_box)
 
-    with open("data/blind_box_price.json", "wb+") as f:
-        f.write(orjson.dumps(box_price, option=orjson.OPT_INDENT_2))
+    _write_json_cached("data/blind_box_price.json", box_price)
 
 async def init_config():
     """
@@ -266,20 +294,17 @@ async def init_config():
 
     # 初始化数据
     if not os.path.exists("data/gift_img.json"):
-        with open("data/gift_img.json", "wb+") as f:
-            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+        _write_json_cached("data/gift_img.json", {})
 
     if not os.path.exists("data/gifts.json"):
-        with open("data/gifts.json", "wb+") as f:
-            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+        _write_json_cached("data/gifts.json", {})
 
     if not os.path.exists("data/gifts_count.json"):
         with open("data/gifts_count.json", "wb+") as f:
             f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
 
     if not os.path.exists("data/special.json"):
-        with open("data/special.json", "wb+") as f:
-            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+        _write_json_cached("data/special.json", {})
 
     if not os.path.exists("data/special_count.json"):
         with open("data/special_count.json", "wb+") as f:
@@ -470,12 +495,8 @@ class BiliHandler(blivedm.BaseHandler):
     async def _on_gift_statistics(self, gift, num, uname, price: int | float = 0):
         async with gift_statistics_lock:  # 异步锁保护
             try:
-                count = {}
-                try:
-                    with open("data/gift_statistics.json", "rb") as f:
-                        content = f.read()
-                        count = orjson.loads(content.decode("utf-8").encode("utf-8")) if content else {}
-                except (FileNotFoundError, EOFError, orjson.JSONDecodeError):
+                count = _read_json_cached("data/gift_statistics.json")
+                if count is None:
                     count = {}
 
                 count.setdefault(gift, {"num": 0, "price": 0, "user": []})
@@ -496,11 +517,7 @@ class BiliHandler(blivedm.BaseHandler):
                 raise
 
         # 重新打开文件写入
-        with open("data/gift_statistics.json", "wb+") as f:
-            try:
-                f.write(orjson.dumps(count, option=orjson.OPT_INDENT_2))
-            except Exception:
-                logger.error(f"写入礼物统计文件失败: {traceback.format_exc()}")
+        _write_json_cached("data/gift_statistics.json", count)
 
     # 收到礼物后执行函数
     async def _on_gift_play(self, gift, num, uname, message, price: int | float = 0):
@@ -515,12 +532,10 @@ class BiliHandler(blivedm.BaseHandler):
         async def _save_blind_box_value(gift, num, price, box_name):
             async with blind_box_lock:
                 try:
-                    if not os.path.exists("data/blind_box_value.json"):
-                        with open("data/blind_box_value.json", "wb+") as f:
-                            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-
-                    with open("data/blind_box_value.json", "rb") as f:
-                        box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+                    box_value = _read_json_cached("data/blind_box_value.json")
+                    if box_value is None:
+                        box_value = {}
+                        _write_json_cached("data/blind_box_value.json", {})
 
                     if box_value.get(box_name, None) is None:
                         box_value[box_name] = {}
@@ -530,31 +545,25 @@ class BiliHandler(blivedm.BaseHandler):
 
                     box_value[box_name][gift] = {"num": box_value[box_name][gift]["num"] + num, "price": price}
 
-                    with open("data/blind_box_value.json", "wb+") as f:
-                        f.write(orjson.dumps(box_value, option=orjson.OPT_INDENT_2))
+                    _write_json_cached("data/blind_box_value.json", box_value)
                 except Exception:
                     logger.error(f"保存盲盒价值数据失败: {traceback.format_exc()}")
 
         if b_connect_status:  # True则已连接至弹幕服务器
             if ct.cd_status or app.storage.general.get("ignore_cd", False):  # True则倒计时为启动状态
                 if os.path.exists("data/gifts.json"):
-                    with open("data/gifts.json", "rb") as f:
-                        gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-                    with open("data/special.json", "rb") as f:
-                        special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+                    gifts = _read_json_cached("data/gifts.json") or {}
+                    special = _read_json_cached("data/special.json") or {}
 
                     current_seconds = countdown_timer.remaining_seconds
 
                     if gift not in gifts and gift not in special:
-                        with open("data/gift_img.json", "rb") as f:
-                            gift_img = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+                        gift_img = _read_json_cached("data/gift_img.json") or {}
                         gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
-                        with open("data/gift_img.json", "wb+") as f:
-                            f.write(orjson.dumps(gift_img, option=orjson.OPT_INDENT_2))
+                        _write_json_cached("data/gift_img.json", gift_img)
 
                     # 初始化盲盒数据
-                    with open("data/blind_box_data.json", "rb") as f:
-                        blind_box = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+                    blind_box = _read_json_cached("data/blind_box_data.json") or {}
 
                     blind_box_gifts = []
 
@@ -738,10 +747,8 @@ def cd_setting_dialog():
 
     # 确定按钮
     def run():
-        with open("data/gifts.json", "rb+") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        gifts = _read_json_cached("data/gifts.json") or {}
+        special = _read_json_cached("data/special.json") or {}
 
         if gift_name.value is None or time.value < 0:
             if gift_name.value is None:
@@ -783,10 +790,8 @@ def cd_setting_dialog():
 
             gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
-            with open("data/gifts.json", "wb+") as f:
-                f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
-            with open("data/special.json", "wb+") as f:
-                f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
+            _write_json_cached("data/gifts.json", gifts)
+            _write_json_cached("data/special.json", special)
 
             capture_cd.refresh_capture_cd = True # 设置capture刷新状态
             refresh_card()
@@ -794,10 +799,8 @@ def cd_setting_dialog():
     # 重置按钮
     def reset():
         def double_check():
-            with open("data/gifts.json", "wb+") as f:
-                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
-            with open("data/special.json", "wb+") as f:
-                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+            _write_json_cached("data/gifts.json", {})
+            _write_json_cached("data/special.json", {})
             capture_cd.refresh_capture_cd = True
             double_check_dialog.close()
             refresh_card()
@@ -812,10 +815,8 @@ def cd_setting_dialog():
         double_check_dialog.open()
 
     def delete():
-        with open("data/gifts.json", "rb+") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special.json", "rb+") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        gifts = _read_json_cached("data/gifts.json") or {}
+        special = _read_json_cached("data/special.json") or {}
 
         if gift_name.value in gifts:
             gifts.pop(gift_name.value)
@@ -824,38 +825,30 @@ def cd_setting_dialog():
 
         gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
 
-        with open("data/gifts.json", "wb+") as f:
-            f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
-        with open("data/special.json", "wb+") as f:
-            f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
+        _write_json_cached("data/gifts.json", gifts)
+        _write_json_cached("data/special.json", special)
 
         capture_cd.refresh_capture_cd = True # 设置capture刷新状态
         refresh_card()
 
     def del_gift(is_special, k):
-        with open("data/gifts.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        gifts = _read_json_cached("data/gifts.json") or {}
+        special = _read_json_cached("data/special.json") or {}
 
         if is_special:
             special.pop(k)
-            with open("data/special.json", "wb+") as f:
-                f.write(orjson.dumps(special, option=orjson.OPT_INDENT_2))
+            _write_json_cached("data/special.json", special)
         else:
             gifts.pop(k)
             gifts = sort_dict(dictionary=gifts, sort_within_type=True)  # 对礼物数据进行排序
-            with open("data/gifts.json", "wb+") as f:
-                f.write(orjson.dumps(gifts, option=orjson.OPT_INDENT_2))
+            _write_json_cached("data/gifts.json", gifts)
 
         capture_cd.refresh_capture_cd = True
         refresh_card()
 
     def create_card():
-        with open("data/gifts.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/special.json", "rb") as f:
-            special = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        gifts = _read_json_cached("data/gifts.json") or {}
+        special = _read_json_cached("data/special.json") or {}
 
         if gifts != {}:
             for k,v in gifts.items():
@@ -895,8 +888,7 @@ def cd_setting_dialog():
 
     # 弹窗
     with ui.dialog() as cd_dialog, ui.card(align_items="center"):
-        with open("data/gift_img.json", "rb") as f:
-            gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        gifts = _read_json_cached("data/gift_img.json") or {}
 
         ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
 
@@ -960,16 +952,12 @@ def cd_setting_dialog():
 def blind_box_value_dialog():
     def get_box_value():
         if not os.path.exists("data/blind_box_value.json"):
-            with open("data/blind_box_value.json", "wb+") as f:
-                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+            _write_json_cached("data/blind_box_value.json", {})
         if not os.path.exists("data/blind_box_price.json"):
-            with open("data/blind_box_price.json", "wb+") as f:
-                f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+            _write_json_cached("data/blind_box_price.json", {})
 
-        with open("data/blind_box_value.json", "rb") as f:
-            box_value = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
-        with open("data/blind_box_price.json", "rb") as f:
-            box_price_list = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        box_value = _read_json_cached("data/blind_box_value.json") or {}
+        box_price_list = _read_json_cached("data/blind_box_price.json") or {}
 
         value_list = {}
         price_list = {}
@@ -1006,14 +994,14 @@ def blind_box_value_dialog():
             ui.label(f"总盈亏：{all_price}电池")
 
     def clear_box_value():
+        _invalidate_json_cache("data/blind_box_value.json")
         os.remove("data/blind_box_value.json")
         value_card.clear()
         get_box_value()
         ui.button("关闭", on_click=lambda: value_dialog.close())
 
     if not os.path.exists("data/blind_box_value.json"):
-        with open("data/blind_box_value.json", "wb+") as f:
-            f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
+        _write_json_cached("data/blind_box_value.json", {})
 
     with ui.dialog() as value_dialog, ui.card(align_items="center") as value_card:
         ui.label().set_visibility(False)
@@ -1260,6 +1248,7 @@ async def refresh_gift_loop():
         return
 
     gift_config = await GiftManager.get_config("data/gift_img.json")
+    _invalidate_json_cache("data/gift_img.json")  # get_config在外部写入文件,需失效缓存
     await create_blind_box()
 
     if gift_config:
@@ -1292,6 +1281,7 @@ async def refresh_gift(heartbeat=False):
 
         try:
             gift_config = await GiftManager.get_config("data/gift_img.json")
+            _invalidate_json_cache("data/gift_img.json")  # get_config在外部写入文件,需失效缓存
             await create_blind_box()
         except Exception as e:
             logger.error(f"更新礼物数据时发生错误: {e}")
@@ -1317,6 +1307,7 @@ async def refresh_gift(heartbeat=False):
         # 重置本地数据
         try:
             await GiftManager.init_gift("data/gift_img.json")
+            _invalidate_json_cache("data/gift_img.json")  # init_gift在外部写入文件,需失效缓存
             ui.notify("重置成功", type="positive")
         except Exception as e:
             logger.error(f"使用本地数据重置失败：{e}")

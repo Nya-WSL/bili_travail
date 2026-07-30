@@ -53,7 +53,7 @@ class BiliGiftManager:
                         raise ValueError("无法获取Nya-WSL服务器存档数据...")
 
         # 读取内置数据
-        except:
+        except Exception:
             gift_mapping = gift_map.gift_mapping
             blind_box = gift_map.blind_box
 
