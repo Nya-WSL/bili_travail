@@ -134,10 +134,10 @@ async def get_blind_box(gift_ids: list, version: str | None) -> dict:
                     else:
                         print(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
 
-            except aiohttp.ClientError as e:
+            except aiohttp.ClientError:
                 print(f"网络请求失败({gift_id}): {traceback.format_exc()}")
                 continue
-            except Exception as e:
+            except Exception:
                 print(f"获取盲盒礼物列表({gift_id})失败: {traceback.format_exc()}")
                 continue
 
