@@ -1,10 +1,12 @@
 import os
 import sys
+import subprocess
 import traceback
 import aiohttp
 import aiofiles
 import zipfile
 import asyncio
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) # 将上级目录加入路径，用于导入hash模块
 
@@ -15,7 +17,7 @@ from . import config as travail_config
 
 from nicegui import ui, app
 
-file_name = "cache\\bili_travail_update.zip"
+file_name = Path("cache") / "bili_travail_update.zip"
 base_config = travail_config.Config()
 
 async def get_sha(url: str, version: str) -> str:
@@ -24,14 +26,14 @@ async def get_sha(url: str, version: str) -> str:
             if response.status != 200:
                 logger.error(f'获取SHA256失败：{response.status} {response.reason}')
                 return None
-            async with aiofiles.open(f"cache\\{version}.sha256", 'wb') as f:
+            async with aiofiles.open(Path("cache") / f"{version}.sha256", 'wb') as f:
                 while True:
                     chunk = await response.content.read(1024)
                     if not chunk:
                         break
                     await f.write(chunk)
 
-            with open(f"cache\\{version}.sha256", 'r') as f:
+            with open(Path("cache") / f"{version}.sha256", 'r') as f:
                 return f.read()
 
 async def update(zip_url, version):
@@ -143,7 +145,7 @@ rmdir /s /q cache
 start start.exe
 timeout /t 1 /nobreak
 """)
-        os.system("update.bat")
+        subprocess.run("update.bat", shell=True)
         app.shutdown()
 
     with ui.dialog() as dialog, ui.card(align_items="center"):

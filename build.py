@@ -7,6 +7,7 @@ import shutil
 import zipfile
 import datetime
 import traceback
+import subprocess
 
 from pathlib import Path
 from libs import hash_utils
@@ -102,6 +103,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     main_py = "main.py"
 
     version = create_version(True)
+    product_version = create_product_version()
 
     if nuitka == 'y':
         if Path("dist", "start").exists():
@@ -117,21 +119,21 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     if manager == "poetry":
         if nuitka == 'y':
             start_time = time.time()
-            os.system(f"poetry run python -m nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
+            subprocess.run(f"poetry run python -m nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            os.system(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}")
+            subprocess.run(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}")
     elif manager == "uv":
         if nuitka == 'y':
             start_time = time.time()
-            os.system(f"uv run nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
+            subprocess.run(f"uv run nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            os.system(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}")
+            subprocess.run(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}")
 
     shutil.copy("check_runtime.ps1", Path("dist", "start", "check_runtime.ps1"))
     shutil.copytree("static", Path("dist", "start", "static"), dirs_exist_ok=True)
@@ -167,7 +169,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
 
     if upload_status == 'y' or upload_status == '':
         if env_data.get("scp_url", ""):
-            os.system(f'scp {Path("dist", "update.zip")} {Path("dist", "update.sha256")} {env_data["scp_url"]}')
+            subprocess.run(f'scp {Path("dist", "update.zip")} {Path("dist", "update.sha256")} {env_data["scp_url"]}')
         else:
             print("未配置scp_url，无法上传到服务器")
 
@@ -196,6 +198,18 @@ def create_version(full: bool = False):
         return version_info["version"]
     else:
         return version
+
+
+def create_product_version():
+    '''
+    生成 Nuitka 兼容的 product-version（4段，每段0-65535，无前导零）
+    与 version 的 MMDDHH 对应：月*100+日 . 时
+    '''
+    now = datetime.datetime.now()
+    md = now.month * 100 + now.day
+    full_version = f"{base_version}.{md}.{now.hour}"
+
+    return full_version
 
 
 def create_env_file(key_id, key_secret, app_id):

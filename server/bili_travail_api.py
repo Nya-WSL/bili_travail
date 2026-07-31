@@ -13,7 +13,8 @@ from minio import Minio
 from pathlib import Path
 from pydantic import BaseModel
 from aiohttp.resolver import AsyncResolver
-from fastapi import FastAPI, UploadFile, File, HTTPException, status, Request
+from packaging.version import parse as parse_version
+from fastapi import FastAPI, UploadFile, File, HTTPException, status
 
 class GiftIdsRequest(BaseModel):
     gift_ids: List[int]
@@ -27,6 +28,13 @@ class StatRequest(BaseModel):
 
 class UpdateRequest(BaseModel):
     version: str
+
+class TicketRequest(BaseModel):
+    type: str
+    title: str
+    description: str
+    version: str
+    room_id: int | None = None
 
 def bytes_to_kb(bytes_size: int) -> float:
     """将字节大小转换为 KB"""
@@ -86,54 +94,57 @@ async def get_blind_box(gift_ids: list, version: str | None) -> dict:
 
     blind_box = {}
 
-    for gift_id in gift_ids:
-        url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
-        params = {
-            "gift_id": gift_id
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
-            "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
-        }
+    resolver = AsyncResolver(nameservers=["8.8.8.8", "114.114.114.114"])
+    connector = aiohttp.TCPConnector(resolver=resolver)
 
-        # 创建自定义解析器
-        resolver = AsyncResolver(
-            nameservers=["8.8.8.8", "114.114.114.114"]
-        )
+    async with aiohttp.ClientSession(connector=connector) as session:
+        for gift_id in gift_ids:
+            url = "https://api.live.bilibili.com/xlive/general-interface/v1/blindFirstWin/getInfo"
+            params = {
+                "gift_id": gift_id
+            }
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+                "Cookie": f"SESSDATA={config.get('SESSDATA', '')}"
+            }
 
-        # 创建连接器并设置解析器
-        connector = aiohttp.TCPConnector(resolver=resolver)
-
-        async with aiohttp.ClientSession(connector=connector) as session:
-            async with session.get(url, params=params, headers=headers) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data['code'] == 0:
-                        for gift in data['data']['gifts']:
-                            if data['data']['blind_gift_name'] not in blind_box:
-                                if version is not None and version > "1.38.041001" and version != "1.38.0":
-                                    blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
+            try:
+                async with session.get(url, params=params, headers=headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data['code'] == 0:
+                            for gift in data['data']['gifts']:
+                                if data['data']['blind_gift_name'] not in blind_box:
+                                    if version is not None and parse_version(version) > parse_version("1.38.041001") and parse_version(version) != parse_version("1.38.0"):
+                                        blind_box[data['data']['blind_gift_name']] = {"price": data['data']['blind_price'], "gifts": []}
+                                    else:
+                                        blind_box[data['data']['blind_gift_name']] = []
+                                if version is not None and parse_version(version) > parse_version("1.38.041001") and parse_version(version) != parse_version("1.38.0"):
+                                    blind_box[data['data']['blind_gift_name']]['gifts'].append({
+                                        'gift': gift['gift_name'], 
+                                        "gift_img": gift['gift_img']
+                                    })
                                 else:
-                                    blind_box[data['data']['blind_gift_name']] = []
-                            if version is not None and version > "1.38.041001" and version != "1.38.0":
-                                blind_box[data['data']['blind_gift_name']]['gifts'].append({
-                                    'gift': gift['gift_name'], 
-                                    "gift_img": gift['gift_img']
-                                })
-                            else:
-                                blind_box[data['data']['blind_gift_name']].append({
-                                    'gift': gift['gift_name'], 
-                                    "gift_img": gift['gift_img']
-                                })
+                                    blind_box[data['data']['blind_gift_name']].append({
+                                        'gift': gift['gift_name'], 
+                                        "gift_img": gift['gift_img']
+                                    })
+                        else:
+                            print(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
                     else:
-                        print(f"获取盲盒礼物列表({gift_id})失败: {data['message']}")
-                else:
-                    print(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
+                        print(f"请求盲盒礼物列表({gift_id})失败: {response.status}")
+
+            except aiohttp.ClientError:
+                print(f"网络请求失败({gift_id}): {traceback.format_exc()}")
+                continue
+            except Exception:
+                print(f"获取盲盒礼物列表({gift_id})失败: {traceback.format_exc()}")
+                continue
 
     return blind_box
 
 @app.post("/gift/get_blind_boxes", status_code=status.HTTP_200_OK)
-async def index(request: GiftIdsRequest):  # pyright: ignore[reportRedeclaration]
+async def get_blind_boxes(request: GiftIdsRequest):
     try:
         blind_box = await get_blind_box(request.gift_ids, request.version)
 
@@ -210,7 +221,7 @@ async def hook(room_id: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.post("/stat", status_code=status.HTTP_200_OK)
-async def index(request: StatRequest):  # pyright: ignore[reportRedeclaration]
+async def post_stat(request: StatRequest):
     try:
         if not Path("stat.json").exists():
             with open("stat.json", "wb+") as f:
@@ -231,8 +242,93 @@ async def index(request: StatRequest):  # pyright: ignore[reportRedeclaration]
         print(traceback.format_exc())
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+@app.post("/ticket", status_code=status.HTTP_201_CREATED)
+async def post_ticket(request: TicketRequest):
+    try:
+        import datetime
+
+        ticket_file = Path("tickets.json")
+
+        if ticket_file.exists():
+            with open(ticket_file, "rb") as f:
+                tickets = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+        else:
+            tickets = []
+
+        now = datetime.datetime.now().isoformat()
+
+        ticket = {
+            "id": len(tickets) + 1,
+            "type": request.type,
+            "title": request.title,
+            "description": request.description,
+            "version": request.version,
+            "room_id": request.room_id,
+            "status": "pending",
+            "admin_comment": "",
+            "created_at": now,
+            "viewed_at": None,
+            "updated_at": now,
+        }
+
+        tickets.append(ticket)
+
+        with open(ticket_file, "wb+") as f:
+            f.write(orjson.dumps(tickets, option=orjson.OPT_INDENT_2))
+
+        return {"status": status.HTTP_201_CREATED, "ticket": ticket}
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        print(traceback.format_exc())
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@app.get("/tickets", status_code=status.HTTP_200_OK)
+async def get_tickets(room_id: int | None = None):
+    try:
+        import datetime
+
+        ticket_file = Path("tickets.json")
+
+        if not ticket_file.exists():
+            return {"tickets": []}
+
+        with open(ticket_file, "rb") as f:
+            all_tickets = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
+
+        if room_id is not None:
+            result = [t for t in all_tickets if t.get("room_id") == room_id]
+        else:
+            result = all_tickets
+
+        # 按创建时间倒序排列
+        result.sort(key=lambda t: t.get("created_at", ""), reverse=True)
+
+        # 标记匹配的工单为已查看（基于全量列表原地修改）
+        updated = False
+        for t in all_tickets:
+            if room_id is None or t.get("room_id") == room_id:
+                if t.get("viewed_at") is None:
+                    t["viewed_at"] = datetime.datetime.now().isoformat()
+                    updated = True
+
+        if updated:
+            with open(ticket_file, "wb+") as f:
+                f.write(orjson.dumps(all_tickets, option=orjson.OPT_INDENT_2))
+
+        return {"tickets": result}
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        print(traceback.format_exc())
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
 @app.get("/notes", status_code=status.HTTP_200_OK)
-async def index():
+async def get_notes():
     try:
         if not Path("notes.json").exists():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="公告不存在")
@@ -253,7 +349,7 @@ async def index():
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @app.get("/update", status_code=status.HTTP_200_OK)
-async def index(version: str, type: Literal["zip", "sha256"]):
+async def get_update(version: str, type: Literal["zip", "sha256"]):
     """_向S3兼容的储存桶请求直链_
 
     Args:

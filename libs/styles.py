@@ -1,5 +1,9 @@
-from nicegui import ui
 import os
+import libs.config as travail_config
+
+from nicegui import ui
+
+base_config = travail_config.Config()
 
 _FORMATS = {
     'ttf': 'truetype',
@@ -25,6 +29,7 @@ def page_styles():
 
         body {{
             font-family: "Custom Font", sans-serif;
+            color: {base_config.get('color', 'text_color', '#4A4A4A')};
         }}
         </style>
         """,
