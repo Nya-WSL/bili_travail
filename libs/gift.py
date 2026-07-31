@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 import orjson
 import asyncio
@@ -20,10 +19,8 @@ base_config = travail_config.Config()
 
 class BiliGiftManager:
     def __init__(self):
-        if base_config.get("general", "room_id", "") != "":
-            self.room_id = base_config.get("general", "room_id", "")
-        else:
-            self.room_id = 3
+        room_id = base_config.get("general", "room_id", "")
+        self.room_id = room_id if room_id else 3
 
         self.area_parent_id = 0
         self.area_id = 0
@@ -77,8 +74,6 @@ class BiliGiftManager:
         :return dict: 盲盒礼物列表
         """
 
-        base_config = travail_config.Config()
-
         url = f"{base_config.get('api', 'server', 'http://api.travail.nya-wsl.cn')}/gift/get_blind_boxes"
         data = {
             "gift_ids": gift_ids,
@@ -88,11 +83,11 @@ class BiliGiftManager:
         async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
             async with session.post(url, json=data) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    if data != {}:
-                        return data
+                    resp_data = await response.json()
+                    if resp_data:
+                        return resp_data
                     else:
-                        logger.error(f"获取盲盒礼物列表失败: {data['message']}")
+                        logger.error("获取盲盒礼物列表失败: API未返回错误详情")
                         return {}
                 else:
                     logger.error(f"请求盲盒礼物列表失败: {response.status}")
@@ -123,7 +118,7 @@ class BiliGiftManager:
                 else:
                     logger.error(f"请求直播分区失败：{response.status}")
 
-    async def get_room_gift(self, platform = "android"):
+    async def get_room_gift(self, platform = "android") -> list:
         """
         获取房间礼物
 
@@ -166,16 +161,61 @@ class BiliGiftManager:
                         return data["data"]["gift_config"]["base_config"]["list"] + data["data"]["gift_config"]["room_config"]
                     else:
                         logger.error(f"获取房间礼物失败：{data['message']}")
+                        return []
                 else:
                     logger.error(f"请求房间礼物失败：{response.status}")
+                    return []
 
+    async def get_global_gift(self, platform = "android", source = "live") -> list:
+        """
+        获取全局礼物
+
+        Args:
+            platform (_str_): pc、android
+            source (_str_): live
+        """
+
+        await self.get_area_id()
+
+        url = "https://api.live.bilibili.com/xlive/web-room/v1/giftPanel/roomGiftConfig"
+        params = {
+            "platform": platform,
+            "room_id": self.room_id,
+            "source": source
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
+        }
+
+        async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data["code"] == 0:
+                        return data["data"]["global_gift"]["list"] + data["data"]["list"]
+                    else:
+                        logger.error(f"获取全局礼物失败：{data['message']}")
+                        return []
+                else:
+                    logger.error(f"请求全局礼物失败：{response.status}")
+                    return []
 
     async def get_config(self, img_path = "data/gift_img.json"):
         try:
             # 获取房间礼物
-            gifts_data = await self.get_room_gift("android")
+            room_gifts = await self.get_room_gift()
+            global_gifts = await self.get_global_gift()
 
-            if gifts_data is None:
+            if not room_gifts and not global_gifts:
+                gifts_data = []
+            elif not room_gifts:
+                gifts_data = global_gifts
+            elif not global_gifts:
+                gifts_data = room_gifts
+            else:
+                gifts_data = global_gifts + room_gifts
+
+            if not gifts_data:
                 logger.error("获取礼物数据失败，无法初始化礼物配置")
                 return False
 
@@ -185,20 +225,21 @@ class BiliGiftManager:
             # 获取盲盒礼物
             for data in gifts_data:
                 gift_mapping[data['name']] = data['img_basic']
-                if re.search("盲盒", data['name']):
+                if "盒" in data['name']:
                     box_id.append(data["id"])
 
-            if box_id == []:
+            blind_box = {}
+            if not box_id:
                 logger.error("初始化礼物时未获取到盲盒数据")
             else:
                 blind_box = await self.get_blind_box(box_id)
 
-                if blind_box != {}:
+                if blind_box:
                     for gifts in blind_box.values():
                         for gift in gifts["gifts"]:
                             gift_mapping[gift['gift']] = gift['gift_img']
                 else:
-                    logger.error(f"盲盒数据为空")
+                    logger.error("盲盒数据为空")
 
             # 更新舰队数据
             guard = {
@@ -219,11 +260,11 @@ class BiliGiftManager:
             with open(img_path, "wb") as f:
                 f.write(orjson.dumps(gift_mapping, option=orjson.OPT_INDENT_2))
 
-            if blind_box == {}:
+            if not blind_box:
                 return "blind_box_none"
             else:
                 return True
 
-        except Exception as e:
+        except Exception:
             logger.error(f"获取礼物数据失败:\n{traceback.format_exc()}")
             return False
