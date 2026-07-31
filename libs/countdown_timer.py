@@ -116,6 +116,10 @@ class CountdownTimer:
             self._paused = False
             if self._task:
                 self._task.cancel()  # 结束协程
+            # 取消退出计时器，防止事件循环残留
+            if self.exit_timer is not None:
+                self.exit_timer.cancel(with_current_invocation=True)
+                self.exit_timer = None
             app.storage.general["countdown_time"] = 0
             self.remaining_time = datetime.timedelta(0)
             self._update_btn_state("stop")  # 更新按钮状态

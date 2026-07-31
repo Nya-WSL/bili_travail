@@ -2187,13 +2187,40 @@ async def create_job():
 
 @app.on_shutdown
 async def shutdown():
+    # 取消倒计时相关的 task 和 timer
+    try:
+        if "countdown_timer" in globals() and countdown_timer is not None:
+            countdown_timer.stop()
+            if countdown_timer.exit_timer is not None:
+                countdown_timer.exit_timer.cancel(with_current_invocation=True)
+                countdown_timer.exit_timer = None
+            logger.debug("[shutdown] 倒计时定时器已清理")
+    except Exception:
+        pass
+
+    # 断开弹幕服务器ws连接
     if "client" in globals() and client is not None:
         await client.stop_and_close() # 彻底断开弹幕服务器ws连接
         logger.info("[shutdown] 弹幕服务器ws连接已断开")
     else:
         logger.warning("[shutdown] 弹幕服务器ws连接未建立，跳过断开")
 
+    # 停止调度器
     scheduler.shutdown()
+    logger.debug("已停止调度器")
+
+    # 取消所有残留的 asyncio 任务，确保事件循环可以退出
+    try:
+        tasks = [t for t in asyncio.all_tasks()
+                if t is not asyncio.current_task()]
+        if tasks:
+            logger.debug(f"[shutdown] 取消 {len(tasks)} 个残留任务")
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            logger.debug("[shutdown] 所有残留任务已取消")
+    except Exception:
+        pass
 
 # 运行NiceGUI
 if __name__ == "__main__":

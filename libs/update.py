@@ -145,8 +145,10 @@ rmdir /s /q cache
 start start.exe
 timeout /t 1 /nobreak
 """)
-        subprocess.run("update.bat", shell=True)
+        subprocess.Popen("update.bat", shell=True)
         app.shutdown()
+        # 强制退出进程，避免事件循环残留导致进程驻留
+        os._exit(0)
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
         percent_dialog = ui.label("")
