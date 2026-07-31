@@ -345,7 +345,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                     rank_dict[i["name"]] += seconds
 
             with capture_rank_scroll:
-                trophy_color = ["#C4AD8A", "#B0B0B0", "#A0806A"]
+                trophy_color = ["#FFD43B", "#C0C0C0", "#CD7F32"]
                 for name, seconds in sorted(rank_dict.items(), key=lambda x: x[1], reverse=True)[:3]:
                     with ui.row().classes("w-full"):
                         ui.icon("emoji_events", size="30px", color=trophy_color[0])

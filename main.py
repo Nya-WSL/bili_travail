@@ -292,6 +292,9 @@ background: {bg_color} !important;
 .q-tabs {{
 background: transparent !important;
 }}
+.q-panel {{
+background: {bg_color} !important;
+}}
 .q-tab__indicator {{
 background: #8BA89A !important;
 }}
@@ -532,7 +535,7 @@ class BiliHandler(blivedm.BaseHandler):
             uname = uname[:5] + "..."
 
         await self._on_gift_play(gift, num, uname, message, int(price))  # type: ignore[arg-type]
-        self._on_gift_statistics(gift, num, uname, int(price))  # type: ignore[arg-type]
+        await self._on_gift_statistics(gift, num, uname, int(price))  # type: ignore[arg-type]
         logger.debug(message)
 
 
@@ -555,7 +558,7 @@ class BiliHandler(blivedm.BaseHandler):
         if len(uname) > 8:
             uname = uname[:5] + "..."
 
-        await self._on_gift_play(gift, num, uname, False)
+        await self._on_gift_play(gift, num, uname, None) # 舰队的message需为None或False，因为API不会返回礼物图片
         self._on_gift_statistics(gift, num, uname, price)
         logger.debug(message)
 
@@ -747,6 +750,86 @@ class BiliHandler(blivedm.BaseHandler):
                         countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
                 else:
                     logger.error("计时失败，未找到礼物数据文件")
+
+# ================================
+# 模拟测试器 - 用于测试BiliHandler功能
+# ================================
+class GiftSimulator:
+    """模拟礼物发送，用于离线测试BiliHandler的倒计时变化和礼物统计功能"""
+
+    def __init__(self):
+        self.handler = BiliHandler()
+        self.sim_count = 0
+        self.sim_log: list[str] = []
+
+    def _add_log(self, msg: str):
+        self.sim_log.append(msg)
+        if len(self.sim_log) > 50:
+            self.sim_log.pop(0)
+        logger.info(f"[Simulator] {msg}")
+
+    def _ensure_available(self) -> bool:
+        """确保模拟环境可用：连接状态、倒计时状态、礼物数据文件"""
+        if not os.path.exists("data/gifts.json"):
+            self._add_log("错误: 礼物数据文件 data/gifts.json 不存在，请先更新礼物")
+            return False
+        if not os.path.exists("data/special.json"):
+            self._add_log("错误: 特殊玩法文件 data/special.json 不存在，请先更新礼物")
+            return False
+
+        gifts = _read_json_cached("data/gifts.json") or {}
+        special = _read_json_cached("data/special.json") or {}
+        if not gifts and not special:
+            self._add_log("错误: gifts.json 和 special.json 均为空，请先设置礼物玩法")
+            return False
+
+        if not ct.cd_status and not app.storage.general.get("ignore_cd", False):
+            self._add_log('提示: 倒计时未运行且未开启「忽略倒计时」，模拟不会生效。请先开始倒计时')
+            return False
+
+        return True
+
+    async def simulate_gift(self, gift_name: str, num: int = 1, uname: str = "测试用户", price: int = 0) -> tuple[bool, str]:
+        """
+        模拟普通礼物发送
+
+        :param gift_name: 礼物名称
+        :param num: 礼物数量
+        :param uname: 发送者用户名
+        :param price: 单个礼物价格（电池）
+        :return: (成功, 消息)
+        """
+        if not self._ensure_available():
+            return False, "模拟环境不满足条件，请检查日志"
+
+        global b_connect_status
+        original_status = b_connect_status
+
+        try:
+            # 临时设置连接状态为 True，使 _on_gift_play 可以执行
+            if not b_connect_status:
+                b_connect_status = True
+
+            await self.handler._on_gift_play(gift_name, int(num), uname, None, int(price))
+            await self.handler._on_gift_statistics(gift_name, int(num), uname, int(price))
+
+            self.sim_count += 1
+            msg = f"模拟礼物 #{self.sim_count}: {uname} 赠送 {gift_name} x{num} (单价{price}电池)"
+            self._add_log(msg)
+            return True, msg
+
+        except Exception as e:
+            err_msg = f"模拟礼物失败: {e}"
+            self._add_log(err_msg)
+            logger.error(f"[Simulator] {err_msg}\n{traceback.format_exc()}")
+            return False, err_msg
+        finally:
+            if not original_status:
+                b_connect_status = False
+
+# 全局模拟器实例
+simulator: GiftSimulator | None = None
+
 
 def update_btn_state(state: str):
     if state == "start":
@@ -1920,7 +2003,7 @@ def index():
 
         ui.separator()
 
-        content = {"1": "账号设置", "2": "礼物设置", "3": "显示设置", "4": "外观设置", "5": "统计相关", "6": "程序设置"} # 所有tab的标题
+        content = {"1": "账号设置", "2": "礼物设置", "3": "显示设置", "4": "外观设置", "5": "统计相关", "6": "程序设置", "7": "模拟测试"} # 所有tab的标题
 
         # 创建标签页
         with ui.tabs() as tabs:
@@ -2019,6 +2102,69 @@ def index():
                 with ui.row(align_items="center"):
                     ui.switch("自动检查更新", value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
 
+            with ui.tab_panel("7").classes("items-center").style("height: 210px;") as sim_panel:
+                global simulator
+                simulator = GiftSimulator()
+
+                # 礼物选择
+                sim_gift_select = ui.select(
+                    label="礼物选择",
+                    options=[],
+                    with_input=True,
+                    clearable=True,
+                ).style("width: 160px")
+
+                with ui.row(align_items="center"):
+                    sim_num = ui.number("数量", value=1, min=1, max=9999).style("width: 100px")
+                    sim_price = ui.number("单价(电池)", value=0, min=0, max=999999).style("width: 120px")
+                    sim_uname = ui.input("用户名", value="测试用户").style("width: 130px")
+
+                with ui.row(align_items="center"):
+                    sim_status = ui.label("就绪 - 请先开始倒计时，再发送模拟礼物").classes("text-grey text-caption")
+
+                with ui.row():
+                    async def do_simulate_gift():
+                        gift = sim_gift_select.value
+                        if not gift:
+                            sim_status.set_text("请选择礼物")
+                            sim_status.classes(replace="text-red")
+                            return
+                        success, msg = await simulator.simulate_gift(
+                            gift_name=gift,
+                            num=int(sim_num.value),
+                            uname=sim_uname.value or "测试用户",
+                            price=int(sim_price.value),
+                        )
+                        if success:
+                            sim_status.set_text(f"成功: {msg}")
+                            sim_status.classes(replace="text-green")
+                            # 刷新 OBS 叠加层
+                            capture_cd.refresh_capture_cd = True
+                        else:
+                            sim_status.set_text(f"失败: {msg}")
+                            sim_status.classes(replace="text-red")
+
+                    ui.button("发送模拟礼物", on_click=lambda: asyncio.ensure_future(do_simulate_gift()))
+
+                # 动态刷新礼物选择列表
+                def refresh_sim_gift_options():
+                    gifts_img = _read_json_cached("data/gift_img.json") or {}
+                    gifts = _read_json_cached("data/gifts.json") or {}
+                    special = _read_json_cached("data/special.json") or {}
+                    # 合并所有已配置的礼物名
+                    all_gifts = set(gifts.keys()) | set(special.keys())
+                    # 按礼物图片列表过滤和排序
+                    available = [g for g in gifts_img.keys() if g in all_gifts]
+                    if not available:
+                        available = list(gifts_img.keys())
+                    sim_gift_select.set_options(available)
+                    if available and not sim_gift_select.value:
+                        sim_gift_select.set_value(available[0])
+
+                refresh_sim_gift_options()
+                # 定时刷新礼物选项
+                sim_refresh_timer = ui.timer(10, lambda: refresh_sim_gift_options())
+
         # obs源
         with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
             ui.tooltip("OBS & 直播姬浏览器源URL，单击可复制至剪贴板")
@@ -2029,7 +2175,7 @@ def index():
 
     # 右下角悬浮按钮组
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
-        with ui.column().classes("gap-1.5"):
+        with ui.row().classes("gap-1.5"):
             ui.button(on_click=lambda: ticket_dialog().open(), icon='bug_report').props('fab').tooltip("提交工单")
             ui.button(on_click=lambda: ticket_list_dialog().open(), icon='inbox').props('fab').tooltip("查看工单")
             ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
