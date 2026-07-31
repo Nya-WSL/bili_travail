@@ -37,12 +37,14 @@ def _build_default_config() -> tomlkit.TOMLDocument:
     doc.add("open_live", open_live)
 
     color = table()
-    color.add("time_color", "#fcefe8")
+    color.add("time_color", "#9BA89A")
     color["time_color"].comment("倒计时颜色")
-    color.add("btn_color", "#fcefe8")
+    color.add("btn_color", "#7A8FA0")
     color["btn_color"].comment("按钮颜色")
-    color.add("text_color", "#000000")
+    color.add("text_color", "#4A4A4A")
     color["text_color"].comment("文字颜色")
+    color.add("bg_color", "#FCFCFA")
+    color["bg_color"].comment("背景颜色")
     doc.add("color", color)
 
     bool_tbl = table()

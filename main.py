@@ -177,6 +177,7 @@ config = base_config.load()
 host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
 btn_color = config["color"]["btn_color"]  # type: ignore[index]
+bg_color = config["color"]["bg_color"]  # type: ignore[index]
 
 # 删除不再使用的背景图
 for i in [
@@ -218,6 +219,8 @@ if base_config.get("open_live", "APP_ID", 0) != 0:
 else:
     APP_ID = bili_keys.get("APP_ID", 0)
 
+bg_color = base_config.get("color", "bg_color", "#FCFCFA")
+
 ui.add_css(
     f"""
 .text-btn {{
@@ -226,6 +229,80 @@ color: {btn_color};
 
 .bg-btn {{
 background: {btn_color};
+}}
+
+/* ===== 低饱和配色覆写 ===== */
+/* 文字颜色 - 柔和绿色替代亮绿 */
+.text-green, .text-positive {{
+color: #7BA08B !important;
+}}
+/* 文字颜色 - 柔和玫瑰灰替代亮红 */
+.text-red, .text-negative {{
+color: #B8908A !important;
+}}
+/* 文字颜色 - 柔和钢蓝替代亮蓝 */
+.text-blue, .text-info {{
+color: #8A9EB0 !important;
+}}
+/* 文字颜色 - 中灰替代默认灰 */
+.text-grey, .text-grey-6, .text-grey-7, .text-grey-8 {{
+color: #8B8B8B !important;
+}}
+/* 文字颜色 - 柔和棕褐替代亮橙 */
+.text-orange, .text-warning {{
+color: #C4AD8A !important;
+}}
+/* 背景颜色覆写 */
+.bg-green, .bg-positive {{
+background: #7BA08B !important;
+}}
+.bg-red, .bg-negative {{
+background: #B8908A !important;
+}}
+.bg-blue, .bg-info {{
+background: #8A9EB0 !important;
+}}
+.bg-grey {{
+background: #8B8B8B !important;
+}}
+.bg-orange, .bg-warning {{
+background: #C4AD8A !important;
+}}
+.bg-primary {{
+background: #8BA89A !important;
+}}
+.bg-secondary {{
+background: #9BA89A !important;
+}}
+/* 边框/组件指示器颜色覆写 */
+.text-primary {{
+color: #8BA89A !important;
+}}
+.text-secondary {{
+color: #9BA89A !important;
+}}
+/* 卡片背景覆写 */
+.q-card {{
+background-color: {bg_color} !important;
+}}
+/* 标签页(Tabs/TabPanels)适配 */
+.q-tab-panel {{
+background: {bg_color} !important;
+}}
+.q-tabs {{
+background: transparent !important;
+}}
+.q-tab__indicator {{
+background: #8BA89A !important;
+}}
+.q-tab--active {{
+color: #4A4A4A !important;
+}}
+.q-tab .q-tab__label {{
+color: #8B8B8B;
+}}
+.q-tab--active .q-tab__label {{
+color: #4A4A4A;
 }}
 """,
     shared=True,
@@ -1420,7 +1497,7 @@ async def refresh_gift(heartbeat=False):
 # 倒计时预览
 @ui.page("/capture_cd", title="倒计时 | bili_travail", response_timeout=30)
 async def _():
-    await capture_cd.capture_cd_page(get_notes, init_config, base_config, GiftManager)
+    await capture_cd.capture_cd_page(get_notes, init_config, base_config)
 
 # 统计页面
 @ui.page('/count', response_timeout=30)
@@ -1441,6 +1518,7 @@ def index():
     global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, pause_button, resume_button, add_button, sub_button, short_switch
 
     styles.page_styles() # 加载自定义样式
+    ui.query("body").style(f"background-color: {config['color']['bg_color']}")  # type: ignore[index]
     async def ping_server(servers):
         server = await ping.ping(servers.values())
         if server:
@@ -1485,7 +1563,7 @@ def index():
 
         async def update(source: dict, server: str):
             if server == "auto":
-                ui.notify(f"测速中，请稍候...", progress=True, timeout=3000, type="ongoing", color="blue-100")
+                ui.notify(f"测速中，请稍候...", progress=True, timeout=3000, type="ongoing", color="#8A9EB0")
                 source_copy = deepcopy(source)
                 urls = source_copy.get("url", {})
                 if urls != {}:
@@ -1720,10 +1798,10 @@ def index():
         return ticket_dialog
 
     STATUS_MAP = {
-        "pending": ("待处理", "orange"),
-        "processing": ("处理中", "blue"),
-        "resolved": ("已解决", "green"),
-        "closed": ("已关闭", "grey"),
+        "pending": ("待处理", "#C4AD8A"),
+        "processing": ("处理中", "#8A9EB0"),
+        "resolved": ("已解决", "#7BA08B"),
+        "closed": ("已关闭", "#8B8B8B"),
     }
 
     def ticket_list_dialog() -> ui.dialog:
@@ -1755,8 +1833,8 @@ def index():
                         with ui.card().classes("w-full").style("padding: 12px;"):
                             with ui.row().classes("items-center justify-between w-full"):
                                 with ui.row().classes("items-center gap-2"):
-                                    ui.badge(f"#{t.get('id', '')}", color="grey")
-                                    ui.badge(type_label, color="secondary")
+                                    ui.badge(f"#{t.get('id', '')}", color="#8B8B8B")
+                                    ui.badge(type_label, color="#8BA89A")
                                     ui.badge(status_label, color=status_color)
                                 ui.label(t.get("created_at", "")[:16].replace("T", " ")).classes("text-caption text-grey")
 
@@ -1796,13 +1874,13 @@ def index():
         changelog_dialog().open() # 打开更新日志弹窗
 
     # 创建主界面
-    with ui.card(align_items="center").classes("absolute-center").style("width: 95%; height: 730px") as main_card:
+    with ui.card(align_items="center").classes("absolute-center").style("width: 95%; height: 730px;") as main_card:
         if base_config.get("bool", "check_update", True):
             asyncio.create_task(check_update())
         else:
             ui.notify("已关闭自动检查更新", type="warning", timeout=3000)
 
-        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {btn_color}") # 创建时钟
+        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {config['color']['time_color']}") # 创建时钟
 
         # 时间输入框
         with ui.row():
@@ -1862,7 +1940,7 @@ def index():
                             login_status = ui.label("未连接").classes("text-red")
 
                 with ui.column(align_items="center").classes("gap-0"):
-                    b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="green" unchecked-icon="clear"')
+                    b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="#7BA08B" unchecked-icon="clear"')
 
                     with ui.row(align_items="center"):
                         with ui.switch("忽略倒计时", value=app.storage.general.get("ignore_cd", False), on_change=lambda e: change_ignore_cd("ignore_cd", e.value)).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
@@ -1916,9 +1994,12 @@ def index():
 
             with ui.tab_panel("4").classes("items-center").style("height: 210px;"):
                 with ui.row():
-                    ui.color_input(label="计时颜色", value="#5a85ad", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label="按钮颜色", value="#eddad2", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label="文字颜色", value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 120px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="计时颜色", value="#9BA89A", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="按钮颜色", value="#7A8FA0", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="文字颜色", value="#4A4A4A", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 120px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+
+                with ui.row():
+                    ui.color_input(label="背景颜色", value="#FCFCFA", on_change=lambda: base_config.save(config), preview=config["color"]["bg_color"]).style(f"width: 120px").bind_value(config["color"], "bg_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
 
             with ui.tab_panel("5").classes("items-center").style("height: 210px;"):
                 with ui.row():
@@ -1948,7 +2029,7 @@ def index():
 
     # 右下角悬浮按钮组
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
-        with ui.column().classes("gap-1"):
+        with ui.column().classes("gap-1.5"):
             ui.button(on_click=lambda: ticket_dialog().open(), icon='bug_report').props('fab').tooltip("提交工单")
             ui.button(on_click=lambda: ticket_list_dialog().open(), icon='inbox').props('fab').tooltip("查看工单")
             ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')

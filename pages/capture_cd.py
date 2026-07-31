@@ -19,11 +19,12 @@ capture_cd_rank_list_show = None
 capture_cd_is_created = False
 refresh_capture_cd = False
 
-async def capture_cd_page(get_notes_func, init_config_func, base_config, gift_manager: gift.BiliGiftManager):
+async def capture_cd_page(get_notes_func, init_config_func, base_config):
     """倒计时预览页面"""
     global capture_cd_gift_list_show, capture_cd_rank_list_show, capture_cd_is_created, refresh_capture_cd
 
     styles.page_styles()  # 加载自定义样式
+    ui.query("body").style("background: transparent; background-color: transparent;")  # OBS叠加层保持透明
 
     config = base_config.load()
 
@@ -144,23 +145,23 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config, gift_ma
             with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                k_label = ui.label(k).classes("text-3xl font-extrabold")  # type: ignore[index]
                 ui.space()
-                v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold")  # type: ignore[index]
 
         if v_type == "list":
             with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                k_label = ui.label(k).classes("text-3xl font-extrabold")  # type: ignore[index]
                 ui.space()
-                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold")  # type: ignore[index]
 
         if v_type == "special":
             with ui.row().classes('w-full'):
                 with ui.avatar(color=None):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
-                k_label = ui.label(k).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                k_label = ui.label(k).classes("text-3xl font-extrabold")  # type: ignore[index]
                 ui.space()
                 if v == "clear":
                     v = "清空"
@@ -168,7 +169,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config, gift_ma
                     v = "加倍"
                 if v == "half":
                     v = "减半"
-                v_label = ui.label(v).classes("text-3xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                v_label = ui.label(v).classes("text-3xl font-extrabold")  # type: ignore[index]
 
     capture_cd_is_created = True
 
@@ -265,8 +266,8 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config, gift_ma
                             gift_img = data["url"]
                             gift_time = data["time"]
 
-                            ui.label(f"{gift_time}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
-                            ui.label(f"{gift_user}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                            ui.label(f"{gift_time}").classes("text-xl font-extrabold")  # type: ignore[index]
+                            ui.label(f"{gift_user}").classes("text-xl font-extrabold")  # type: ignore[index]
                             with ui.avatar(color="").classes("w-6 h-6"):
                                 if gift_name not in ["舰长", "提督", "总督"]:
                                     if message:
@@ -275,9 +276,9 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config, gift_ma
                                         ui.image(gifts.get(gift_name, ""))
                                 else:
                                     ui.image(gifts.get(gift_name, ""))
-                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                            ui.label(f"x{gift_num}").classes("text-xl font-extrabold")  # type: ignore[index]
                             ui.space()
-                            ui.label(gift_rule).classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                            ui.label(gift_rule).classes("text-xl font-extrabold")  # type: ignore[index]
 
                 capture_gift_scroll.scroll_to(percent=1, duration=0.5)
                 capture_cd_rank_list_show()
@@ -344,14 +345,14 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config, gift_ma
                     rank_dict[i["name"]] += seconds
 
             with capture_rank_scroll:
-                trophy_color = ["#FFD43B", "#C0C0C0", "#CD7F32"]
+                trophy_color = ["#C4AD8A", "#B0B0B0", "#A0806A"]
                 for name, seconds in sorted(rank_dict.items(), key=lambda x: x[1], reverse=True)[:3]:
                     with ui.row().classes("w-full"):
                         ui.icon("emoji_events", size="30px", color=trophy_color[0])
                         trophy_color.pop(0)
-                        ui.label(f"{name}").classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                        ui.label(f"{name}").classes("text-xl font-extrabold")  # type: ignore[index]
                         ui.space()
-                        ui.label(format_seconds(seconds)).classes("text-xl font-extrabold").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+                        ui.label(format_seconds(seconds)).classes("text-xl font-extrabold")  # type: ignore[index]
 
             capture_rank_scroll.scroll_to(percent=1, duration=0.5)
 

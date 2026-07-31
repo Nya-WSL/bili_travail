@@ -22,7 +22,7 @@ async def about_page():
 
     # Card框
     with ui.card(align_items="center").classes("absolute-center"):
-        ui.label(f"B站加班姬").classes("text-3xl").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+        ui.label(f"B站加班姬").classes("text-3xl")  # type: ignore[index]
 
         # 私货
         def read_or_create_file(file_path, default_content):
@@ -245,7 +245,7 @@ async def about_page():
         ui.separator()
 
         # 联系我们
-        ui.label(f"联系我们").classes("text-2xl").style(f"color: {config['color']['text_color']}")  # type: ignore[index]
+        ui.label(f"联系我们").classes("text-2xl")  # type: ignore[index]
         ui.link("GitHub Issues", "https://github.com/Nya-WSL/bili_travail/issues", True)
         ui.link("support@nya-wsl.com", "mailto:support@nya-wsl.com", True)
         ui.link("Nya-WSL服务与反馈群", "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
