@@ -2182,6 +2182,8 @@ def index():
 
 @app.on_startup
 async def create_job():
+    # 安装 asyncio 全局异常处理器，捕获任务/协程中未被 try...except 包裹的异常并写入日志
+    log.install_asyncio_handler()
     scheduler.add_job(refresh_gift_loop, trigger='cron', minute=0) # 每个整点更新一次礼物数据
     scheduler.start()
 

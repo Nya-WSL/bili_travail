@@ -1,8 +1,10 @@
 import os
 import re
 import sys
+import threading
 import datetime
 import traceback
+import asyncio
 
 from loguru import logger
 
@@ -72,21 +74,76 @@ def mask_rule(logger):
 logger = mask_rule(logger)
 
 # 全局异常捕获
+def _log_traceback(tb_str: str) -> None:
+    """统一将脱敏后的堆栈信息写入日志"""
+    tb_str = mask_home_dir(exc_traceback=tb_str)
+    tb_str = mask_phone_num(exc_traceback=tb_str)
+
+    if "KeyboardInterrupt" not in tb_str:
+        logger.opt(exception=False).error("未知错误！\n{}", tb_str)
+    else:
+        logger.opt(exception=False).warning("程序被用户中断\n{}", tb_str)
+
+
 def handle_exception(exc_type, exc_value, exc_traceback):
     tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
     tb_str = "".join(tb_lines)
 
-    tb_str = mask_home_dir(exc_traceback=tb_str)
-    tb_str = mask_phone_num(exc_traceback=tb_str)
-
     if exc_type != KeyboardInterrupt:
-        logger.opt(exception=False).error(
-            "未知错误！\n{}", tb_str
-        )
+        logger.opt(exception=False).error("未知错误！\n{}", tb_str)
     else:
-        logger.opt(exception=False).warning(
-            "程序被用户中断\n{}", tb_str
-        )
+        logger.opt(exception=False).warning("程序被用户中断\n{}", tb_str)
+
+
+def handle_thread_exception(args):
+    """捕获子线程中未被 try...except 包裹的异常"""
+    try:
+        exc_type, exc_value, exc_traceback = args.exc_type, args.exc_value, args.exc_traceback
+    except AttributeError:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    tb_str = "".join(tb_lines)
+    _log_traceback(tb_str)
+
+
+def handle_asyncio_exception(loop, context):
+    """捕获 asyncio 任务/协程中未被 try...except 包裹的异常"""
+    try:
+        exception = context.get("exception")
+        if exception is None:
+            # 没有异常对象（如取消、句柄错误等），记录上下文信息
+            logger.opt(exception=False).error("asyncio 异常：{}", context.get("message", context))
+            return
+        tb_lines = traceback.format_exception(type(exception), exception, exception.__traceback__)
+        tb_str = "".join(tb_lines)
+        _log_traceback(tb_str)
+    except Exception:
+        logger.opt(exception=False).error("asyncio 异常：{}", context)
 
 
 sys.excepthook = handle_exception
+
+# 捕获子线程中的未捕获异常
+threading.excepthook = handle_thread_exception
+
+
+def install_asyncio_handler(loop=None):
+    """为事件循环安装全局异常处理器，捕获任务中未被 try...except 包裹的异常。
+
+    NiceGUI 等框架的 ui.run 会在内部创建新的事件循环，
+    需在其启动回调（如 @app.on_startup）内调用本函数，传入当前运行循环。
+    """
+    if loop is None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                return
+    if loop is not None and not loop.is_closed():
+        loop.set_exception_handler(handle_asyncio_exception)
+
+
+# 尽力为已存在的默认事件循环安装（若当时存在运行中的循环）
+install_asyncio_handler()
