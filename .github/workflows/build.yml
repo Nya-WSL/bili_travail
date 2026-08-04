@@ -1,0 +1,205 @@
+name: Build and Release
+
+# 仅在打 v 开头标签时触发；其余推送（分支）不触发 CI。
+# 也可在 Actions 页面手动触发（workflow_dispatch）。
+# 单一 workflow 内含 Nuitka / PyInstaller 两个并行构建 job，最后由 release job
+# 汇总两者的产物并发布到同一个 GitHub Release，避免多个 workflow 竞争同一 tag。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号（tag 名，如 v2.40.073119）。留空则按构建生成的版本号。'
+        required: false
+        type: string
+
+jobs:
+  # Nuitka 正式包：编译 + 上传七牛/scp
+  build-nuitka:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13.5'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      # 禁用 Windows Defender 实时扫描：Nuitka 编译会产生海量中间文件，
+      # Defender 逐个扫描会严重拖慢编译；此处关闭实时保护（runner 以管理员运行）。
+      # 失败仅告警，不阻断构建（部分托管 runner 可能不允许修改）。
+      - name: Disable Windows Defender real-time monitoring
+        shell: pwsh
+        run: |
+          try {
+            Set-MpPreference -DisableRealtimeMonitoring $true
+            Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
+            Write-Host "Windows Defender 实时扫描已禁用，并已排除工作目录"
+          } catch {
+            Write-Host "禁用 Windows Defender 失败（不影响构建）：$_"
+          }
+
+      # Nuitka 缓存：Dependency Walker、依赖分析结果等复用，避免每次 CI 重新下载/分析
+      - name: Cache Nuitka
+        uses: actions/cache@v6
+        with:
+          path: .nuitka-cache
+          key: nuitka-${{ runner.os }}-python-3.13.5-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            nuitka-${{ runner.os }}-python-3.13.5-
+
+      - name: Build with gh_action.py (Nuitka)
+        shell: pwsh
+        env:
+          ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
+          ACCESS_KEY_SECRET: ${{ secrets.ACCESS_KEY_SECRET }}
+          APP_ID: ${{ secrets.APP_ID }}
+          QINIU_ACCESS_KEY: ${{ secrets.QINIU_ACCESS_KEY }}
+          QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          SCP_URL: ${{ secrets.SCP_URL }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          NUITKA_CACHE_DIR: .nuitka-cache
+        run: |
+          uv run python gh_action.py --variant nuitka
+
+      # 上传构建产物与 version.json，供 release job 汇总发布
+      - name: Upload build artifacts (Nuitka)
+        uses: actions/upload-artifact@v7
+        with:
+          name: bili_travail_nuitka_dist
+          path: |
+            dist/bili_travail_nuitka.zip
+            dist/bili_travail_inst_nuitka.exe
+            version.json
+
+  # PyInstaller 备选包：编译，不对外上传（由 release job 统一发布）
+  build-pyinstaller:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13.5
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13.5'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Build with gh_action.py (PyInstaller)
+        shell: pwsh
+        env:
+          ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
+          ACCESS_KEY_SECRET: ${{ secrets.ACCESS_KEY_SECRET }}
+          APP_ID: ${{ secrets.APP_ID }}
+          QINIU_ACCESS_KEY: ${{ secrets.QINIU_ACCESS_KEY }}
+          QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          SCP_URL: ${{ secrets.SCP_URL }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          uv run python gh_action.py --variant pyinstaller
+
+      - name: Upload build artifacts (PyInstaller)
+        uses: actions/upload-artifact@v7
+        with:
+          name: bili_travail_pyinstaller_dist
+          path: |
+            dist/bili_travail_pyinstaller.zip
+            dist/bili_travail_inst_pyinstaller.exe
+
+  # 汇总两个构建产物，发布到同一个 Release
+  release:
+    needs: [build-nuitka, build-pyinstaller]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Nuitka artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: bili_travail_nuitka_dist
+          path: nuitka_dist
+
+      - name: Download PyInstaller artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: bili_travail_pyinstaller_dist
+          path: pyinstaller_dist
+
+      # 平铺下载产物：upload-artifact 会保留相对工作区的 dist/ 前缀，
+      # 导致 zip/exe 落在 nuitka_dist/dist/ 等子目录，与后续 Release 路径不匹配。
+      # 这里把各目录下所有文件统一移动到顶层，保证 softprops 能按预期路径找到。
+      - name: Flatten downloaded artifacts
+        shell: bash
+        run: |
+          find nuitka_dist -type f -exec mv -n {} nuitka_dist/ \;
+          find pyinstaller_dist -type f -exec mv -n {} pyinstaller_dist/ \;
+          echo "=== nuitka_dist ==="
+          ls -la nuitka_dist/
+          echo "=== pyinstaller_dist ==="
+          ls -la pyinstaller_dist/
+
+      - name: Get Version
+        id: get_version
+        shell: bash
+        run: |
+          version=$(python3 -c "import json;print(json.load(open('nuitka_dist/version.json'))['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "版本号: $version"
+
+      # 确定 Release 的 tag 名：
+      #  - push（v 标签）：直接用 github.ref（形如 refs/tags/v2.40.073119）
+      #  - workflow_dispatch（手动触发）：优先用手动输入的 version（自动补 v 前缀），
+      #    未输入则用 get_version 生成、补 v 前缀，保证手动触发也能正常建 Release
+      - name: Set release tag
+        id: set_release_tag
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            input_version="${{ inputs.version }}"
+            if [[ -n "$input_version" ]]; then
+              [[ "$input_version" != v* ]] && input_version="v$input_version"
+              tag="$input_version"
+            else
+              tag="v${{ steps.get_version.outputs.version }}"
+            fi
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "手动触发，Release tag: $tag"
+          else
+            echo "tag=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+            echo "push 触发，Release tag: ${{ github.ref }}"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          name: v${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.set_release_tag.outputs.tag }}
+          body: |
+            ### v${{ steps.get_version.outputs.version }}
+          files: |
+            nuitka_dist/bili_travail_nuitka.zip
+            nuitka_dist/bili_travail_inst_nuitka.exe
+            pyinstaller_dist/bili_travail_pyinstaller.zip
+            pyinstaller_dist/bili_travail_inst_pyinstaller.exe
+          draft: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

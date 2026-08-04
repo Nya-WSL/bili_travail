@@ -189,3 +189,5 @@ config.toml
 stat.json
 /.idea
 /cache
+/.codebuddy
+CODEBUDDY.md

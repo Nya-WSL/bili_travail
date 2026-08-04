@@ -10,6 +10,18 @@ import traceback
 import subprocess
 
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+# 版本号基于中国时区生成，避免 CI（默认 UTC）生成的时间与本地/预期不符
+CN_TZ = ZoneInfo("Asia/Shanghai")
+
+# 强制 stdout/stderr 使用 UTF-8 编码，避免 Windows CI 默认的 cp1252 编码
+# 无法打印中文字符而抛出 UnicodeEncodeError
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 from libs import hash_utils
 from version import base_version
 from qiniu import Auth, put_file, etag
@@ -86,6 +98,21 @@ def compress(folder, output=None, parent=False):
     print(f"成功压缩到 '{output}'")
     return True
 
+def _verify_start_exe():
+    """
+    校验 Nuitka 是否真正产出了 dist/start.exe。
+
+    Nuitka 编译失败时（例如缺少依赖、C 编译器问题）即使退出码为 0 也可能
+    未生成可执行文件，这里给出明确错误提示，避免后续 shutil.copy 抛误导性的
+    FileNotFoundError。
+    """
+    exe = Path("dist", "start.exe")
+    if not exe.exists():
+        raise FileNotFoundError(
+            f"未找到 Nuitka 编译产物 {exe}，请检查上方 Nuitka 日志是否编译失败"
+        )
+    print(f"Nuitka 产物确认存在：{exe}")
+
 def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_status: str = 'y'):
     '''
     qiniu_status: 是否上传到七牛云，y=True, n=False, 留空为y
@@ -116,24 +143,35 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     if nuitka == 'y':
         os.makedirs(Path("dist", "start"), exist_ok=True)
 
+    # --assume-yes-for-downloads：CI 为非交互环境，Nuitka 在 Windows --onefile 模式需要
+    # Dependency Walker，此参数让它自动同意下载并缓存，避免交互式提示默认选 no 导致编译失败
+    nuitka_download_flag = "--assume-yes-for-downloads"
+
+    # 实现跨构建复用；本地若未设置则默认到 dist/nuitka-cache 启用缓存。
+    nuitka_cache_dir = os.environ.get("NUITKA_CACHE_DIR", "dist/nuitka-cache")
+    os.environ["NUITKA_CACHE_DIR"] = nuitka_cache_dir
+    nuitka_perf_flags = f"--jobs={os.cpu_count()} --lto=no"
+
     if manager == "poetry":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"poetry run python -m nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
+            subprocess.run(f"poetry run python -m nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
+            _verify_start_exe()
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            subprocess.run(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}")
+            subprocess.run(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}", check=True)
     elif manager == "uv":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"uv run nuitka --onefile --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe")
+            subprocess.run(f"uv run nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
+            _verify_start_exe()
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            subprocess.run(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}")
+            subprocess.run(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}", check=True)
 
     shutil.copy("check_runtime.ps1", Path("dist", "start", "check_runtime.ps1"))
     shutil.copytree("static", Path("dist", "start", "static"), dirs_exist_ok=True)
@@ -169,7 +207,25 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
 
     if upload_status == 'y' or upload_status == '':
         if env_data.get("scp_url", ""):
-            subprocess.run(f'scp {Path("dist", "update.zip")} {Path("dist", "update.sha256")} {env_data["scp_url"]}')
+            # scp 使用显式指定的 SSH 私钥（setup_ssh_key 已写入 ~/.ssh/id_rsa），
+            # 避免 Windows OpenSSH 因默认 key 找不到/权限问题导致退出码 255。
+            #  - -o StrictHostKeyChecking=no / UserKnownHostsFile=/dev/null：跳过 host key 确认，避免 CI 挂起
+            #  - -o BatchMode=yes：非交互模式，认证失败立即报错而不是等待密码输入
+            # 上传失败仅告警，不中断整个构建流程（本地已产出 zip / sha256 产物）。
+            ssh_key = Path(Path.home(), ".ssh", "id_rsa")
+            scp_flags = (
+                f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+                f"-o BatchMode=yes -i {ssh_key}"
+            )
+            try:
+                subprocess.run(
+                    f'scp {scp_flags} {Path("dist", "update.zip")} {Path("dist", "update.sha256")} {env_data["scp_url"]}',
+                    check=True,
+                )
+                print(f"已上传到服务器：{env_data['scp_url'].split(':')[1]}")
+            except Exception as e:
+                print(f"上传到服务器失败（不影响构建产物）：{e}")
+                print(traceback.format_exc())
         else:
             print("未配置scp_url，无法上传到服务器")
 
@@ -177,7 +233,7 @@ def create_version(full: bool = False):
     '''
     full: 是否返回完整版本号（包含基础版本号）
     '''
-    version = datetime.datetime.now().strftime("%m%d%H")
+    version = datetime.datetime.now(CN_TZ).strftime("%m%d%H")
     version_info = {}
     version_info["version"] = f"{base_version}.{version}"
 
@@ -205,7 +261,7 @@ def create_product_version():
     生成 Nuitka 兼容的 product-version（4段，每段0-65535，无前导零）
     与 version 的 MMDDHH 对应：月*100+日 . 时
     '''
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(CN_TZ)
     md = now.month * 100 + now.day
     full_version = f"{base_version}.{md}.{now.hour}"
 
