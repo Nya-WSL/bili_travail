@@ -17,7 +17,7 @@
 - 支持 `保存/读取` 倒计时
 - 支持 `增加/减少` 倒计时
 - 支持根据直播间获取B站礼物数据
-- 支持自定义api服务器（目前只支持 `上传日志和获取盲盒数据`，需服务器运行 `bili_travail_api.py`，依赖文件：`pyproject_server.toml`）
+- 支持自定义api服务器（需服务器运行 `bili_travail_api.py`，安装依赖：`uv sync --group server`）
 
 ## Usage
 
@@ -43,19 +43,9 @@ cd bili_travail
 
 #### install depend
 
-- poetry
-
-```
-pip install poetry
-poetry config virtualenvs.in-project true # if need create virtualenv in project
-poetry install
-```
-
 - uv
 
 ```
-# use uv
-
 # windows
 winget install --id=astral-sh.uv -e
 
@@ -75,10 +65,7 @@ uv sync
 ```
 # 如果使用mac，构建需要苹果开发者账号
 
-# poetry
-poetry run python build.py
-
-# uv
+uv sync --group dev
 uv run build.py
 
 # https://open-live.bilibili.com/open-manage
@@ -89,13 +76,25 @@ input your access_key_id、access_key_secred、app_id
 >
 > 无论安装MSVC还是Clang都必须勾选 `Windows 11 SDK`
 >
-> 或者可以尝试将Python版本降级至3.12及以下，使用从Nuitka下载的 `MinGW64` 编译器（如果Visual Studio无法安装，Nuitka似乎会自动安装该编译器）
+> 或者可以尝试将Python版本降级至3.12及以下，使用从Nuitka下载的 `MinGW64` 编译器
 
 ## Known Issues
 
-- 因为B站API数据不全，获取房间礼物时可能会缺少部分特殊礼物
 - 在极特殊的情况下可能会同时存在两个倒计时
 
 ## Changelog
 
 [changelog](https://github.com/Nya-WSL/bili_travail/blob/open_live/changelog.json)
+
+## License
+
+本产品采用基于 MIT 协议修改的自定义许可协议（含附加限制条款），并非标准 MIT 协议。使用时需遵守以下附加限制：
+
+- 未经重大更改（即未对核心逻辑/功能进行实质性重写）的版本，禁止上传至 [Bilibili 开放平台](https://open-live.bilibili.com)，亦禁止在任何电商平台（淘宝、京东、拼多多、闲鱼、亚马逊等）出售或提供销售
+- 软件名称和图标不得在任何衍生作品中二次使用或重新品牌化
+- 不得冒用作者组织 `Nya-WSL` 及其名下成员的身份
+- 本产品与哔哩哔哩（Bilibili）公司无任何隶属、背书或关联关系
+
+完整条款见 [LICENSE](LICENSE)。
+
+This project is licensed under a custom license based on the MIT License (with additional restrictions), not the standard MIT License. See [LICENSE](LICENSE) for full terms.

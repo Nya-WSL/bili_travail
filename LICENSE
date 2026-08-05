@@ -1,6 +1,17 @@
-MIT License
+Custom License Based on MIT (MIT License with Additional Restrictions)
 
-Copyright (c) 2025 Nya-WSL.
+Copyright (c) 2025-2026 Nya-WSL.
+
+This is a modified version of the MIT License that includes additional
+restrictions beyond the standard MIT terms. It is NOT the standard MIT
+License, and the granted permissions are subject to the restrictions below.
+本协议为基于 MIT 协议修改的版本，除标准 MIT 条款外包含附加限制条款，并非标准 MIT 协议，
+所授予的许可受下述限制条款约束。
+
+This license is provided in both Chinese and English. The Chinese and English
+versions shall have equal effect. In the event of any discrepancy, the
+Chinese version shall prevail.
+本许可证提供中文与英文两种文本，两种文本具有同等效力；如存在歧义，以中文文本为准。
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,8 +20,46 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Notwithstanding the foregoing, the Software shall not be:
+1. uploaded to the Bilibili Open Platform (https://open-live.bilibili.com).
+2. sold or offered for sale on any e-commerce platform (including but not
+limited to Taobao, JD.com, Pinduoduo, Xianyu, and Amazon).
+
+unless the Software has undergone a major change.
+
+尽管有上述许可，软件仍不得：
+1. 上传至 Bilibili 开放平台（https://open-live.bilibili.com）。
+2. 在任何电商平台（包括但不限于淘宝、京东、拼多多、闲鱼、亚马逊等）出售或提供销售。
+
+除非软件经过重大更改。
+
+For the purpose of this condition, "major change" means a substantial rewrite
+of the Software's core logic or functionality. Minor modifications do not
+constitute a major change and therefore remain subject to the above
+prohibition, including but not limited to: bug fixes, small feature
+improvements, optimizations, changes to configuration files, resources, and
+color/theme settings.
+就本条件而言，“重大更改”指对软件核心逻辑或功能进行实质性重写。轻微修改不构成重大更改，
+因此仍受上述禁止，包括但不限于：错误修复、小功能改进、优化、修改配置文件、资源以及
+颜色/主题设置。
+
+The software name and icon shall not be reused or re-branded in any derived
+work, regardless of whether the Software has undergone a major change.
+The developer "Nya-WSL" and the names or ID of its members shall not be
+misrepresented as the author or contributor of any derived work, regardless
+of whether the Software has undergone a major change.
+无论软件是否经过重大更改，软件名称和图标均不得在任何衍生作品中被二次使用或重新品牌化。
+无论软件是否经过重大更改，开发者 “Nya-WSL” 及其名下成员的姓名或ID均不得在任何衍生作品中
+被虚假标注为作者或贡献者。
+
+This product is not affiliated with, endorsed by, or connected to Bilibili
+Inc. in any way. If you believe any content infringes upon your rights,
+please contact us.
+本产品与哔哩哔哩（Bilibili）公司不存在任何隶属、背书或关联关系。如认为任何内容侵犯您的权益，
+请联系我们。
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
