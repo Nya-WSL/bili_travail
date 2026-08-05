@@ -12,7 +12,13 @@ import os
 import sys
 import shutil
 import subprocess
+import tempfile
+import requests
 from pathlib import Path
+
+ISS_RAW_URL = (
+    "https://raw.githubusercontent.com/Nya-WSL/installer/main/bili_travail.iss"
+)
 
 # 强制 stdout/stderr 使用 UTF-8 编码，避免 Windows CI 默认的 cp1252 编码
 # 无法打印中文字符而抛出 UnicodeEncodeError
@@ -138,12 +144,25 @@ def build_inno_installer(version: str, variant: str) -> None:
     if not Path(iscc).exists():
         raise FileNotFoundError(f"未找到 Inno Setup：{iscc}")
 
-    iss_file = Path("tools", "bili_travail.iss")
-    subprocess.run([
-        iscc, str(iss_file),
-        f"/DMyAppVersion={version}",
-        f"/DMyOutputBaseName={cfg['installer_name']}",
-    ], check=True)
+    # 从远端仓库拉取 Inno Setup 脚本
+    try:
+        resp = requests.get(ISS_RAW_URL, timeout=30)
+        resp.raise_for_status()
+        resp.encoding = "utf-8"
+        iss_content = resp.text
+    except requests.RequestException as e:
+        raise RuntimeError(f"从 {ISS_RAW_URL} 下载 Inno Setup 脚本失败：{e}") from e
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        iss_file = Path(tmp_dir, "bili_travail.iss")
+        iss_file.write_text(iss_content, encoding="utf-8")
+        print(f"Inno Setup 脚本已从远端仓库拉取：{len(iss_content)} bytes")
+
+        subprocess.run([
+            iscc, str(iss_file),
+            f"/DMyAppVersion={version}",
+            f"/DMyOutputBaseName={cfg['installer_name']}",
+        ], check=True)
     output = Path("dist", f"{cfg['installer_name']}.exe")
     if not output.exists():
         raise FileNotFoundError(f"安装包未生成：{output}")
