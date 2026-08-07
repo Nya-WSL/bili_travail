@@ -17,7 +17,11 @@ _FONT_SRC = ", ".join(
     if os.path.exists(f'static/fonts/custom-font.{ext}')
 )
 
-def page_styles():
+def page_styles(text_color=None):
+    if text_color is None:
+        # 默认使用子页面字体颜色
+        text_color = base_config.get('color', 'text_color', '#4A4A4A')
+
     ui.add_head_html(
         f"""
         <style>
@@ -29,7 +33,7 @@ def page_styles():
 
         body {{
             font-family: "Custom Font", sans-serif;
-            color: {base_config.get('color', 'text_color', '#4A4A4A')};
+            color: {text_color};
         }}
         </style>
         """,
