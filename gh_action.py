@@ -12,7 +12,6 @@ import os
 import sys
 import shutil
 import subprocess
-import tempfile
 import requests
 from pathlib import Path
 
@@ -153,8 +152,12 @@ def build_inno_installer(version: str, variant: str) -> None:
     except requests.RequestException as e:
         raise RuntimeError(f"从 {ISS_RAW_URL} 下载 Inno Setup 脚本失败：{e}") from e
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        iss_file = Path(tmp_dir, "bili_travail.iss")
+    # 注意：Inno Setup 中 [Files]/[Setup] 等节的相对路径是相对【脚本所在目录】
+    # 解析的，而非当前工作目录。iss 内容里的路径（dist\start\*、static\logo.ico、
+    # LICENSE）都以仓库根目录为基准，因此脚本必须放到仓库根目录下编译，
+    # 不能放到临时目录（否则相对路径全部失效导致退出码 2）。
+    iss_file = Path("bili_travail.iss")
+    try:
         iss_file.write_text(iss_content, encoding="utf-8")
         print(f"Inno Setup 脚本已从远端仓库拉取：{len(iss_content)} bytes")
 
@@ -163,6 +166,9 @@ def build_inno_installer(version: str, variant: str) -> None:
             f"/DMyAppVersion={version}",
             f"/DMyOutputBaseName={cfg['installer_name']}",
         ], check=True)
+    finally:
+        # 构建结束无论成败都清理脚本，避免污染仓库工作区
+        iss_file.unlink(missing_ok=True)
     output = Path("dist", f"{cfg['installer_name']}.exe")
     if not output.exists():
         raise FileNotFoundError(f"安装包未生成：{output}")
