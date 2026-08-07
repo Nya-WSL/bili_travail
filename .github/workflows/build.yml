@@ -35,6 +35,10 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7.6.0
+        with:
+          # 禁用 uv 缓存：两个并行 job 会竞争同一缓存 key 导致
+          # "Unable to reserve cache" 警告，且缓存保存失败无实际收益
+          enable-cache: false
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -105,6 +109,10 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7.6.0
+        with:
+          # 禁用 uv 缓存：两个并行 job 会竞争同一缓存 key 导致
+          # "Unable to reserve cache" 警告，且缓存保存失败无实际收益
+          enable-cache: false
 
       - name: Install dependencies
         run: uv sync --group dev
