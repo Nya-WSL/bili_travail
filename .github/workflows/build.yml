@@ -81,7 +81,7 @@ jobs:
         run: |
           uv run python gh_action.py --variant nuitka
 
-      # 上传构建产物与 version.json，供 release job 汇总发布
+      # 上传构建产物、version.json 与增量更新包，供 release job 汇总发布
       - name: Upload build artifacts (Nuitka)
         uses: actions/upload-artifact@v7
         with:
@@ -89,6 +89,8 @@ jobs:
           path: |
             dist/bili_travail_nuitka.zip
             dist/bili_travail_inst_nuitka.exe
+            dist/update.zip
+            dist/update.sha256
             version.json
 
   # PyInstaller 备选包：编译，不对外上传（由 release job 统一发布）
@@ -144,6 +146,12 @@ jobs:
     needs: [build-nuitka, build-pyinstaller]
     runs-on: ubuntu-latest
     steps:
+      # checkout 仓库以读取 changelog.json（Release 正文取自该文件对应版本条目）
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Download Nuitka artifacts
         uses: actions/download-artifact@v7
         with:
@@ -200,19 +208,93 @@ jobs:
             echo "push 触发，Release tag: ${{ github.ref }}"
           fi
 
+      # 从 changelog.json 读取当前版本条目的 content，组装 Release 正文。
+      # 格式参考历史 Release：标题 + 日期 + 更新内容列表。
+      - name: Build release body from changelog
+        id: build_body
+        shell: bash
+        run: |
+          version="${{ steps.get_version.outputs.version }}"
+          python3 - "$version" <<'EOF'
+          import json, sys
+          version = sys.argv[1]
+          with open("changelog.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+          entry = data.get(version)
+          if not entry:
+              print(f"警告：changelog.json 中未找到版本 {version} 的条目，使用空正文")
+              body = f"### v{version}\n"
+          else:
+              date = entry.get("date", "")
+              lines = [f"### v{version}", "", "### 更新内容"]
+              lines += [f"- {item}" for item in entry.get("content", [])]
+              body = "\n".join(lines) + "\n"
+          with open("release_body.md", "w", encoding="utf-8") as f:
+              f.write(body)
+          print(f"已生成 Release 正文")
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3.0.2
         with:
           name: v${{ steps.get_version.outputs.version }}
           tag_name: ${{ steps.set_release_tag.outputs.tag }}
-          body: |
-            ### v${{ steps.get_version.outputs.version }}
+          body_path: release_body.md
           files: |
             nuitka_dist/bili_travail_nuitka.zip
             nuitka_dist/bili_travail_inst_nuitka.exe
             pyinstaller_dist/bili_travail_pyinstaller.zip
             pyinstaller_dist/bili_travail_inst_pyinstaller.exe
           draft: true
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 发布 Nuitka 增量更新包到独立的 update Release（tag: update）。
+  # update.zip / update.sha256 为增量更新通道，每次构建用 --clobber 覆盖同名资产，
+  # 保证 update Release 始终指向最新增量包。
+  release-update:
+    needs: [build-nuitka]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Nuitka artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: bili_travail_nuitka_dist
+          path: nuitka_dist
+
+      # 平铺下载产物：upload-artifact 会保留相对工作区的 dist/ 前缀
+      - name: Flatten downloaded artifacts
+        shell: bash
+        run: |
+          find nuitka_dist -type f -exec mv -n {} nuitka_dist/ \;
+          echo "=== nuitka_dist ==="
+          ls -la nuitka_dist/
+
+      - name: Create or update update Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version=$(python3 -c "import json;print(json.load(open('nuitka_dist/version.json'))['version'])")
+          echo "版本号: $version"
+          # 标题与正文格式参考现有 update Release：
+          #   标题: update
+          #   正文:
+          #     ### Version
+          #
+          #     #### <版本号>
+          body=$(printf '### Version\n\n#### %s\n' "$version")
+          if ! gh release view update >/dev/null 2>&1; then
+            echo "创建 update Release"
+            gh release create update \
+              --title "update" \
+              --notes "$body" \
+              --prerelease \
+              nuitka_dist/update.zip nuitka_dist/update.sha256
+          else
+            echo "update Release 已存在，覆盖同名资产"
+            gh release upload update --clobber \
+              nuitka_dist/update.zip nuitka_dist/update.sha256
+          fi
