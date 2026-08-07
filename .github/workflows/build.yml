@@ -24,6 +24,9 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # blivedm 是 git 子模块，checkout 默认不拉取，必须显式递归拉取，
+          # 否则 CI 上 blivedm/ 目录为空，main.py 导入 blivedm.blivedm 失败
+          submodules: recursive
 
       - name: Set up Python 3.13.5
         uses: actions/setup-python@v6
@@ -92,6 +95,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          # blivedm 是 git 子模块，checkout 默认不拉取，必须显式递归拉取
+          submodules: recursive
 
       - name: Set up Python 3.13.5
         uses: actions/setup-python@v6
