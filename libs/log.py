@@ -88,11 +88,7 @@ def _log_traceback(tb_str: str) -> None:
 def handle_exception(exc_type, exc_value, exc_traceback):
     tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
     tb_str = "".join(tb_lines)
-
-    if exc_type != KeyboardInterrupt:
-        logger.opt(exception=False).error("未知错误！\n{}", tb_str)
-    else:
-        logger.opt(exception=False).warning("程序被用户中断\n{}", tb_str)
+    _log_traceback(tb_str)
 
 
 def handle_thread_exception(args):
@@ -111,14 +107,21 @@ def handle_asyncio_exception(loop, context):
     try:
         exception = context.get("exception")
         if exception is None:
-            # 没有异常对象（如取消、句柄错误等），记录上下文信息
-            logger.opt(exception=False).error("asyncio 异常：{}", context.get("message", context))
+            # 没有异常对象（如取消、句柄错误等），记录上下文信息（先脱敏）
+            ctx_str = str(context.get("message", context))
+            ctx_str = mask_home_dir(exc_traceback=ctx_str)
+            ctx_str = mask_phone_num(exc_traceback=ctx_str)
+            logger.opt(exception=False).error("asyncio 异常：{}", ctx_str)
             return
         tb_lines = traceback.format_exception(type(exception), exception, exception.__traceback__)
         tb_str = "".join(tb_lines)
         _log_traceback(tb_str)
     except Exception:
-        logger.opt(exception=False).error("asyncio 异常：{}", context)
+        # 兜底：即使 context 解析失败也先脱敏再记录
+        ctx_str = str(context)
+        ctx_str = mask_home_dir(exc_traceback=ctx_str)
+        ctx_str = mask_phone_num(exc_traceback=ctx_str)
+        logger.opt(exception=False).error("asyncio 异常：{}", ctx_str)
 
 
 sys.excepthook = handle_exception
