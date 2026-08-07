@@ -165,6 +165,10 @@ cython_debug/
 *.png
 *.zip
 
+# 豁免构建/运行时必需的资源 png（build.py 需拷贝进安装包与 zip），
+# 否则 CI fresh checkout 会因这些文件未被跟踪而构建失败
+!data/*.png
+
 /logs
 /.vscode
 /.nicegui
