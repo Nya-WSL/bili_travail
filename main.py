@@ -1154,11 +1154,23 @@ def blind_box_value_dialog():
             ui.label(f"总盈亏：{all_price}电池")
 
     def clear_box_value():
-        _invalidate_json_cache("data/blind_box_value.json")
-        os.remove("data/blind_box_value.json")
-        value_card.clear()
-        get_box_value()
-        ui.button("关闭", on_click=lambda: value_dialog.close())
+        def do_clear():
+            _invalidate_json_cache("data/blind_box_value.json")
+            os.remove("data/blind_box_value.json")
+            value_card.clear()
+            get_box_value()
+            with main_card:
+                ui.notify("盲盒统计已清空", type="positive")
+
+        # 二次确认清空盲盒统计
+        with ui.dialog() as clear_confirm_dialog, ui.card(align_items="center"):
+            ui.label("是否确认清空所有盲盒统计？")
+
+            with ui.row():
+                ui.button("确认清空", on_click=lambda: do_clear())
+                ui.button("取消", on_click=lambda: clear_confirm_dialog.close())
+
+        clear_confirm_dialog.open()
 
     if not os.path.exists("data/blind_box_value.json"):
         _write_json_cached("data/blind_box_value.json", {})
@@ -1166,7 +1178,7 @@ def blind_box_value_dialog():
     with ui.dialog() as value_dialog, ui.card(align_items="center") as value_card:
         ui.label().set_visibility(False)
         get_box_value()
-        ui.button("清零", on_click=lambda: clear_box_value())
+        ui.button("清空", on_click=lambda: clear_box_value())
 
     value_dialog.open()
 
@@ -1600,7 +1612,7 @@ def index():
 
     global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, pause_button, resume_button, add_button, sub_button, short_switch
 
-    styles.page_styles() # 加载自定义样式
+    styles.page_styles(config['color']['main_text_color']) # 加载自定义样式，主界面使用主界面字体颜色
     ui.query("body").style(f"background-color: {config['color']['bg_color']}")  # type: ignore[index]
     async def ping_server(servers):
         server = await ping.ping(servers.values())
@@ -2079,10 +2091,11 @@ def index():
                 with ui.row():
                     ui.color_input(label="计时颜色", value="#9BA89A", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
                     ui.color_input(label="按钮颜色", value="#7A8FA0", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label="文字颜色", value="#4A4A4A", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 120px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="背景颜色", value="#FCFCFA", on_change=lambda: base_config.save(config), preview=config["color"]["bg_color"]).style(f"width: 120px").bind_value(config["color"], "bg_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
 
                 with ui.row():
-                    ui.color_input(label="背景颜色", value="#FCFCFA", on_change=lambda: base_config.save(config), preview=config["color"]["bg_color"]).style(f"width: 120px").bind_value(config["color"], "bg_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="主界面字体颜色", value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["main_text_color"]).style(f"width: 140px").bind_value(config["color"], "main_text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label="子页面字体颜色", value="#4A4A4A", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 140px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
 
             with ui.tab_panel("5").classes("items-center").style("height: 210px;"):
                 with ui.row():
