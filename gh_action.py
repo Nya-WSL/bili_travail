@@ -64,6 +64,7 @@ SECRET_ENV_KEYS = {
     "QINIU_SECRET_KEY": "qiniu_secret_key",
     "BUCKET_NAME": "bucket_name",
     "SCP_URL": "scp_url",
+    "VERSION_URL": "version_url",
 }
 
 
@@ -88,6 +89,7 @@ def create_env_file() -> None:
         f'        "qiniu_secret_key": "{keys["qiniu_secret_key"]}",\n'
         f'        "bucket_name": "{keys["bucket_name"]}",\n'
         f'        "scp_url": "{keys["scp_url"]}",\n'
+        f'        "version_url": "{keys["version_url"]}",\n'
         '        "version": ""\n'
         "    }\n"
     )
@@ -96,22 +98,22 @@ def create_env_file() -> None:
     print("env.py 已根据环境变量生成")
 
 
-def setup_ssh_key() -> None:
+def write_ssh_key(secret_name: str, key_filename: str) -> Path | None:
     """
-    配置 SSH 私钥，使 build.py 中的 scp 上传无需手动输入密码。
+    将指定 secret 写入 ~/.ssh/<key_filename>，返回 key 文件路径；未配置返回 None。
 
     Windows OpenSSH 对私钥文件权限要求严格：只能当前用户可读，
     否则会拒绝使用（报 Permissions too open），导致 scp 退出码 255。
     这里显式用 icacls 收紧权限，避免该问题。
     """
-    ssh_key = get_env("SSH_PRIVATE_KEY")
+    ssh_key = get_env(secret_name)
     if not ssh_key:
-        print("未配置 SSH_PRIVATE_KEY，scp 上传将要求密码")
-        return
+        print(f"未配置 {secret_name}，跳过 {key_filename} 配置")
+        return None
 
     ssh_dir = Path.home() / ".ssh"
     ssh_dir.mkdir(parents=True, exist_ok=True)
-    key_file = ssh_dir / "id_rsa"
+    key_file = ssh_dir / key_filename
 
     # 清理私钥内容，避免 OpenSSH 报 "invalid format"：
     #  - secret 里的换行可能被存成字面 "\n"，这里还原为真实换行
@@ -129,6 +131,18 @@ def setup_ssh_key() -> None:
             check=False,
         )
     print(f"SSH key 已配置：{key_file}")
+    return key_file
+
+
+def setup_ssh_key() -> None:
+    """
+    配置 SSH 私钥，使 build.py 中的 scp 上传无需手动输入密码。
+
+    - SSH_PRIVATE_KEY      → ~/.ssh/id_rsa（scp_url 推送 update.zip / update.sha256）
+    - SSH_PRIVATE_KEY_VERSION → ~/.ssh/version_id_rsa（version_url 推送 changelog.json / version.json）
+    """
+    write_ssh_key("SSH_PRIVATE_KEY", "id_rsa")
+    write_ssh_key("SSH_PRIVATE_KEY_VERSION", "version_id_rsa")
 
 
 def build_inno_installer(version: str, variant: str) -> None:

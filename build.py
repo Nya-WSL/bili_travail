@@ -227,8 +227,27 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
             except Exception as e:
                 print(f"上传到服务器失败（不影响构建产物）：{e}")
                 print(traceback.format_exc())
+
+        # 构建完成后将 changelog.json 与 version.json 推送到 version_url（secrets）。
+        # 使用独立的 SSH key（gh_action.setup_ssh_key 写入 ~/.ssh/version_id_rsa），
+        # 与 scp_url 的 id_rsa 分离，避免密钥混用。
+        if env_data.get("version_url", ""):
+            version_ssh_key = Path(Path.home(), ".ssh", "version_id_rsa")
+            version_scp_flags = (
+                f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+                f"-o BatchMode=yes -i {version_ssh_key}"
+            )
+            try:
+                subprocess.run(
+                    f'scp {version_scp_flags} {Path("changelog.json")} {Path("version.json")} {env_data["version_url"]}',
+                    check=True,
+                )
+                print(f"已推送 changelog.json / version.json 到服务器：{env_data['version_url'].split(':')[1]}")
+            except Exception as e:
+                print(f"推送 changelog.json / version.json 失败（不影响构建产物）：{e}")
+                print(traceback.format_exc())
         else:
-            print("未配置scp_url，无法上传到服务器")
+            print("未配置version_url，跳过推送 changelog.json / version.json")
 
 def create_version(full: bool = False):
     '''
@@ -275,6 +294,7 @@ def create_env_file(key_id, key_secret, app_id):
     access_key = input("请输入七牛云ACCESS_KEY：")
     secret_key = input("请输入七牛云SECRET_KEY：")
     scp_url = input("请输入SCP服务器URL（例：user@host:/path/），留空为无需上传：")
+    version_url = input("请输入版本信息SCP服务器URL（例：user@host:/path/），留空为无需推送：")
 
     with open("env.py", "w+", encoding="utf-8") as f:
         f.write(
@@ -286,6 +306,7 @@ def create_env_file(key_id, key_secret, app_id):
         "qiniu_access_key": "{access_key}",
         "qiniu_secret_key": "{secret_key}",
         "scp_url": "{scp_url}",
+        "version_url": "{version_url}",
         "version": "{version}"
     }}"""
         )

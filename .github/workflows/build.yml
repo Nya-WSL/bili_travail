@@ -76,7 +76,9 @@ jobs:
           QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           SCP_URL: ${{ secrets.SCP_URL }}
+          VERSION_URL: ${{ secrets.VERSION_URL }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY_VERSION: ${{ secrets.SSH_PRIVATE_KEY_VERSION }}
           NUITKA_CACHE_DIR: .nuitka-cache
         run: |
           uv run python gh_action.py --variant nuitka
@@ -129,7 +131,9 @@ jobs:
           QINIU_SECRET_KEY: ${{ secrets.QINIU_SECRET_KEY }}
           BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           SCP_URL: ${{ secrets.SCP_URL }}
+          VERSION_URL: ${{ secrets.VERSION_URL }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY_VERSION: ${{ secrets.SSH_PRIVATE_KEY_VERSION }}
         run: |
           uv run python gh_action.py --variant pyinstaller
 
