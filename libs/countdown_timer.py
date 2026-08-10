@@ -130,3 +130,16 @@ class CountdownTimer:
                 self.remaining_time = datetime.timedelta(0)
                 self._cancel_button.set_text("停止")
                 self._cancel_button.disable()
+
+    # 程序退出时的清理，只取消计时相关的 task/timer，
+    # 不会清零 app.storage.general["countdown_time"]，从而保留可继承的倒计时
+    def cleanup(self):
+        global cd_status
+        self._running = False
+        self._paused = False
+        if self._task:
+            self._task.cancel()  # 结束协程
+        if self.exit_timer is not None:
+            self.exit_timer.cancel(with_current_invocation=True)
+            self.exit_timer = None
+        cd_status = False

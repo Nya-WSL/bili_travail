@@ -155,9 +155,6 @@ def init_storage():
             os.mkdir("data/blind_box")
         shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
 
-    app.storage.general["gift_challenge_count"] = app.storage.general.get("gift_challenge_count", 0)
-    app.storage.general["gift_challenge_unit"] = app.storage.general.get("gift_challenge_unit", "")
-    app.storage.general["gift_challenge_text"] = app.storage.general.get("gift_challenge_text", "")
     app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
     app.storage.general["version"] = app.storage.general.get("version", version)
     app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
@@ -2203,12 +2200,11 @@ async def create_job():
 @app.on_shutdown
 async def shutdown():
     # 取消倒计时相关的 task 和 timer
+    # 注意：这里使用 cleanup() 而非 stop()，避免在退出时将
+    # app.storage.general["countdown_time"] 清零，从而保留可继承的倒计时
     try:
         if "countdown_timer" in globals() and countdown_timer is not None:
-            countdown_timer.stop()
-            if countdown_timer.exit_timer is not None:
-                countdown_timer.exit_timer.cancel(with_current_invocation=True)
-                countdown_timer.exit_timer = None
+            countdown_timer.cleanup()
             logger.debug("[shutdown] 倒计时定时器已清理")
     except Exception:
         pass
