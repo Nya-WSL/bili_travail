@@ -1,0 +1,59 @@
+name: Cleanup Actions Cache
+
+# 每周一 0 点（中国时区，UTC+8）自动清理所有 GitHub Actions 缓存。
+# 注意：GitHub Actions 的 schedule cron 固定使用 UTC 时区，需自行换算：
+#   中国周一 00:00 = UTC 周日 16:00，故 cron 为 '0 16 * * 0'。
+on:
+  schedule:
+    - cron: '0 16 * * 0'   # 每周一 00:00 中国时间（周日 16:00 UTC）
+  workflow_dispatch:
+
+permissions:
+  actions: write   # 需要该权限才能调用 /actions/caches 接口删除缓存
+  contents: read
+
+jobs:
+  cleanup-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # 列出所有缓存 key（含已部分匹配的分支缓存）
+      - name: List all cache keys
+        id: list-cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== 当前所有 Actions 缓存 ==="
+          gh api "repos/${{ github.repository }}/actions/caches" \
+            --paginate -q '.actions_caches[] | "\(.id)\t\(.key)\t\(.size_in_bytes)"' || true
+          gh api "repos/${{ github.repository }}/actions/caches" \
+            --paginate -q '.actions_caches[].key' > cache_keys.txt || true
+          echo "count=$(wc -l < cache_keys.txt)" >> "$GITHUB_OUTPUT"
+          echo "共列出 $(wc -l < cache_keys.txt) 条缓存"
+
+      # 逐条删除缓存（通过 actions:delete 子命令，避免缓存读取权限限制）
+      - name: Delete all caches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          count=${{ steps.list-cache.outputs.count }}
+          echo "待删除缓存数: $count"
+          # 每行一个 cache key，删空为止；分支缓存可能跨多个 key，循环处理
+          while read -r cache_key; do
+            [ -z "$cache_key" ] && continue
+            echo "删除缓存: $cache_key"
+            gh actions-cache delete "$cache_key" --repo "${{ github.repository }}" --confirm || true
+          done < cache_keys.txt
+          echo "清理完成"
+
+      # 汇报剩余缓存数（应接近 0）
+      - name: Verify cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          remaining=$(gh api "repos/${{ github.repository }}/actions/caches" \
+            --paginate -q '.actions_caches[].id' | wc -l)
+          echo "清理后剩余缓存数: $remaining"
