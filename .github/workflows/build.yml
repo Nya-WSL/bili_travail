@@ -262,6 +262,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      # checkout 仓库：gh CLI 内部需要 git 上下文（即便只是 release view/create），
+      # 未 checkout 时会报 "fatal: not a git repository"
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Download Nuitka artifacts
         uses: actions/download-artifact@v7
         with:
