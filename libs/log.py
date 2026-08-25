@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import logging
 import threading
 import datetime
 import traceback
@@ -150,3 +151,64 @@ def install_asyncio_handler(loop=None):
 
 # 尽力为已存在的默认事件循环安装（若当时存在运行中的循环）
 install_asyncio_handler()
+
+
+# ================================
+# 将标准库 logging 日志（如 pywebview）桥接到 loguru，写入项目 logs/ 目录
+# ================================
+class LoguruHandler(logging.Handler):
+    """将 Python 标准库 logging 的日志转发到 loguru，使日志统一写入项目 logs/ 目录。
+
+    :param label: 日志前缀标识，如 "[pywebview]"，用于区分不同来源的项目日志
+    """
+
+    _level_map = {
+        logging.DEBUG: "DEBUG",
+        logging.INFO: "INFO",
+        logging.WARNING: "WARNING",
+        logging.ERROR: "ERROR",
+        logging.CRITICAL: "CRITICAL",
+    }
+
+    def __init__(self, label: str = "", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._label = label
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level = self._level_map.get(record.levelno, "INFO")
+            message = record.getMessage()
+            # 在日志消息前加上项目名标识
+            if self._label:
+                message = f"[{self._label}] {message}"
+            # 复用 loguru 的脱敏规则与文件 handler
+            logger.opt(depth=1, colors=False).log(level, message)
+        except Exception:
+            self.handleError(record)
+
+
+def route_logging_to_loguru(logger_name: str | None = None, level: int = logging.DEBUG,
+                            remove_existing: bool = True, label: str | None = None) -> logging.Handler:
+    """将指定名称（或根）的标准库 logging logger 桥接到 loguru。
+
+    主要用于捕获 pywebview、blivedm 等第三方库通过标准库 logging 输出的日志，
+    使其统一写入项目的 logs/ 目录。
+
+    :param logger_name: 标准库 logger 名称，None 表示根 logger
+    :param level: 需要桥接的最低日志级别
+    :param remove_existing: 是否移除该 logger 上已有的非 loguru handler（如 pywebview 默认的 StreamHandler，避免控制台重复输出）
+    :param label: 日志前缀标识，如 "pywebview"。默认使用 logger_name 作为标识
+    :return: 已添加的 handler，便于后续按需移除
+    """
+    target = logging.getLogger(logger_name)
+    if remove_existing:
+        for h in list(target.handlers):
+            target.removeHandler(h)
+    handler = LoguruHandler(label=label if label is not None else logger_name)
+    handler.setLevel(level)
+    target.addHandler(handler)
+    target.setLevel(level)
+    return handler
+
+_webview_handler = route_logging_to_loguru("pywebview")
+_blivedm_handler = route_logging_to_loguru("blivedm")
