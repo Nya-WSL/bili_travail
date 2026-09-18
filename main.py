@@ -2168,6 +2168,7 @@ def index():
                         clearable=True,
                     ).style("width: 150px")
                     sim_box_select.set_visibility(False)
+
                     sim_box_switch.on_value_change(lambda e: sim_box_select.set_visibility(e.value))
 
                 with ui.row(align_items="center"):
@@ -2214,23 +2215,16 @@ def index():
                 # 动态刷新礼物选择列表
                 def refresh_sim_gift_options():
                     gifts_img = _read_json_cached("data/gift_img.json") or {}
-                    gifts = _read_json_cached("data/gifts.json") or {}
-                    special = _read_json_cached("data/special.json") or {}
-                    # 合并所有已配置的礼物名
-                    all_gifts = set(gifts.keys()) | set(special.keys())
-                    # 按礼物图片列表过滤和排序
-                    available = [g for g in gifts_img.keys() if g in all_gifts]
-                    if not available:
-                        available = list(gifts_img.keys())
+                    # 展示所有礼物，已设定玩法的礼物同样包含在内
+                    available = list(gifts_img.keys())
                     sim_gift_select.set_options(available)
                     if available and not sim_gift_select.value:
                         sim_gift_select.set_value(available[0])
 
-                    # 盲盒候选，盲盒名称并不固定，仅用于筛选候选项，未匹配到时回退为全部礼物
+                    # 盲盒候选，盲盒名称并不固定，常见命名排在前面，其余礼物一并列出以便选择任意盲盒
                     gift_price = _read_json_cached("data/gift_price.json") or {}
                     box_options = [g for g in gift_price.keys() if any(k in g for k in ("盲盒", "扭蛋", "宝盒"))]
-                    if not box_options:
-                        box_options = list(gift_price.keys())
+                    box_options += [g for g in gift_price.keys() if g not in box_options]
                     sim_box_select.set_options(box_options)
 
                 refresh_sim_gift_options()
