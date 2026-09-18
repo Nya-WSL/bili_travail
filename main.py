@@ -1,6 +1,5 @@
 import os
 
-os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--disable-gpu --disable-software-rasterizer --no-sandbox" # 强制关闭 GPU 硬件加速和沙盒机制（防止被游戏反作弊误杀子进程）
 os.environ['PYWEBVIEW_LOG'] = 'debug' # 设置pywebview日志级别为debug，用于接收webview的崩溃日志
 
 # 动态指定 WebView2 的数据存放目录
@@ -85,37 +84,6 @@ version = f"{base_ver.base_version}.{ver_strftime}"
 
 logger = log.logger
 logger.debug("version: {}", version)
-
-last_frontend_heartbeat = time.time()
-
-@app.get('/api/heartbeat')
-def frontend_heartbeat():
-    global last_frontend_heartbeat
-    last_frontend_heartbeat = time.time() # 刷新最后活跃时间
-    return {"status": "ok"}
-
-def watchdog_check():
-    """ 检查前端是否存活 """
-    global last_frontend_heartbeat
-
-    # 如果窗口没生成，先不检查
-    if not webview.windows:
-        return
-
-    current_time = time.time()
-    # 如果超过 4 秒前端没有任何心跳报平安，说明前端已经白屏、断网或内核被反作弊挂起
-    if current_time - last_frontend_heartbeat > 4.0:
-        logger.warning("侦测到前端失去响应（可能发生白屏/断网），正在强制重载...")
-        try:
-            native_window = webview.windows[0]
-            current_url = native_window.get_current_url()
-            if current_url:
-                native_window.load_url(current_url)
-                logger.info("已向前端窗口发送强制重载指令")
-            # 重置心跳时间，给前端 4 秒的加载缓冲时间
-            last_frontend_heartbeat = time.time() + 4.0 
-        except Exception as ex:
-            logger.error("强制重载失败，底层窗口可能已被彻底摧毁: {}", ex)
 
 # ================================
 # JSON文件缓存，减少高频率文件IO
@@ -1651,15 +1619,6 @@ def index():
     # ================================
 
     global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, pause_button, resume_button, add_button, sub_button, short_switch
-
-    # 向前端注入JS代码，定时发送心跳请求
-    ui.run_javascript('''
-        setInterval(() => {
-            console.log('发送心跳请求');
-            fetch('/api/heartbeat').catch(err => console.log('心跳发送失败，网络或内核可能被拦截'));
-        }, 1500);
-    ''')
-    ui.timer(2.0, watchdog_check)
 
     styles.page_styles(config['color']['main_text_color']) # 加载自定义样式，主界面使用主界面字体颜色
     ui.query("body").style(f"background-color: {config['color']['bg_color']}")  # type: ignore[index]
