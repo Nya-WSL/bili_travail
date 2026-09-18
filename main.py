@@ -46,7 +46,6 @@ from libs import dns_resolver
 from libs import check_runtime
 from libs import gift as get_gift
 from libs import update as travail_update
-from libs import gift_mapping as gift_map
 from libs.changelog import changelog, get_log
 from libs.format import format_cd, format_seconds, sort_dict
 
@@ -56,7 +55,6 @@ from pages import count, about, capture_cd
 from blivedm import blivedm
 
 # Third Party Packages
-import re
 import time
 import orjson
 import shutil
@@ -146,8 +144,14 @@ def init_storage():
     if not os.path.exists("data"):
         os.mkdir("data")
 
-    if not os.path.exists("data/blind_box_data.json"):
-        _write_json_cached("data/blind_box_data.json", {})
+    if not os.path.exists("data/gift_id.json"):
+        _write_json_cached("data/gift_id.json", {})
+
+    # 移除不再使用的盲盒数据
+    for old_blind_box_file in ["data/blind_box_data.json", "data/blind_box_id.json", "data/blind_box_price.json"]:
+        if os.path.exists(old_blind_box_file):
+            _invalidate_json_cache(old_blind_box_file)
+            os.remove(old_blind_box_file)
 
     if not os.path.exists("data/time.json"):
         with open("data/time.json", "wb+") as f:
@@ -330,38 +334,36 @@ else:
 
 GiftManager = get_gift.BiliGiftManager()
 
-async def create_blind_box():
-    box_id = []
-    blind_box = {}
-    box_price = {}
-    gifts = await GiftManager.get_room_gift("android")
+async def create_gift_index(gifts: list | None = None):
+    """
+    生成本地礼物索引（礼物id与礼物名的映射、礼物单价）
 
-    if gifts is None:
+    盲盒名称并不固定，因此不再尝试识别哪些礼物是盲盒，而是建立全量礼物索引，
+    收到礼物时通过blivedm下发的blind_gift_id直接查询盲盒名称与单价
+
+    数据与图标均来自B站礼物面板，不再从API服务器获取盲盒礼物列表
+
+    :param gifts: 礼物数据，一般传入最近一次更新礼物时获取的数据以避免重复请求，为空则重新获取
+    """
+
+    if not gifts:
+        room_gifts = await GiftManager.get_room_gift("android")
+        global_gifts = await GiftManager.get_global_gift()
+        gifts = (room_gifts or []) + (global_gifts or [])
+
+    if not gifts:
         logger.error("未获取到礼物数据")
         return
 
+    gift_id_name = {} # 礼物id与礼物名的映射，用于查询blivedm下发的blind_gift_id
+    gift_price = {} # 礼物名与单价的映射，单位为电池
+
     for gift in gifts:
-        if re.search("盒", gift["name"]):
-            box_id.append(gift["id"])
+        gift_id_name[str(gift["id"])] = gift["name"]
+        gift_price.setdefault(gift["name"], int(gift.get("price", 0) / 100)) # 金瓜子换算为电池
 
-    if box_id == []:
-        logger.error("未获取到盲盒数据")
-        return
-
-    blind_boxes = await GiftManager.get_blind_box(box_id)
-
-    # 忽略盲盒礼物图标，图标在gift.get_config()中已经处理了
-    for box, box_gifts in blind_boxes.items():
-        box_price.setdefault(box, 0)
-        box_price[box] = int(box_gifts['price'] / 100) # API的单位是金瓜子，这里换算为电池
-        if not box in blind_box:
-            blind_box[box] = []
-        for gift in box_gifts["gifts"]:
-            blind_box[box].append(gift['gift'])
-
-    _write_json_cached("data/blind_box_data.json", blind_box)
-
-    _write_json_cached("data/blind_box_price.json", box_price)
+    _write_json_cached("data/gift_id.json", gift_id_name)
+    _write_json_cached("data/gift_price.json", gift_price)
 
 async def init_config():
     """
@@ -538,11 +540,20 @@ class BiliHandler(blivedm.BaseHandler):
         num = message.gift_num
         uname = message.uname
         price = message.price / 100
-        is_paid = message.paid
+        is_blind = message.blind_gift.status # 是否是盲盒爆出的礼物
+        blind_id = message.blind_gift.blind_gift_id # 盲盒id
+
         if len(uname) > 8:
             uname = uname[:5] + "..."
 
-        await self._on_gift_play(gift, num, uname, message, int(price))  # type: ignore[arg-type]
+        # 使用消息自带的礼物图标，补齐盲盒爆出礼物等未在礼物列表中的礼物图标
+        if message.gift_icon:
+            gift_img = _read_json_cached("data/gift_img.json") or {}
+            if gift_img.get(gift, None) is None:
+                gift_img[gift] = message.gift_icon
+                _write_json_cached("data/gift_img.json", gift_img)
+
+        await self._on_gift_play(gift, num, uname, message, int(price), is_blind, blind_id)  # type: ignore[arg-type]
         await self._on_gift_statistics(gift, num, uname, int(price))  # type: ignore[arg-type]
         logger.debug(message)
 
@@ -608,7 +619,7 @@ class BiliHandler(blivedm.BaseHandler):
         _write_json_cached("data/gift_statistics.json", count)
 
     # 收到礼物后执行函数
-    async def _on_gift_play(self, gift, num, uname, message, price: int | float = 0):
+    async def _on_gift_play(self, gift, num, uname, message, price: int | float = 0, is_blind: bool = False, blind_id: int = 0):
         is_blind_box = False
 
         def blind_box_value(gift, num : int, price : int | float, box_name):
@@ -647,34 +658,33 @@ class BiliHandler(blivedm.BaseHandler):
 
                     if gift not in gifts and gift not in special:
                         gift_img = _read_json_cached("data/gift_img.json") or {}
-                        gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
-                        _write_json_cached("data/gift_img.json", gift_img)
+                        # 已有图标时不再覆盖，避免使用默认图覆盖消息自带的礼物图标
+                        if gift_img.get(gift, None) is None:
+                            gift_img[gift] = "https://s1.hdslb.com/bfs/live/d57afb7c5596359970eb430655c6aef501a268ab.png"
+                            _write_json_cached("data/gift_img.json", gift_img)
 
-                    # 初始化盲盒数据
-                    blind_box = _read_json_cached("data/blind_box_data.json") or {}
+                    # 礼物id与礼物名的映射
+                    gift_id_name = _read_json_cached("data/gift_id.json") or {}
 
-                    blind_box_gifts = []
-
-                    if blind_box == {}:
-                        logger.error("初始化盲盒失败，将使用默认数据")
-                        blind_box = gift_map.blind_box
-
-                    for v in blind_box.values():
-                        for blind_gift in v:
-                            blind_box_gifts.append(blind_gift)
-
-                    # 如果礼物在盲盒中，将礼物设定为盲盒id
+                    # 通过blivedm下发的盲盒信息定位礼物所属的盲盒
                     origin_gift = None
-                    if gift in blind_box_gifts:
-                        for box_name, gifts_name in blind_box.items():
-                            if gift in gifts_name:
-                                if gifts.get(box_name, None) != None or special.get(box_name, None) != None:
-                                    origin_gift = gift
-                                    if gift not in special and gifts.get(gift, None) is None:
-                                        is_blind_box = True
-                                        gift = box_name
+                    box_name = None
 
-                                    blind_box_value(origin_gift, num, price, box_name) # 盲盒价值
+                    if is_blind:
+                        box_name = gift_id_name.get(str(blind_id), None)
+
+                        if box_name is None:
+                            logger.warning(f"未找到盲盒id {blind_id} 对应的盲盒数据，请尝试更新礼物")
+
+                    if box_name is not None:
+                        origin_gift = gift
+                        blind_box_value(origin_gift, num, price, box_name) # 盲盒价值
+
+                        # 如果礼物在盲盒中，将礼物设定为盲盒名
+                        if gifts.get(box_name, None) != None or special.get(box_name, None) != None:
+                            if gift not in special and gifts.get(gift, None) is None:
+                                is_blind_box = True
+                                gift = box_name
 
                     if gift in special:
                         new_seconds = current_seconds  # 初始化为当前剩余秒数
@@ -797,18 +807,34 @@ class GiftSimulator:
 
         return True
 
-    async def simulate_gift(self, gift_name: str, num: int = 1, uname: str = "测试用户", price: int = 0) -> tuple[bool, str]:
+    async def simulate_gift(self, gift_name: str, num: int = 1, uname: str = "测试用户", price: int = 0, box_name: str | None = None) -> tuple[bool, str]:
         """
-        模拟普通礼物发送
+        模拟礼物发送
 
         :param gift_name: 礼物名称
         :param num: 礼物数量
         :param uname: 发送者用户名
         :param price: 单个礼物价格（电池）
+        :param box_name: 盲盒名称，传入则模拟从盲盒中开出的礼物
         :return: (成功, 消息)
         """
         if not self._ensure_available():
             return False, "模拟环境不满足条件，请检查日志"
+
+        is_blind = False
+        blind_id = 0
+
+        # 通过礼物索引反查盲盒id，与blivedm下发的blind_gift_id保持一致
+        if box_name:
+            gift_id_name = _read_json_cached("data/gift_id.json") or {}
+            for gift_id, name in gift_id_name.items():
+                if name == box_name:
+                    is_blind = True
+                    blind_id = int(gift_id)
+                    break
+
+            if not is_blind:
+                return False, f"未找到盲盒 {box_name} 对应的礼物id，请先更新礼物"
 
         global b_connect_status
         original_status = b_connect_status
@@ -818,11 +844,13 @@ class GiftSimulator:
             if not b_connect_status:
                 b_connect_status = True
 
-            await self.handler._on_gift_play(gift_name, int(num), uname, None, int(price))
+            await self.handler._on_gift_play(gift_name, int(num), uname, None, int(price), is_blind, blind_id)
             await self.handler._on_gift_statistics(gift_name, int(num), uname, int(price))
 
             self.sim_count += 1
             msg = f"模拟礼物 #{self.sim_count}: {uname} 赠送 {gift_name} x{num} (单价{price}电池)"
+            if is_blind:
+                msg += f" [盲盒: {box_name}]"
             self._add_log(msg)
             return True, msg
 
@@ -1121,17 +1149,17 @@ def blind_box_value_dialog():
     def get_box_value():
         if not os.path.exists("data/blind_box_value.json"):
             _write_json_cached("data/blind_box_value.json", {})
-        if not os.path.exists("data/blind_box_price.json"):
-            _write_json_cached("data/blind_box_price.json", {})
+        if not os.path.exists("data/gift_price.json"):
+            _write_json_cached("data/gift_price.json", {})
 
         box_value = _read_json_cached("data/blind_box_value.json") or {}
-        box_price_list = _read_json_cached("data/blind_box_price.json") or {}
+        gift_price_list = _read_json_cached("data/gift_price.json") or {}
 
         value_list = {}
         price_list = {}
         for k,v in box_value.items():
-            if not k in box_price_list:
-                box_price_list[k] = 0
+            if not k in gift_price_list:
+                gift_price_list[k] = 0
 
             for gift, value in v.items():
                 gift_name = gift
@@ -1143,12 +1171,12 @@ def blind_box_value_dialog():
 
             blind_all_price = 0
             for gift_name, gift_value in v.items():
-                blind_all_price += (gift_value["num"] * gift_value["price"]) - (box_price_list[k] * gift_value["num"])
+                blind_all_price += (gift_value["num"] * gift_value["price"]) - (gift_price_list[k] * gift_value["num"])
             price_list[k] = blind_all_price
 
         with value_card:
             for box_name in box_value.keys():
-                ui.label(f"{box_name} | 价格：{box_price_list[box_name]}电池")
+                ui.label(f"{box_name} | 价格：{gift_price_list[box_name]}电池")
                 for k,v in value_list.items():
                     if k == box_name:
                         for i in v:
@@ -1518,15 +1546,13 @@ async def refresh_gift_loop():
 
     gift_config = await GiftManager.get_config("data/gift_img.json")
     _invalidate_json_cache("data/gift_img.json")  # get_config在外部写入文件,需失效缓存
-    await create_blind_box()
+    await create_gift_index(GiftManager.gift_list)
 
     if gift_config:
         result = "礼物数据定时更新完成"
         with main_card:
             ui.notify(result, type="positive")
         logger.info(result)
-    elif gift_config == "blind_box_none":
-        logger.warning("未登录账号，无法定时更新盲盒礼物，将使用默认数据...")
     else:
         result = f"定时更新礼物数据失败: gift_config return {gift_config}"
         with main_card:
@@ -1551,7 +1577,7 @@ async def refresh_gift(heartbeat=False):
         try:
             gift_config = await GiftManager.get_config("data/gift_img.json")
             _invalidate_json_cache("data/gift_img.json")  # get_config在外部写入文件,需失效缓存
-            await create_blind_box()
+            await create_gift_index(GiftManager.gift_list)
         except Exception as e:
             logger.error(f"更新礼物数据时发生错误: {e}")
             raise
@@ -1563,11 +1589,6 @@ async def refresh_gift(heartbeat=False):
             ui.notify("未检测到本地礼物数据，将初始化礼物数据...", type="info")
             await init_config()
             ui.notify("礼物数据初始化完成", type="positive")
-        # 如果更新盲盒礼物出错
-        elif gift_config == "blind_box_none":
-            ui.notify("未登录账号，无法更新盲盒礼物，将使用默认数据...", type="negative")
-            await asyncio.sleep(2)
-            ui.notify("礼物数据更新完成", type="positive")
         # 如果礼物数据更新失败，则使用本地数据重置
         else:
             ui.notify("礼物数据更新失败，请检查日志或稍后重试，或者使用本地数据重置", type="negative")
@@ -2127,13 +2148,27 @@ def index():
                 global simulator
                 simulator = GiftSimulator()
 
-                # 礼物选择
-                sim_gift_select = ui.select(
-                    label="礼物选择",
-                    options=[],
-                    with_input=True,
-                    clearable=True,
-                ).style("width: 160px")
+                with ui.row(align_items="center"):
+                    # 礼物选择
+                    sim_gift_select = ui.select(
+                        label="礼物选择",
+                        options=[],
+                        with_input=True,
+                        clearable=True,
+                    ).style("width: 160px")
+
+                    # 盲盒礼物开关与盲盒选择
+                    with ui.switch("盲盒礼物", value=False).props('color="btn"') as sim_box_switch:
+                        ui.tooltip("模拟从盲盒中开出的礼物，「礼物选择」为开出的礼物，「盲盒选择」为其所属的盲盒")
+
+                    sim_box_select = ui.select(
+                        label="盲盒选择",
+                        options=[],
+                        with_input=True,
+                        clearable=True,
+                    ).style("width: 150px")
+                    sim_box_select.set_visibility(False)
+                    sim_box_switch.on_value_change(lambda e: sim_box_select.set_visibility(e.value))
 
                 with ui.row(align_items="center"):
                     sim_num = ui.number("数量", value=1, min=1, max=9999).style("width: 100px")
@@ -2150,11 +2185,20 @@ def index():
                             sim_status.set_text("请选择礼物")
                             sim_status.classes(replace="text-red")
                             return
+
+                        box_name = sim_box_select.value if sim_box_switch.value else None
+
+                        if sim_box_switch.value and not box_name:
+                            sim_status.set_text("请选择盲盒")
+                            sim_status.classes(replace="text-red")
+                            return
+
                         success, msg = await simulator.simulate_gift(
                             gift_name=gift,
                             num=int(sim_num.value),
                             uname=sim_uname.value or "测试用户",
                             price=int(sim_price.value),
+                            box_name=box_name,
                         )
                         if success:
                             sim_status.set_text(f"成功: {msg}")
@@ -2181,6 +2225,13 @@ def index():
                     sim_gift_select.set_options(available)
                     if available and not sim_gift_select.value:
                         sim_gift_select.set_value(available[0])
+
+                    # 盲盒候选，盲盒名称并不固定，仅用于筛选候选项，未匹配到时回退为全部礼物
+                    gift_price = _read_json_cached("data/gift_price.json") or {}
+                    box_options = [g for g in gift_price.keys() if any(k in g for k in ("盲盒", "扭蛋", "宝盒"))]
+                    if not box_options:
+                        box_options = list(gift_price.keys())
+                    sim_box_select.set_options(box_options)
 
                 refresh_sim_gift_options()
                 # 定时刷新礼物选项

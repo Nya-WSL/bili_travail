@@ -1,5 +1,4 @@
 import os
-import sys
 import orjson
 import asyncio
 import aiohttp
@@ -9,11 +8,6 @@ from .log import logger
 from . import dns_resolver
 from . import gift_mapping as gift_map
 from . import config as travail_config
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) # 将上级目录加入路径，以便导入版本号
-
-import env
-import version as base_ver
 
 base_config = travail_config.Config()
 
@@ -26,6 +20,7 @@ class BiliGiftManager:
         self.area_id = 0
         self.custom_gifts = []
         self.wait_num = 0
+        self.gift_list = [] # 最近一次获取的礼物数据，供生成礼物索引复用
 
     async def init_gift(self, img_path):
         """
@@ -65,33 +60,6 @@ class BiliGiftManager:
         """
 
         self.room_id = room_id
-
-    async def get_blind_box(self, gift_ids: list) -> dict:
-        """
-        获取盲盒礼物列表
-        
-        :param gift_ids (_list_): 盲盒礼物ID
-        :return dict: 盲盒礼物列表
-        """
-
-        url = f"{base_config.get('api', 'server', 'http://api.travail.nya-wsl.cn')}/gift/get_blind_boxes"
-        data = {
-            "gift_ids": gift_ids,
-            "version": f"{base_ver.base_version}.{env.get_key().get('version', '0')}"
-        }
-
-        async with aiohttp.ClientSession(connector=await dns_resolver.connector()) as session:
-            async with session.post(url, json=data) as response:
-                if response.status == 200:
-                    resp_data = await response.json()
-                    if resp_data:
-                        return resp_data
-                    else:
-                        logger.error("获取盲盒礼物列表失败: API未返回错误详情")
-                        return {}
-                else:
-                    logger.error(f"请求盲盒礼物列表失败: {response.status}")
-                    return {}
 
     async def get_area_id(self):
         """
@@ -219,27 +187,12 @@ class BiliGiftManager:
                 logger.error("获取礼物数据失败，无法初始化礼物配置")
                 return False
 
-            gift_mapping = {}
-            box_id = []
+            self.gift_list = gifts_data # 记录本次获取的礼物数据，避免生成礼物索引时重复请求
 
-            # 获取盲盒礼物
+            gift_mapping = {}
+
             for data in gifts_data:
                 gift_mapping[data['name']] = data['img_basic']
-                if "盒" in data['name']:
-                    box_id.append(data["id"])
-
-            blind_box = {}
-            if not box_id:
-                logger.error("初始化礼物时未获取到盲盒数据")
-            else:
-                blind_box = await self.get_blind_box(box_id)
-
-                if blind_box:
-                    for gifts in blind_box.values():
-                        for gift in gifts["gifts"]:
-                            gift_mapping[gift['gift']] = gift['gift_img']
-                else:
-                    logger.error("盲盒数据为空")
 
             # 更新舰队数据
             guard = {
@@ -260,10 +213,7 @@ class BiliGiftManager:
             with open(img_path, "wb") as f:
                 f.write(orjson.dumps(gift_mapping, option=orjson.OPT_INDENT_2))
 
-            if not blind_box:
-                return "blind_box_none"
-            else:
-                return True
+            return True
 
         except Exception:
             logger.error(f"获取礼物数据失败:\n{traceback.format_exc()}")
