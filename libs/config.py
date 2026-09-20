@@ -16,6 +16,8 @@ def _build_default_config() -> tomlkit.TOMLDocument:
     general["port"].comment("监听端口")
     general.add("auth_code", "")
     general["auth_code"].comment("主播身份码")
+    general.add("language", "auto")
+    general["language"].comment("界面语言，auto 为跟随系统")
     bg = array()
     bg.append("static/bg_vita.png")
     general.add("background_image", bg)
