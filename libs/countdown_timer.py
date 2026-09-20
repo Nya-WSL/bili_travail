@@ -129,7 +129,7 @@ class CountdownTimer:
             if reset_inherit_status:
                 app.storage.general["countdown_time"] = 0
                 self.remaining_time = datetime.timedelta(0)
-                self._cancel_button.set_text("停止")
+                self._cancel_button.set_text(t("main.btn.stop"))
                 self._cancel_button.disable()
 
     # 程序退出时的清理，只取消计时相关的 task/timer，

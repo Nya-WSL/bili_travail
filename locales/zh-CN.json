@@ -180,7 +180,6 @@
     "gift.play.random": "随机",
     "gift.reset_all": "重置全部",
     "dialog.auto_detect": "自动检测",
-    "common.unknown": "未知错误",
     "notify.log_upload_failed_network": "日志上传失败，发生网络错误: ",
     "notify.log_upload_failed_error": "日志上传失败，发生错误: ",
     "notify.gift_update_loop_failed": "定时更新礼物数据失败: gift_config return {result}",
@@ -212,5 +211,9 @@
     "update.sha_failed": "更新失败：SHA256校验未通过，请检查日志",
     "update.extracting": "正在解压更新包...",
     "update.updating": "正在更新...",
-    "cd.enter_time": "请输入时间"
+    "cd.enter_time": "请输入时间",
+    "capture.double_times": "2^{num}倍",
+    "capture.half_times": "-2^{num}倍",
+    "capture.page_title": "倒计时 | bili_travail",
+    "update.failed_error": "更新失败：{error}"
 }

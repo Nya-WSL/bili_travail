@@ -180,7 +180,6 @@
     "gift.play.random": "Random",
     "gift.reset_all": "Reset all",
     "dialog.auto_detect": "Auto detect",
-    "common.unknown": "Unknown error",
     "notify.log_upload_failed_network": "Failed to upload log, network error: ",
     "notify.log_upload_failed_error": "Failed to upload log: ",
     "notify.gift_update_loop_failed": "Scheduled gift update failed: gift_config returned {result}",
@@ -212,5 +211,9 @@
     "update.sha_failed": "Update failed: SHA256 mismatch, check the log",
     "update.extracting": "Extracting...",
     "update.updating": "Updating...",
-    "cd.enter_time": "Please enter a time"
+    "cd.enter_time": "Please enter a time",
+    "capture.double_times": "2^{num}x",
+    "capture.half_times": "-2^{num}x",
+    "capture.page_title": "Countdown | bili_travail",
+    "update.failed_error": "Update failed: {error}"
 }

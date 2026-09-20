@@ -701,7 +701,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, f"2^{int(num)}倍", message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.double_times", num=int(num)), message)
 
                         if special[gift] == "half":
                             new_seconds = current_seconds / (2 ** num) # 新倒计时为浮点数，不能使用位运算
@@ -710,7 +710,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, f"-2^{int(num)}倍", message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.half_times", num=int(num)), message)
 
                         if special[gift] == "clear":
                             new_seconds = 3
@@ -719,7 +719,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, "清空", message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("gift.play.clear"), message)
 
                         if type(special[gift]) == list:
                             total_changed_time = 0
@@ -853,17 +853,20 @@ class GiftSimulator:
             await self.handler._on_gift_statistics(gift_name, int(num), uname, int(price))
 
             self.sim_count += 1
+            # 日志保持中文，界面文案使用翻译
+            log_msg = f"模拟礼物 #{self.sim_count}: {uname} 赠送 {gift_name} x{num} (单价{price}电池)"
             msg = t("sim.gift_sent", n=self.sim_count, uname=uname, gift=gift_name, num=num, price=price)
             if is_blind:
+                log_msg += f" [盲盒: {box_name}]"
                 msg += t("sim.blind_box_tag", box=box_name)
-            self._add_log(msg)
+            self._add_log(log_msg)
             return True, msg
 
         except Exception as e:
-            err_msg = t("sim.failed", error=e)
+            err_msg = f"模拟礼物失败: {e}"
             self._add_log(err_msg)
             logger.error(f"[Simulator] {err_msg}\n{traceback.format_exc()}")
-            return False, err_msg
+            return False, t("sim.failed", error=e)
         finally:
             if not original_status:
                 b_connect_status = False
@@ -1074,11 +1077,11 @@ def cd_setting_dialog():
 
                         # 格式化输出
                         if v == "clear":
-                            v = "清空"
+                            v = t("gift.play.clear")
                         if v == "double":
-                            v = "加倍"
+                            v = t("gift.play.double")
                         if v == "half":
-                            v = "减半"
+                            v = t("gift.play.half")
                         ui.label(v)
                         ui.button(t("common.delete"), on_click=lambda k = k: del_gift(True, k))
 
@@ -1305,9 +1308,9 @@ async def submit_ticket(ticket_type: str, title: str, description: str, room_id:
                     return True, t("ticket.submit_success"), "positive"
                 else:
                     error = await response.text()
-                    result = t("ticket.submit_failed_status", status=response.status)
+                    result = f"工单提交失败，状态码: {response.status}"
                     logger.error(f"{result}, 服务器返回: {error}")
-                    return False, result, "negative"
+                    return False, t("ticket.submit_failed_status", status=response.status), "negative"
 
     except aiohttp.ClientError as e:
         result = t("ticket.submit_failed_network")
@@ -1624,7 +1627,7 @@ async def refresh_gift(heartbeat=False):
 
 
 # 倒计时预览
-@ui.page("/capture_cd", title="倒计时 | bili_travail", response_timeout=30)
+@ui.page("/capture_cd", title=t("capture.page_title"), response_timeout=30)
 async def _():
     await capture_cd.capture_cd_page(get_notes, init_config, base_config)
 
@@ -1730,9 +1733,10 @@ def index():
                                 result = await response.json()
                                 server = result.get("url", None)
                                 if server is None:
-                                    result = f"获取直链失败: {result.get('message', '未知错误')}"
+                                    message = result.get('message', '未知错误')
+                                    result = f"获取直链失败: {message}"
                                     logger.error(result)
-                                    ui.notify(t("notify.update_url_failed", message=result.get('message', t("common.unknown"))), type="negative")
+                                    ui.notify(t("notify.update_url_failed", message=message), type="negative")
                                     return
                             else:
                                 error = await response.text()

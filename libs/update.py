@@ -157,6 +157,6 @@ timeout /t 1 /nobreak
         try:
             await download(zip_url, file_name, version)
         except Exception as e:
-            ui.notify(t("update.failed_reason", status="", reason=e), type="negative")
+            ui.notify(t("update.failed_error", error=e), type="negative")
             logger.error(f"更新失败：{traceback.format_exc()}")
             return

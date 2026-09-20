@@ -10,6 +10,7 @@ from libs import log
 from libs import gift
 from libs import styles
 from libs.format import format_cd, format_seconds, sort_dict
+from libs.i18n import t
 
 logger = log.logger
 
@@ -86,11 +87,11 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
 
         if v_type == "special":
             if v == "clear":
-                v = "清空"
+                v = t("gift.play.clear")
             if v == "double":
-                v = "加倍"
+                v = t("gift.play.double")
             if v == "half":
-                v = "减半"
+                v = t("gift.play.half")
 
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
@@ -164,11 +165,11 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 k_label = ui.label(k).classes("text-3xl font-extrabold")  # type: ignore[index]
                 ui.space()
                 if v == "clear":
-                    v = "清空"
+                    v = t("gift.play.clear")
                 if v == "double":
-                    v = "加倍"
+                    v = t("gift.play.double")
                 if v == "half":
-                    v = "减半"
+                    v = t("gift.play.half")
                 v_label = ui.label(v).classes("text-3xl font-extrabold")  # type: ignore[index]
 
     capture_cd_is_created = True
@@ -233,9 +234,9 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 with open("data/gift_img.json", "rb") as f:
                     gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-                if "倍" in time:
+                if re.search(r"\d+\^", time):
                     tmp_time = app.storage.general["countdown_time"]
-                    if re.search(r"-2\^(\d+)倍", time):
+                    if re.search(r"-\d+\^", time):
                         for _ in range(num):
                             tmp_time -= tmp_time / 2
                         time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"))
@@ -301,17 +302,17 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 minutes = 0
                 seconds = 0
 
-                hour_match = re.search(r'(\d+)(?:小时|时)', rule)
+                hour_match = re.search(r'(\d+)(?:小时|时|h)', rule)
                 if hour_match:
                     hours = int(hour_match.group(1))
                     rule = rule.replace(hour_match.group(0), '')
 
-                minute_match = re.search(r'(\d+)分', rule)
+                minute_match = re.search(r'(\d+)(?:分|m)', rule)
                 if minute_match:
                     minutes = int(minute_match.group(1))
                     rule = rule.replace(minute_match.group(0), '')
 
-                second_match = re.search(r'(\d+)秒', rule)
+                second_match = re.search(r'(\d+)(?:秒|s)', rule)
                 if second_match:
                     seconds = int(second_match.group(1))
                     rule = rule.replace(second_match.group(0), '')

@@ -7,8 +7,8 @@ import orjson
 from .log import logger
 
 DEFAULT_LANG = "zh-CN"
+# 翻译回退顺序，逐层查找直至最后一个
 SUPPORTED_FALLBACK_ORDER = ["zh-CN"]
-"""翻译回退顺序，逐层查找直至最后一个"""
 LOCALES_DIR = Path("locales")
 LANG_NAME_KEY = "__language_name__"
 
@@ -20,11 +20,12 @@ _UI_LANG_MAP = {"zh-CN": "zh-CN", "en-US": "en-US"}
 _translations: dict[str, dict[str, str]] = {}
 _current_lang = DEFAULT_LANG
 _missing_keys: set[str] = set() # 已报告过的缺失key，避免重复打日志
+_warned_files: set[str] = set() # 已报告过的加载失败语言，避免重复打日志
 _warned_missing_dir = False # 语言文件目录缺失或为空时只告警一次
 
 
 def _load(lang: str) -> dict[str, str]:
-    """加载语言文件并缓存，失败时缓存空字典"""
+    """加载语言文件并缓存，失败时不写入缓存以便文件恢复后重试"""
 
     if lang in _translations:
         return _translations[lang]
@@ -42,7 +43,10 @@ def _load(lang: str) -> dict[str, str]:
         _translations[lang] = data
     except Exception:
         # 失败时不写入缓存，文件恢复后下次调用会重新加载
-        logger.opt(exception=True).warning("加载语言文件失败，将回退默认语言: {}", path)
+        if lang not in _warned_files:
+            _warned_files.add(lang)
+            logger.opt(exception=True).warning("加载语言文件失败，将回退默认语言: {}", path)
+
         return {}
 
     return _translations[lang]
