@@ -7,6 +7,8 @@ import orjson
 from .log import logger
 
 DEFAULT_LANG = "zh-CN"
+SUPPORTED_FALLBACK_ORDER = ["zh-CN"]
+"""翻译回退顺序，逐层查找直至最后一个"""
 LOCALES_DIR = Path("locales")
 LANG_NAME_KEY = "__language_name__"
 
@@ -17,6 +19,8 @@ _UI_LANG_MAP = {"zh-CN": "zh-CN", "en-US": "en-US"}
 
 _translations: dict[str, dict[str, str]] = {}
 _current_lang = DEFAULT_LANG
+_missing_keys: set[str] = set() # 已报告过的缺失key，避免重复打日志
+_warned_missing_dir = False # 语言文件目录缺失或为空时只告警一次
 
 
 def _load(lang: str) -> dict[str, str]:
@@ -30,12 +34,30 @@ def _load(lang: str) -> dict[str, str]:
     try:
         with open(path, "rb") as f:
             data = orjson.loads(f.read())
+
+        if not isinstance(data, dict):
+            logger.warning("语言文件内容不是字典，已忽略: {}", path)
+            return {}
+
         _translations[lang] = data
     except Exception:
-        logger.warning("加载语言文件失败，将回退默认语言: {}", path)
-        _translations[lang] = {}
+        # 失败时不写入缓存，文件恢复后下次调用会重新加载
+        logger.opt(exception=True).warning("加载语言文件失败，将回退默认语言: {}", path)
+        return {}
 
     return _translations[lang]
+
+
+def _warn_missing_dir() -> None:
+    """语言文件目录缺失或为空时只告警一次"""
+
+    global _warned_missing_dir
+
+    if _warned_missing_dir:
+        return
+
+    _warned_missing_dir = True
+    logger.warning("未找到可用的语言文件，将回退默认语言: {}", LOCALES_DIR)
 
 
 def available_languages() -> dict[str, str]:
@@ -48,6 +70,7 @@ def available_languages() -> dict[str, str]:
     langs: dict[str, str] = {}
 
     if not LOCALES_DIR.exists():
+        _warn_missing_dir()
         return {DEFAULT_LANG: DEFAULT_LANG}
 
     for path in sorted(LOCALES_DIR.glob("*.json")):
@@ -55,6 +78,7 @@ def available_languages() -> dict[str, str]:
         langs[code] = _load(code).get(LANG_NAME_KEY, code)
 
     if not langs:
+        _warn_missing_dir()
         return {DEFAULT_LANG: DEFAULT_LANG}
 
     ordered = {code: langs[code] for code in _ORDER if code in langs}
@@ -84,7 +108,7 @@ def detect_system_language() -> str:
 
             return DEFAULT_LANG
 
-        lang = (_locale.getdefaultlocale()[0] or os.environ.get("LANG", "")).lower()
+        lang = (_locale.getlocale()[0] or os.environ.get("LANG", "")).lower()
 
         if lang.startswith("zh"):
             return "zh-CN"
@@ -163,7 +187,10 @@ def t(key: str, **kwargs) -> str:
         text = _load(DEFAULT_LANG).get(key)
 
     if text is None:
-        logger.debug("缺少翻译: {}", key)
+        if key not in _missing_keys:
+            _missing_keys.add(key)
+            logger.debug("缺少翻译: {}", key)
+
         return key
 
     if kwargs:
