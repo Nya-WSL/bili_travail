@@ -1955,25 +1955,26 @@ def index():
                         ui.label("暂无工单记录").classes("text-grey q-pa-lg")
                         return
 
-                    for t in tickets:
-                        status_label, status_color = STATUS_MAP.get(t.get("status", "pending"), ("未知", "grey"))
-                        type_label = "Bug反馈" if t.get("type") == "bug" else "功能请求"
+                    # 循环变量不能命名为 t，否则会遮蔽翻译函数 t()
+                    for ticket in tickets:
+                        status_label, status_color = STATUS_MAP.get(ticket.get("status", "pending"), ("未知", "grey"))
+                        type_label = "Bug反馈" if ticket.get("type") == "bug" else "功能请求"
 
                         with ui.card().classes("w-full").style("padding: 12px;"):
                             with ui.row().classes("items-center justify-between w-full"):
                                 with ui.row().classes("items-center gap-2"):
-                                    ui.badge(f"#{t.get('id', '')}", color="#8B8B8B")
+                                    ui.badge(f"#{ticket.get('id', '')}", color="#8B8B8B")
                                     ui.badge(type_label, color="#8BA89A")
                                     ui.badge(status_label, color=status_color)
-                                ui.label(t.get("created_at", "")[:16].replace("T", " ")).classes("text-caption text-grey")
+                                ui.label(ticket.get("created_at", "")[:16].replace("T", " ")).classes("text-caption text-grey")
 
                             with ui.row().classes("items-center w-full mt-1"):
-                                ui.label(t.get("title", "")).classes("text-subtitle2 text-bold")
+                                ui.label(ticket.get("title", "")).classes("text-subtitle2 text-bold")
 
-                            if t.get("admin_comment"):
+                            if ticket.get("admin_comment"):
                                 with ui.row().classes("w-full mt-1"):
                                     ui.icon("reply").classes("text-grey")
-                                    ui.label(t["admin_comment"]).classes("text-caption text-grey")
+                                    ui.label(ticket["admin_comment"]).classes("text-caption text-grey")
 
             # 初始加载
             asyncio.create_task(refresh_list())
