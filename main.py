@@ -44,6 +44,8 @@ from libs import styles
 from libs import travail_stat
 from libs import dns_resolver
 from libs import check_runtime
+from libs import i18n
+from libs.i18n import t
 from libs import gift as get_gift
 from libs import update as travail_update
 from libs.changelog import changelog, get_log
@@ -185,6 +187,9 @@ init_storage()
 base_config = travail_config.Config()
 base_config.sync_config()
 config = base_config.load()
+
+i18n.set_language(i18n.resolve_language(config["general"].get("language", "auto")))
+logger.debug("界面语言: {}", i18n.get_language())
 
 host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
@@ -2309,7 +2314,7 @@ if __name__ == "__main__":
             native=True,
             window_size=(600, 780),
             reconnect_timeout=30,
-            language="zh-CN",
+            language=i18n.ui_language(),
             use_colors=False
         )  # pyright: ignore[reportArgumentType]
     except Exception:
