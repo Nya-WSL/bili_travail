@@ -1,4 +1,6 @@
 from libs import log
+from libs.i18n import t
+
 logger = log.logger
 
 def format_cd(seconds):
@@ -34,11 +36,11 @@ def format_seconds(seconds) -> str:
     # 格式化输出
     parts = []
     if hours > 0:
-        parts.append(f"{hours}小时")
+        parts.append(t("format.hours", hours=hours))
     if minutes > 0:  # 只有分钟 > 0 时才显示 "分"
-        parts.append(f"{minutes}分")
+        parts.append(t("format.minutes", minutes=minutes))
     if seconds > 0 or (hours == 0 and minutes == 0):  # 有秒或时分均为 0 时，才显示秒
-        parts.append(f"{seconds}秒")
+        parts.append(t("format.seconds", seconds=seconds))
     return sign + "".join(parts)  # 返回结果，注意是字符串形式
 
 def sort_dict(dictionary, type_order=None, sort_within_type=False):

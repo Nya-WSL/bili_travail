@@ -5,6 +5,7 @@ import aiohttp
 
 from nicegui import ui
 from libs import log
+from libs.i18n import t
 from libs import bili_api
 from libs import config as travail_config
 from libs import styles, dns_resolver
@@ -127,7 +128,7 @@ async def about_page():
             except Exception as e:
                 logger.error(f"显示聊天消息失败: {e}")
                 # 显示错误消息
-                ui.notify("加载聊天消息失败，请稍后再试", type="negative")
+                ui.notify(t("about.chat_load_failed"), type="negative")
 
         async def display_message_pair(msg):
             """显示一对聊天消息"""
@@ -168,7 +169,7 @@ async def about_page():
         # 成员显示
         with ui.row(align_items="center"):
             with ui.column(align_items="center"):
-                ui.label("程序开发").classes("text-blue")
+                ui.label(t("about.development")).classes("text-blue")
                 with ui.row(align_items="center"):
                     with ui.column(align_items="center"):
                         with ui.link(
@@ -194,7 +195,7 @@ async def about_page():
                         ui.badge("狐日泽", outline=True)
             ui.separator().props("vertical")
             with ui.column(align_items="center"):
-                ui.label("特别鸣谢").classes("text-blue")
+                ui.label(t("about.thanks")).classes("text-blue")
                 with ui.row(align_items="center"):
                     with ui.column(align_items="center"):
                         with ui.link(
@@ -245,10 +246,10 @@ async def about_page():
         ui.separator()
 
         # 联系我们
-        ui.label(f"联系我们").classes("text-2xl")  # type: ignore[index]
+        ui.label(t("about.contact")).classes("text-2xl")  # type: ignore[index]
         ui.link("GitHub Issues", "https://github.com/Nya-WSL/bili_travail/issues", True)
         ui.link("support@nya-wsl.com", "mailto:support@nya-wsl.com", True)
-        ui.link("Nya-WSL服务与反馈群", "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
+        ui.link(t("about.group"), "https://jq.qq.com/?_wv=1027&k=tSeB0sdy", True)
         ui.separator()
-        ui.link("使用文档", "https://docs.travail.nya-wsl.com", True)
+        ui.link(t("about.docs"), "https://docs.travail.nya-wsl.com", True)
         # ui.html('关注<u><a href="https://space.bilibili.com/3546729020394298" target="_blank">千蚀vita</a></u>谢谢喵', sanitize=False).classes("text-2xl text-white")

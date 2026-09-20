@@ -3,6 +3,7 @@ import orjson
 from nicegui import ui
 from libs import log
 from libs import styles
+from libs.i18n import t
 
 logger = log.logger
 
@@ -29,9 +30,9 @@ def count_page():
         for gift, value in count.items():
             with ui.row():
                 ui.label(gift + ": ")
-                ui.label(str(value["num"]) + "个 / " + str(value["price"] * value["num"]) + "电池")
-            ui.label("送礼用户")
+                ui.label(t("count.gift_unit", num=value["num"], price=value["price"] * value["num"]))
+            ui.label(t("count.senders"))
             for i in value["user"]:
                 ui.label(i)
             ui.separator()
-        ui.label(f"总计：{sum([value['num'] for value in count.values()])}个礼物 / {int(sum([value['price'] * value['num'] for value in count.values()]))}电池")
+        ui.label(t("count.total", num=sum([value['num'] for value in count.values()]), price=int(sum([value['price'] * value['num'] for value in count.values()]))))

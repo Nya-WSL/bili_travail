@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))) # 将上级目录加入路径，用于导入hash模块
 
 from .log import logger
+from .i18n import t
 from . import hash_utils
 from . import dns_resolver
 from . import config as travail_config
@@ -46,7 +47,7 @@ async def update(zip_url, version):
             dialog.close()
 
         dialog.open()
-        percent_dialog.set_text("正在下载更新包")
+        percent_dialog.set_text(t("update.downloading"))
         logger.debug(f"更新包：{url}")
 
         if not os.path.exists("cache"):
@@ -57,9 +58,9 @@ async def update(zip_url, version):
                 cancel_button.on_click(lambda: close_session())
                 if response.status != 200:
 
-                    ui.notify("更新失败", type="negative")
+                    ui.notify(t("update.failed"), type="negative")
                     logger.error(f'更新包下载失败：{response.status} {response.reason}')
-                    percent_dialog.set_text(f'更新失败：{response.status} {response.reason}')
+                    percent_dialog.set_text(t("update.failed_reason", status=response.status, reason=response.reason))
                     await session.close()
                     return
 
@@ -68,17 +69,17 @@ async def update(zip_url, version):
                         chunk = await response.content.read(1024)
                         f.write(chunk)
                         if response.content_length is not None and response.content_length > 0:
-                            percent_dialog.set_text("下载进度：" + "%.2f%%" % (f.tell() / response.content_length * 100))
+                            percent_dialog.set_text(t("update.progress", percent="%.2f%%" % (f.tell() / response.content_length * 100)))
                         else:
-                            percent_dialog.set_text(f"下载中... 已下载 {f.tell()} 字节")
+                            percent_dialog.set_text(t("update.downloading_bytes", bytes=f.tell()))
 
                         if not chunk:
-                            percent_dialog.set_text("下载完成！")
+                            percent_dialog.set_text(t("update.download_done"))
                             await asyncio.sleep(1)
                             break
 
         if base_config.get("bool", "check_sha256", True):
-            percent_dialog.set_text("正在校验SHA256...")
+            percent_dialog.set_text(t("update.checking_sha"))
             try:
                 if "hi168" in url:
                     url = base_config.get("api", "server", None)
@@ -117,18 +118,18 @@ async def update(zip_url, version):
             local_hash = hash_utils.get_hash(save_path).strip().lower()
 
             if server_hash != local_hash:
-                ui.notify("更新失败：SHA256校验未通过，请检查日志", type="negative")
+                ui.notify(t("update.sha_failed"), type="negative")
                 logger.error(f"更新失败：SHA256校验未通过, 服务器返回的SHA256：{server_hash}，本地文件的SHA256：{local_hash}")
-                percent_dialog.set_text("更新失败：SHA256校验未通过，请检查日志")
+                percent_dialog.set_text(t("update.sha_failed"))
                 return
 
         unzip = zipfile.ZipFile(file_name, mode='r')
-        percent_dialog.set_text("正在解压更新包...")
+        percent_dialog.set_text(t("update.extracting"))
         await asyncio.sleep(1)
         for names in unzip.namelist():
             unzip.extract(names, os.getcwd())
         unzip.close()
-        percent_dialog.set_text("正在更新...")
+        percent_dialog.set_text(t("update.updating"))
         await asyncio.sleep(1)
         with open("update.bat", "w") as f:
             f.write(rf"""
@@ -152,10 +153,10 @@ timeout /t 1 /nobreak
 
     with ui.dialog() as dialog, ui.card(align_items="center"):
         percent_dialog = ui.label("")
-        cancel_button = ui.button("取消")
+        cancel_button = ui.button(t("common.cancel"))
         try:
             await download(zip_url, file_name, version)
         except Exception as e:
-            ui.notify(f"更新失败：{e}", type="negative")
+            ui.notify(t("update.failed_reason", status="", reason=e), type="negative")
             logger.error(f"更新失败：{traceback.format_exc()}")
             return
