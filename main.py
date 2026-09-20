@@ -1313,14 +1313,14 @@ async def submit_ticket(ticket_type: str, title: str, description: str, room_id:
                     return False, t("ticket.submit_failed_status", status=response.status), "negative"
 
     except aiohttp.ClientError as e:
-        result = t("ticket.submit_failed_network")
+        result = "工单提交失败，发生网络错误: "
         logger.error(result + traceback.format_exc())
-        return False, result + str(e), "negative"
+        return False, t("ticket.submit_failed_network") + str(e), "negative"
 
     except Exception as e:
-        result = t("ticket.submit_failed")
+        result = "工单提交失败，发生错误: "
         logger.error(result + traceback.format_exc())
-        return False, result + str(e), "negative"
+        return False, t("ticket.submit_failed") + str(e), "negative"
 
 
 async def fetch_tickets(room_id: int) -> tuple[list[dict], str | None, str | None]:
