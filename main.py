@@ -534,7 +534,7 @@ class BiliHandler(blivedm.BaseHandler):
                 async with b_connect_status_lock:
                     b_connect_status = True # 在第一次心跳时设置状态为已连接至弹幕服务器
                 b_connect_switch.set_value(True)
-                b_connect_switch.set_text("已连接弹幕服务器")
+                b_connect_switch.set_text(t("main.status.connected_dm"))
             else:
                 login_status.set_text(t("main.status.disconnected"))
                 login_status.classes(replace="text-red")
@@ -824,7 +824,7 @@ class GiftSimulator:
         :return: (成功, 消息)
         """
         if not self._ensure_available():
-            return False, "模拟环境不满足条件，请检查日志"
+            return False, t("sim.env_not_ready")
 
         is_blind = False
         blind_id = 0
@@ -839,7 +839,7 @@ class GiftSimulator:
                     break
 
             if not is_blind:
-                return False, f"未找到盲盒 {box_name} 对应的礼物id，请先更新礼物"
+                return False, t("sim.box_id_not_found", box=box_name)
 
         global b_connect_status
         original_status = b_connect_status
@@ -853,14 +853,14 @@ class GiftSimulator:
             await self.handler._on_gift_statistics(gift_name, int(num), uname, int(price))
 
             self.sim_count += 1
-            msg = f"模拟礼物 #{self.sim_count}: {uname} 赠送 {gift_name} x{num} (单价{price}电池)"
+            msg = t("sim.gift_sent", n=self.sim_count, uname=uname, gift=gift_name, num=num, price=price)
             if is_blind:
-                msg += f" [盲盒: {box_name}]"
+                msg += t("sim.blind_box_tag", box=box_name)
             self._add_log(msg)
             return True, msg
 
         except Exception as e:
-            err_msg = f"模拟礼物失败: {e}"
+            err_msg = t("sim.failed", error=e)
             self._add_log(err_msg)
             logger.error(f"[Simulator] {err_msg}\n{traceback.format_exc()}")
             return False, err_msg
@@ -884,7 +884,7 @@ def update_btn_state(state: str):
         pause_button.enable()
         add_button.enable()
         sub_button.enable()
-        cancel_button.set_text("停止")
+        cancel_button.set_text(t("main.btn.stop"))
     elif state == "pause":
         resume_button.enable()
         pause_button.disable()
@@ -1099,22 +1099,22 @@ def cd_setting_dialog():
         ui.separator() # 分割线
 
         with ui.row(align_items="center"):
-            gift_name = ui.select(label="礼物选择", options=list(gifts.keys()), with_input=True, clearable=True).style("width: 200px")
+            gift_name = ui.select(label=t("gift.select"), options=list(gifts.keys()), with_input=True, clearable=True).style("width: 200px")
 
-        status = ui.toggle(options={"add": "加时", "sub": "减时", "double": "加倍", "half": "减半", "clear": "清空", "random": "随机"}, on_change=lambda: show()).classes('items-center')
+        status = ui.toggle(options={"add": t("gift.play.add"), "sub": t("gift.play.sub"), "double": t("gift.play.double"), "half": t("gift.play.half"), "clear": t("gift.play.clear"), "random": t("gift.play.random")}, on_change=lambda: show()).classes('items-center')
 
         # 数值输入框
         with ui.row():
-            min = ui.number("随机最小数(秒)", value=0)
-            max = ui.number("随机最大数(秒)", value=0)
-            time = ui.number(label="时长(秒)", value=0, min=0)
+            min = ui.number(t("gift.random_min"), value=0)
+            max = ui.number(t("gift.random_max"), value=0)
+            time = ui.number(label=t("gift.duration"), value=0, min=0)
             time.set_visibility(False)
             min.set_visibility(False)
             max.set_visibility(False)
 
         with ui.column(align_items="center") as rate_column:
-            ui.label("随机玩法权重设置(设置会自动保存) - BETA")
-            ui.link("使用说明", "https://docs.travail.nya-wsl.com/guides/usage/play/#随机权重", True)
+            ui.label(t("gift.random_weight"))
+            ui.link(t("gift.usage_doc"), "https://docs.travail.nya-wsl.com/guides/usage/play/#随机权重", True)
 
         # rate_column.set_visibility(False)
 
@@ -1132,9 +1132,9 @@ def cd_setting_dialog():
 
         # 概率输入框
         with ui.row():
-            rate_nega = ui.number(label="减时概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "nega")
-            rate_zero = ui.number(label="零的概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "zero")
-            rate_posi = ui.number(label="加时概率", value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "posi")
+            rate_nega = ui.number(label=t("gift.rate_nega"), value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "nega")
+            rate_zero = ui.number(label=t("gift.rate_zero"), value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "zero")
+            rate_posi = ui.number(label=t("gift.rate_posi"), value=0, min=0, max=1, step=0.01, on_change=lambda: verify_rate()).bind_value(app.storage.general["gift_cd_rate"], "posi")
             # rate_nega.set_visibility(False)
             # rate_zero.set_visibility(False)
             # rate_posi.set_visibility(False)
@@ -1228,7 +1228,7 @@ def init_task():
     global countdown_timer
     countdown_timer = ct.CountdownTimer(update_btn_state, cancel_button)
     if app.storage.general.get("countdown_time", 0) != 0: # 如果存在可继承的倒计时
-        cancel_button.set_text("重置")
+        cancel_button.set_text(t("main.btn.reset"))
         cancel_button.enable()
         ct.reset_inherit_status = True # 设置重置继承倒计时状态为True
 
@@ -1272,15 +1272,15 @@ async def submit_ticket(ticket_type: str, title: str, description: str, room_id:
     返回 (success, message, notify_type)
     '''
     if not title.strip():
-        return False, "请输入工单标题", "warning"
+        return False, t("ticket.title_required"), "warning"
 
     if not description.strip():
-        return False, "请输入工单描述", "warning"
+        return False, t("ticket.desc_required"), "warning"
 
     url = base_config.get("api", "server", None)
 
     if url is None or url == "":
-        result = "未配置服务器地址，提交工单失败"
+        result = t("ticket.no_server")
         logger.error(result)
         return False, result, "negative"
 
@@ -1302,20 +1302,20 @@ async def submit_ticket(ticket_type: str, title: str, description: str, room_id:
                 if response.status == 201:
                     result = await response.json()
                     logger.info(f"工单提交成功：{result}")
-                    return True, "工单提交成功，感谢您的反馈！", "positive"
+                    return True, t("ticket.submit_success"), "positive"
                 else:
                     error = await response.text()
-                    result = f"工单提交失败，状态码: {response.status}"
+                    result = t("ticket.submit_failed_status", status=response.status)
                     logger.error(f"{result}, 服务器返回: {error}")
                     return False, result, "negative"
 
     except aiohttp.ClientError as e:
-        result = "工单提交失败，发生网络错误: "
+        result = t("ticket.submit_failed_network")
         logger.error(result + traceback.format_exc())
         return False, result + str(e), "negative"
 
     except Exception as e:
-        result = "工单提交失败，发生错误: "
+        result = t("ticket.submit_failed")
         logger.error(result + traceback.format_exc())
         return False, result + str(e), "negative"
 
@@ -1328,7 +1328,7 @@ async def fetch_tickets(room_id: int) -> tuple[list[dict], str | None, str | Non
     url = base_config.get("api", "server", None)
 
     if url is None or url == "":
-        return [], "未配置服务器地址，无法获取工单", "negative"
+        return [], t("ticket.list_no_server"), "negative"
 
     url = f"{url}/tickets"
 
@@ -1344,15 +1344,15 @@ async def fetch_tickets(room_id: int) -> tuple[list[dict], str | None, str | Non
                 else:
                     error = await response.text()
                     logger.error(f"获取工单失败: {error}")
-                    return [], f"获取工单列表失败，状态码: {response.status}", "negative"
+                    return [], t("ticket.list_failed_status", status=response.status), "negative"
 
     except aiohttp.ClientError as e:
         logger.error("获取工单网络错误: " + traceback.format_exc())
-        return [], "获取工单列表失败，发生网络错误: " + str(e), "negative"
+        return [], t("ticket.list_failed_network") + str(e), "negative"
 
     except Exception as e:
         logger.error("获取工单错误: " + traceback.format_exc())
-        return [], "获取工单列表失败，发生错误: " + str(e), "negative"
+        return [], t("ticket.list_failed") + str(e), "negative"
 
 
 async def upload_log(room_id):
@@ -1407,12 +1407,12 @@ async def upload_log(room_id):
 
     except aiohttp.ClientError as e:
         result = "日志上传失败，发生网络错误: "
-        ui.notify(result + str(e), type="negative")
+        ui.notify(t("notify.log_upload_failed_network") + str(e), type="negative")
         logger.error(result + traceback.format_exc())
 
     except Exception as e:
         result = "日志上传失败，发生错误: "
-        ui.notify(result + str(e), type="negative")
+        ui.notify(t("notify.log_upload_failed_error") + str(e), type="negative")
         logger.error(result + traceback.format_exc())
 
     finally:
@@ -1450,7 +1450,7 @@ async def check_b_connect_status():
 
         ui.notify(t("notify.disconnected"))
         b_connect_switch.set_value(False)
-        b_connect_switch.set_text("连接至弹幕服务器")
+        b_connect_switch.set_text(t("main.switch.connect"))
         login_status.set_text(t("main.status.disconnected"))
         login_status.classes(replace="text-red")
 
@@ -1467,7 +1467,7 @@ async def check_b_connect_status():
             asyncio.create_task(start_handler())
             ui.timer(60, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
-            b_connect_switch.set_text("尝试连接弹幕服务器")
+            b_connect_switch.set_text(t("main.status.connecting"))
             login_status.set_text(t("main.status.disconnected"))
             login_status.classes(replace="text-red")
         else:
@@ -1556,12 +1556,12 @@ async def refresh_gift_loop():
     if gift_config:
         result = "礼物数据定时更新完成"
         with main_card:
-            ui.notify(result, type="positive")
+            ui.notify(t("notify.gift_updated"), type="positive")
         logger.info(result)
     else:
         result = f"定时更新礼物数据失败: gift_config return {gift_config}"
         with main_card:
-            ui.notify(result, type="negative")
+            ui.notify(t("notify.gift_update_loop_failed", result=gift_config), type="negative")
         logger.error(result)
 
 
@@ -1732,25 +1732,25 @@ def index():
                                 if server is None:
                                     result = f"获取直链失败: {result.get('message', '未知错误')}"
                                     logger.error(result)
-                                    ui.notify(result, type="negative")
+                                    ui.notify(t("notify.update_url_failed", message=result.get('message', t("common.unknown"))), type="negative")
                                     return
                             else:
                                 error = await response.text()
                                 result = f"获取直链失败:{error}，状态码: {response.status}"
                                 logger.error(result)
-                                ui.notify(result, type="negative")
+                                ui.notify(t("notify.update_url_failed_status", status=response.status), type="negative")
                                 return
 
                 except aiohttp.ClientError as e:
                     result = f"获取直链失败，发生网络错误: {e}"
                     logger.error(result + "\n" + traceback.format_exc())
-                    ui.notify(result, type="negative")
+                    ui.notify(t("notify.update_url_failed_network") + str(e), type="negative")
                     return
 
                 except Exception as e:
                     result = f"获取直链失败，发生错误: {e}"
                     logger.error(result + "\n" + traceback.format_exc())
-                    ui.notify(result, type="negative")
+                    ui.notify(t("notify.update_url_failed_error") + str(e), type="negative")
                     return
 
             else:
@@ -1763,7 +1763,7 @@ def index():
                 ui.label(t("dialog.update_version", current=version, latest=status))
                 source = get_source()
                 # server_select = ui.select(options={"auto": "自动检测", "hi168": "国内首选", "CN-HK": "国内备用", "CN-QN": "国内CDN", "GitHub": "GitHub"}, label=t("dialog.select_update_source"), value="auto").classes("w-1/2")
-                server_select = ui.select(options=source.get("source", {"auto": "自动检测"}), label=t("dialog.select_update_source"), value="auto").classes("w-1/2")  # pyright: ignore[reportArgumentType]
+                server_select = ui.select(options=source.get("source", {"auto": t("dialog.auto_detect")}), label=t("dialog.select_update_source"), value="auto").classes("w-1/2")  # pyright: ignore[reportArgumentType]
                 ui.button(t("dialog.update"), on_click=lambda: update(source, server_select.value))  # pyright: ignore[reportArgumentType]
                 for k,v in get_version().items():
                     with ui.timeline(side="right", layout="dense", color="btn"):
@@ -1889,22 +1889,22 @@ def index():
 
     def ticket_dialog() -> ui.dialog:
         with ui.dialog() as ticket_dialog, ui.card(align_items="center").style("min-width: 400px; max-width: 500px;"):
-            ui.label("提交工单").classes("text-h6 text-bold")
+            ui.label(t("ticket.submit_title")).classes("text-h6 text-bold")
 
             ticket_type_select = ui.select(
-                options={"bug": "Bug反馈", "feature": "功能请求"},
-                label="工单类型",
+                options={"bug": t("ticket.type.bug"), "feature": t("ticket.type.feature")},
+                label=t("ticket.type"),
                 value="bug",
             ).style("width: 100%")
 
             title_input = ui.input(
-                label="标题",
-                placeholder="请输入工单标题",
+                label=t("ticket.title"),
+                placeholder=t("ticket.title_placeholder"),
             ).style("width: 100%").props("clearable")
 
             description_textarea = ui.textarea(
-                label="详细描述",
-                placeholder="请详细描述您遇到的问题或期望的功能...",
+                label=t("ticket.description"),
+                placeholder=t("ticket.description_placeholder"),
             ).style("width: 100%").props("clearable rows=5")
 
             async def do_submit():
@@ -1921,22 +1921,22 @@ def index():
                         ticket_dialog.close()
 
             with ui.row().classes("justify-end w-full mt-2"):
-                ui.button("取消", on_click=lambda: ticket_dialog.close())
-                ui.button("提交", on_click=lambda: asyncio.create_task(do_submit()), color=base_config.get("color", "btn_color", "btn"))
+                ui.button(t("common.cancel"), on_click=lambda: ticket_dialog.close())
+                ui.button(t("common.submit"), on_click=lambda: asyncio.create_task(do_submit()), color=base_config.get("color", "btn_color", "btn"))
 
         return ticket_dialog
 
     STATUS_MAP = {
-        "pending": ("待处理", "#C4AD8A"),
-        "processing": ("处理中", "#8A9EB0"),
-        "resolved": ("已解决", "#7BA08B"),
-        "closed": ("已关闭", "#8B8B8B"),
+        "pending": (t("ticket.status.pending"), "#C4AD8A"),
+        "processing": (t("ticket.status.processing"), "#8A9EB0"),
+        "resolved": (t("ticket.status.resolved"), "#7BA08B"),
+        "closed": (t("ticket.status.closed"), "#8B8B8B"),
     }
 
     def ticket_list_dialog() -> ui.dialog:
         with ui.dialog() as ticket_list_dialog, ui.card(align_items="center").style("min-width: 550px; max-width: 650px; max-height: 70vh;"):
             with ui.row().classes("items-center justify-between w-full"):
-                ui.label("我的工单").classes("text-h6 text-bold")
+                ui.label(t("ticket.my_tickets")).classes("text-h6 text-bold")
                 ui.button(icon="refresh", on_click=lambda: asyncio.create_task(refresh_list())).props("flat round")
 
             tickets_container = ui.column().classes("w-full gap-3 overflow-auto").style("max-height: 50vh;")
@@ -1952,13 +1952,13 @@ def index():
                         ui.notify(error_msg, type=notify_type)
 
                     if not tickets:
-                        ui.label("暂无工单记录").classes("text-grey q-pa-lg")
+                        ui.label(t("ticket.empty")).classes("text-grey q-pa-lg")
                         return
 
                     # 循环变量不能命名为 t，否则会遮蔽翻译函数 t()
                     for ticket in tickets:
-                        status_label, status_color = STATUS_MAP.get(ticket.get("status", "pending"), ("未知", "grey"))
-                        type_label = "Bug反馈" if ticket.get("type") == "bug" else "功能请求"
+                        status_label, status_color = STATUS_MAP.get(ticket.get("status", "pending"), (t("ticket.status.unknown"), "grey"))
+                        type_label = t("ticket.type.bug") if ticket.get("type") == "bug" else t("ticket.type.feature")
 
                         with ui.card().classes("w-full").style("padding: 12px;"):
                             with ui.row().classes("items-center justify-between w-full"):
@@ -1980,7 +1980,7 @@ def index():
             asyncio.create_task(refresh_list())
 
             with ui.row().classes("justify-end w-full mt-2"):
-                ui.button("关闭", on_click=lambda: ticket_list_dialog.close())
+                ui.button(t("common.close"), on_click=lambda: ticket_list_dialog.close())
 
         return ticket_list_dialog
 
@@ -2177,18 +2177,18 @@ def index():
                 with ui.row(align_items="center"):
                     # 礼物选择
                     sim_gift_select = ui.select(
-                        label="礼物选择",
+                        label=t("sim.gift"),
                         options=[],
                         with_input=True,
                         clearable=True,
                     ).style("width: 160px")
 
                     # 盲盒礼物开关与盲盒选择
-                    with ui.switch("盲盒礼物", value=False).props('color="btn"') as sim_box_switch:
-                        ui.tooltip("模拟从盲盒中开出的礼物，「礼物选择」为开出的礼物，「盲盒选择」为其所属的盲盒")
+                    with ui.switch(t("sim.blind_box_switch"), value=False).props('color="btn"') as sim_box_switch:
+                        ui.tooltip(t("sim.tooltip_box"))
 
                     sim_box_select = ui.select(
-                        label="盲盒选择",
+                        label=t("sim.box"),
                         options=[],
                         with_input=True,
                         clearable=True,
@@ -2198,25 +2198,25 @@ def index():
                     sim_box_switch.on_value_change(lambda e: sim_box_select.set_visibility(e.value))
 
                 with ui.row(align_items="center"):
-                    sim_num = ui.number("数量", value=1, min=1, max=9999).style("width: 100px")
-                    sim_price = ui.number("单价(电池)", value=0, min=0, max=999999).style("width: 120px")
-                    sim_uname = ui.input("用户名", value="测试用户").style("width: 130px")
+                    sim_num = ui.number(t("sim.num"), value=1, min=1, max=9999).style("width: 100px")
+                    sim_price = ui.number(t("sim.price"), value=0, min=0, max=999999).style("width: 120px")
+                    sim_uname = ui.input(t("sim.uname"), value=t("sim.default_uname")).style("width: 130px")
 
                 with ui.row(align_items="center"):
-                    sim_status = ui.label("就绪 - 请先开始倒计时，再发送模拟礼物").classes("text-grey text-caption")
+                    sim_status = ui.label(t("sim.ready")).classes("text-grey text-caption")
 
                 with ui.row():
                     async def do_simulate_gift():
                         gift = sim_gift_select.value
                         if not gift:
-                            sim_status.set_text("请选择礼物")
+                            sim_status.set_text(t("sim.select_gift"))
                             sim_status.classes(replace="text-red")
                             return
 
                         box_name = sim_box_select.value if sim_box_switch.value else None
 
                         if sim_box_switch.value and not box_name:
-                            sim_status.set_text("请选择盲盒")
+                            sim_status.set_text(t("sim.select_box"))
                             sim_status.classes(replace="text-red")
                             return
 
@@ -2228,15 +2228,15 @@ def index():
                             box_name=box_name,
                         )
                         if success:
-                            sim_status.set_text(f"成功: {msg}")
+                            sim_status.set_text(t("sim.success", msg=msg))
                             sim_status.classes(replace="text-green")
                             # 刷新 OBS 叠加层
                             capture_cd.refresh_capture_cd = True
                         else:
-                            sim_status.set_text(f"失败: {msg}")
+                            sim_status.set_text(t("sim.failure", msg=msg))
                             sim_status.classes(replace="text-red")
 
-                    ui.button("发送模拟礼物", on_click=lambda: asyncio.ensure_future(do_simulate_gift()))
+                    ui.button(t("sim.send"), on_click=lambda: asyncio.ensure_future(do_simulate_gift()))
 
                 # 动态刷新礼物选择列表
                 def refresh_sim_gift_options():
