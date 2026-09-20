@@ -178,6 +178,7 @@
     "gift.play.half": "Halve",
     "gift.play.clear": "Clear",
     "gift.play.random": "Random",
+    "gift.reset_all": "Reset all",
     "dialog.auto_detect": "Auto detect",
     "common.unknown": "Unknown error",
     "notify.log_upload_failed_network": "Failed to upload log, network error: ",

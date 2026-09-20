@@ -178,6 +178,7 @@
     "gift.play.half": "减半",
     "gift.play.clear": "清空",
     "gift.play.random": "随机",
+    "gift.reset_all": "重置全部",
     "dialog.auto_detect": "自动检测",
     "common.unknown": "未知错误",
     "notify.log_upload_failed_network": "日志上传失败，发生网络错误: ",
