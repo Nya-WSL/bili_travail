@@ -1,0 +1,19 @@
+{
+    "__language_name__": "English",
+    "common.confirm": "OK",
+    "common.cancel": "Cancel",
+    "common.close": "Close",
+    "common.delete": "Delete",
+    "common.submit": "Submit",
+    "common.load": "Load",
+    "common.save": "Save",
+    "common.clear": "Clear",
+    "common.yes": "Yes",
+    "common.no": "No",
+    "settings.language": "Language",
+    "settings.language_auto": "Follow system",
+    "settings.language_restart": "Language saved. Restart the app to apply.",
+    "format.hours": "{hours}h",
+    "format.minutes": "{minutes}m",
+    "format.seconds": "{seconds}s"
+}
