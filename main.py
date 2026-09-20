@@ -536,7 +536,7 @@ class BiliHandler(blivedm.BaseHandler):
                 b_connect_switch.set_value(True)
                 b_connect_switch.set_text("已连接弹幕服务器")
             else:
-                login_status.set_text("未连接")
+                login_status.set_text(t("main.status.disconnected"))
                 login_status.classes(replace="text-red")
 
     # 礼物数据
@@ -1451,7 +1451,7 @@ async def check_b_connect_status():
         ui.notify("已断开连接")
         b_connect_switch.set_value(False)
         b_connect_switch.set_text("连接至弹幕服务器")
-        login_status.set_text("未连接")
+        login_status.set_text(t("main.status.disconnected"))
         login_status.classes(replace="text-red")
 
     # 开关为"null"状态：尝试连接
@@ -1468,7 +1468,7 @@ async def check_b_connect_status():
             ui.timer(60, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
             b_connect_switch.set_text("尝试连接弹幕服务器")
-            login_status.set_text("未连接")
+            login_status.set_text(t("main.status.disconnected"))
             login_status.classes(replace="text-red")
         else:
             b_connect_switch.set_value(True)
@@ -2014,43 +2014,43 @@ def index():
 
         # 时间输入框
         with ui.row():
-            input_hour = ui.number("时", value=0, min=0).style("width: 100px")
-            input_minute = ui.number("分", value=0, min=0).style("width: 100px")
-            input_second = ui.number("秒", value=0, min=0).style("width: 100px")
+            input_hour = ui.number(t("main.input.hour"), value=0, min=0).style("width: 100px")
+            input_minute = ui.number(t("main.input.minute"), value=0, min=0).style("width: 100px")
+            input_second = ui.number(t("main.input.second"), value=0, min=0).style("width: 100px")
 
         # 倒计时按钮
         with ui.row():
             # Start button
-            start_button = ui.button('开始', on_click=lambda: start_task())
+            start_button = ui.button(t('main.btn.start'), on_click=lambda: start_task())
             start_button.disable()
 
             # Pause button
-            pause_button = ui.button('暂停', on_click=lambda: countdown_timer.pause())
+            pause_button = ui.button(t('main.btn.pause'), on_click=lambda: countdown_timer.pause())
             pause_button.disable()
 
             # Resume button
-            resume_button = ui.button('继续', on_click=lambda: countdown_timer.resume())
+            resume_button = ui.button(t('main.btn.resume'), on_click=lambda: countdown_timer.resume())
             resume_button.disable()
 
             # Stop button
-            cancel_button = ui.button('停止', on_click=lambda: countdown_timer.stop())
+            cancel_button = ui.button(t('main.btn.stop'), on_click=lambda: countdown_timer.stop())
             cancel_button.disable()
 
         with ui.row():
             # Add time Button
-            add_button = ui.button("增加", on_click=lambda: add_time())
+            add_button = ui.button(t("main.btn.add"), on_click=lambda: add_time())
             add_button.disable()
 
             # Sub Time Button
-            sub_button = ui.button("减少", on_click=lambda: sub_time())
+            sub_button = ui.button(t("main.btn.sub"), on_click=lambda: sub_time())
             sub_button.disable()
 
-            save_button = ui.button("保存", on_click=lambda: save_time())
-            load_button = ui.button("读取", on_click=lambda: load_time())
+            save_button = ui.button(t("main.btn.save"), on_click=lambda: save_time())
+            load_button = ui.button(t("main.btn.load"), on_click=lambda: load_time())
 
         ui.separator()
 
-        content = {"1": "账号设置", "2": "礼物设置", "3": "显示设置", "4": "外观设置", "5": "统计相关", "6": "程序设置", "7": "模拟测试"} # 所有tab的标题
+        content = {"1": t("main.tab.account"), "2": t("main.tab.gift"), "3": t("main.tab.display"), "4": t("main.tab.appearance"), "5": t("main.tab.stats"), "6": t("main.tab.program"), "7": t("main.tab.simulator")} # 所有tab的标题
 
         # 创建标签页
         with ui.tabs() as tabs:
@@ -2063,21 +2063,21 @@ def index():
                 with ui.row(align_items="center"):
                     with ui.column(align_items="center").classes("gap-0"):
                         # 身份码
-                        auth_code = ui.input("身份码", on_change=lambda: base_config.save(config), password=True, password_toggle_button=True).style("width: 120px")
+                        auth_code = ui.input(t("main.input.auth_code"), on_change=lambda: base_config.save(config), password=True, password_toggle_button=True).style("width: 120px")
                         auth_code.bind_value(config["general"], "auth_code") # 实时写入身份码到配置文件
                         with ui.row().classes("gap-0"):
-                            ui.label("房间号：")
-                            login_status = ui.label("未连接").classes("text-red")
+                            ui.label(t("main.label.room_id"))
+                            login_status = ui.label(t("main.status.disconnected")).classes("text-red")
 
                 with ui.column(align_items="center").classes("gap-0"):
-                    b_connect_switch = ui.switch("连接至弹幕服务器", on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="#7BA08B" unchecked-icon="clear"')
+                    b_connect_switch = ui.switch(t("main.switch.connect"), on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="#7BA08B" unchecked-icon="clear"')
 
                     with ui.row(align_items="center"):
-                        with ui.switch("忽略倒计时", value=app.storage.general.get("ignore_cd", False), on_change=lambda e: change_ignore_cd("ignore_cd", e.value)).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
-                            ui.tooltip("启用时在倒计时结束后（包括暂停时）仍然会触发加减时，与倒计时结束后断开连接互斥")
+                        with ui.switch(t("main.switch.ignore_cd"), value=app.storage.general.get("ignore_cd", False), on_change=lambda e: change_ignore_cd("ignore_cd", e.value)).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
+                            ui.tooltip(t("main.tooltip.ignore_cd"))
 
-                        with ui.switch("倒计时结束后断开连接", value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)) as exit_timer_switch:
-                            ui.tooltip(f"倒计时结束后是否断开弹幕服务器连接，与忽略倒计时互斥")
+                        with ui.switch(t("main.switch.exit_timer"), value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)) as exit_timer_switch:
+                            ui.tooltip(t("main.tooltip.exit_timer"))
                         exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
                         exit_timer_switch.on_value_change(lambda e: exit_timer_delay.set_visibility(e.value))
                         exit_timer_switch.on_value_change(lambda e: change_ignore_cd("exit_timer", e.value))
@@ -2089,7 +2089,7 @@ def index():
                             change_ignore_cd("ignore_cd", True)
 
                         with ui.number(value=base_config.get("num", "exit_time", 0), min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "exit_time") as exit_timer_delay:
-                            ui.tooltip("倒计时结束后断开连接的延迟时间，单位为秒")
+                            ui.tooltip(t("main.tooltip.exit_delay"))
                         exit_timer_delay.style("width: 60px")
                         exit_timer_delay.set_visibility(exit_timer_switch.value)
 
@@ -2108,47 +2108,47 @@ def index():
                 #         short_time.set_visibility(False)
 
                 with ui.row():
-                    ui.button("设置礼物", on_click=lambda: cd_setting_dialog())
-                    ui.button("更新礼物", on_click=lambda: refresh_gift())
+                    ui.button(t("main.btn.gift_setting"), on_click=lambda: cd_setting_dialog())
+                    ui.button(t("main.btn.gift_refresh"), on_click=lambda: refresh_gift())
 
             with ui.tab_panel("3").classes("items-center").style("height: 210px;"):
                 with ui.row(align_items="center").classes("gap-0"):
-                    show_capture_rank_list_switch = ui.switch("OBS显示排行榜", value=False, on_change=lambda: base_config.save(config))
+                    show_capture_rank_list_switch = ui.switch(t("main.switch.capture_rank"), value=False, on_change=lambda: base_config.save(config))
                     show_capture_rank_list_switch.bind_value(config["bool"], "show_capture_rank_list").props('color="btn"')
 
-                    show_capture_gift_list_switch = ui.switch("OBS显示投喂记录", value=False, on_change=lambda: base_config.save(config))
+                    show_capture_gift_list_switch = ui.switch(t("main.switch.capture_gift"), value=False, on_change=lambda: base_config.save(config))
                     show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
 
-                    with ui.switch("无边框倒计时", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
-                        ui.tooltip("启用时OBS页面倒计时将不显示边框，仅显示数字")
+                    with ui.switch(t("main.switch.borderless_cd"), value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
+                        ui.tooltip(t("main.tooltip.borderless"))
 
             with ui.tab_panel("4").classes("items-center").style("height: 210px;"):
                 with ui.row():
-                    ui.color_input(label="计时颜色", value="#9BA89A", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label="按钮颜色", value="#7A8FA0", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label="背景颜色", value="#FCFCFA", on_change=lambda: base_config.save(config), preview=config["color"]["bg_color"]).style(f"width: 120px").bind_value(config["color"], "bg_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label=t("main.color.time"), value="#9BA89A", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label=t("main.color.btn"), value="#7A8FA0", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label=t("main.color.bg"), value="#FCFCFA", on_change=lambda: base_config.save(config), preview=config["color"]["bg_color"]).style(f"width: 120px").bind_value(config["color"], "bg_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
 
                 with ui.row():
-                    ui.color_input(label="主界面字体颜色", value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["main_text_color"]).style(f"width: 140px").bind_value(config["color"], "main_text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label="子页面字体颜色", value="#4A4A4A", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 140px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label=t("main.color.main_text"), value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["main_text_color"]).style(f"width: 140px").bind_value(config["color"], "main_text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+                    ui.color_input(label=t("main.color.sub_text"), value="#4A4A4A", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 140px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
 
             with ui.tab_panel("5").classes("items-center").style("height: 210px;"):
                 with ui.row():
-                    ui.button("盲盒盈亏", on_click=lambda: blind_box_value_dialog())
-                    ui.button("礼物统计", on_click=lambda: ui.navigate.to("/count", True))
+                    ui.button(t("main.btn.blind_box"), on_click=lambda: blind_box_value_dialog())
+                    ui.button(t("main.btn.gift_stats"), on_click=lambda: ui.navigate.to("/count", True))
 
             with ui.tab_panel("6").classes("items-center gap-1").style("height: 210px;"):
                 with ui.row():
                     # Login bilibili button
-                    ui.button("登录账号", on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
+                    ui.button(t("main.btn.login"), on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
                     # Update version button
-                    ui.button("检查更新", on_click=lambda: check_update())
+                    ui.button(t("main.btn.check_update"), on_click=lambda: check_update())
                     # Changelog button
-                    ui.button("更新日志", on_click=lambda: changelog_dialog().open())
-                    ui.button("上传日志", on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
+                    ui.button(t("main.btn.changelog"), on_click=lambda: changelog_dialog().open())
+                    ui.button(t("main.btn.upload_log"), on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
 
                 with ui.row(align_items="center"):
-                    ui.switch("自动检查更新", value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
+                    ui.switch(t("main.switch.auto_update"), value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
 
                 with ui.row(align_items="center"):
                     def language_options() -> dict:
@@ -2258,18 +2258,18 @@ def index():
                 sim_refresh_timer = ui.timer(10, lambda: refresh_sim_gift_options())
 
         # obs源
-        with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify("已复制至剪贴板", type="info")):
-            ui.tooltip("OBS & 直播姬浏览器源URL，单击可复制至剪贴板")
-        with ui.link("使用文档", "https://docs.travail.nya-wsl.com", True):
-            ui.tooltip("点击查看使用说明书")
+        with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify(t("notify.copied"), type="info")):
+            ui.tooltip(t("main.tooltip.obs_url"))
+        with ui.link(t("main.link.docs"), "https://docs.travail.nya-wsl.com", True):
+            ui.tooltip(t("main.tooltip.docs"))
 
         init_task()
 
     # 右下角悬浮按钮组
     with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
         with ui.row().classes("gap-1.5"):
-            ui.button(on_click=lambda: ticket_dialog().open(), icon='bug_report').props('fab').tooltip("提交工单")
-            ui.button(on_click=lambda: ticket_list_dialog().open(), icon='inbox').props('fab').tooltip("查看工单")
+            ui.button(on_click=lambda: ticket_dialog().open(), icon='bug_report').props('fab').tooltip(t("main.tooltip.ticket"))
+            ui.button(on_click=lambda: ticket_list_dialog().open(), icon='inbox').props('fab').tooltip(t("main.tooltip.ticket_list"))
             ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @app.on_startup
