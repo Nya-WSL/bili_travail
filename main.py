@@ -2150,6 +2150,26 @@ def index():
                 with ui.row(align_items="center"):
                     ui.switch("自动检查更新", value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
 
+                with ui.row(align_items="center"):
+                    def language_options() -> dict:
+                        return {"auto": t("settings.language_auto"), **i18n.available_languages()}
+
+                    lang_select = ui.select(
+                        label=t("settings.language"),
+                        options=language_options(),
+                        value=config["general"].get("language", "auto"),
+                    ).style("width: 160px")
+
+                    def change_language(e):
+                        config["general"]["language"] = e.value
+                        base_config.save(config)
+                        ui.notify(t("settings.language_restart"), type="info")
+
+                    lang_select.on_value_change(change_language)
+
+                    # 切到本标签页时重新扫描语言目录，运行中新增的语言文件会立即出现
+                    tabs.on_value_change(lambda e: lang_select.set_options(language_options()) if e.value == "6" else None)
+
             with ui.tab_panel("7").classes("items-center").style("height: 210px;") as sim_panel:
                 global simulator
                 simulator = GiftSimulator()
