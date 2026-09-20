@@ -458,7 +458,7 @@ def check_sys():
 
 @ui.page("/debug", response_timeout=30)
 async def debug():
-    ui.label(f"统计时间: {datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')}")
+    ui.label(t("debug.stats_time", time=datetime.datetime.now().strftime('%Y.%m.%d %H:%M:%S')))
     for k, v in check_sys().items():
         if isinstance(v, list):
             ui.label(f"{k}: {', '.join(map(str, v))}")
@@ -515,13 +515,13 @@ class BiliHandler(blivedm.BaseHandler):
             GiftManager.set_room_id(room_id)
 
             with main_card:
-                ui.notify("正在等待B站下发自定义礼物数据，请稍候...", type="info")
+                ui.notify(t("notify.waiting_gift_data"), type="info")
                 await asyncio.sleep(5) # 等待5秒B站发送自定义礼物数据
 
                 try:
                     await refresh_gift(True) # 刷新礼物数据
                 except Exception:
-                    ui.notify("获取礼物数据失败，可能导致部分功能异常", type="warning")
+                    ui.notify(t("notify.gift_data_failed"), type="warning")
 
             logger.info(f"已连接至{room_id}")
 
@@ -953,9 +953,9 @@ def cd_setting_dialog():
 
         if gift_name.value is None or time.value < 0:
             if gift_name.value is None:
-                ui.notify("请选择礼物", type="negative")
+                ui.notify(t("notify.select_gift"), type="negative")
             if time.value < 0:
-                ui.notify("时间不能是负数", type="negative")
+                ui.notify(t("notify.time_not_negative"), type="negative")
         else:
             if status.value == "add":
                 gifts[gift_name.value] = int(time.value)
@@ -982,10 +982,10 @@ def cd_setting_dialog():
                     if min.value <= max.value:
                         special[gift_name.value] = [int(min.value), int(max.value)]
                     else:
-                        ui.notify("随机的值必须最小数<=最大数", type="negative")
+                        ui.notify(t("notify.random_range_invalid"), type="negative")
                         return
                 except TypeError:
-                    ui.notify("随机的值为空", type="negative")
+                    ui.notify(t("notify.random_empty"), type="negative")
                 if gift_name.value in gifts:
                     gifts.pop(gift_name.value)
 
@@ -1007,11 +1007,11 @@ def cd_setting_dialog():
             refresh_card()
 
         with ui.dialog() as double_check_dialog, ui.card(align_items="center"):
-            ui.label("是否确认重置所有礼物？")
+            ui.label(t("dialog.reset_all_gifts"))
 
             with ui.row():
-                ui.button("确认重置", on_click=lambda: double_check())
-                ui.button("取消重置", on_click=lambda: double_check_dialog.close())
+                ui.button(t("dialog.confirm_reset"), on_click=lambda: double_check())
+                ui.button(t("dialog.cancel_reset"), on_click=lambda: double_check_dialog.close())
 
         double_check_dialog.open()
 
@@ -1057,7 +1057,7 @@ def cd_setting_dialog():
                     ui.label(k)
                     ui.space()
                     ui.label(format_seconds(v))
-                    ui.button("删除", on_click=lambda k = k: del_gift(False, k))
+                    ui.button(t("common.delete"), on_click=lambda k = k: del_gift(False, k))
 
         if special != {}: # 如果特殊礼物的数据不是空的
             for k,v in special.items():
@@ -1066,7 +1066,7 @@ def cd_setting_dialog():
                         ui.label(k)
                         ui.space()
                         ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
+                        ui.button(t("common.delete"), on_click=lambda k = k: del_gift(True, k))
                 else:
                     with ui.row().classes('w-full'):
                         ui.label(k)
@@ -1080,7 +1080,7 @@ def cd_setting_dialog():
                         if v == "half":
                             v = "减半"
                         ui.label(v)
-                        ui.button("删除", on_click=lambda k = k: del_gift(True, k))
+                        ui.button(t("common.delete"), on_click=lambda k = k: del_gift(True, k))
 
     def refresh_card():
         gift_card.clear()  # 清空卡片内容
@@ -1091,7 +1091,7 @@ def cd_setting_dialog():
     with ui.dialog() as cd_dialog, ui.card(align_items="center"):
         gifts = _read_json_cached("data/gift_img.json") or {}
 
-        ui.label("设置预览").classes("text-2xl text-blue").style("font-size: 20px")
+        ui.label(t("dialog.gift_preview")).classes("text-2xl text-blue").style("font-size: 20px")
 
         with ui.card().classes("w-full") as gift_card:
             create_card()
@@ -1141,10 +1141,10 @@ def cd_setting_dialog():
 
         # 按钮
         with ui.row():
-            ui.button('提交', on_click=lambda: run())
-            ui.button("删除", on_click=lambda: delete())
-            ui.button("重置全部", on_click=lambda: reset())
-            ui.button('关闭', on_click=lambda: cd_dialog.close())
+            ui.button(t("common.submit"), on_click=lambda: run())
+            ui.button(t("common.delete"), on_click=lambda: delete())
+            ui.button(t("gift.reset_all"), on_click=lambda: reset())
+            ui.button(t("common.close"), on_click=lambda: cd_dialog.close())
 
     cd_dialog.open() # 打开弹窗
 
@@ -1172,7 +1172,7 @@ def blind_box_value_dialog():
                 price = int(value["price"])
                 if value_list.get(k, None) is None:
                     value_list[k] = []
-                value_list[k].append(f"礼物：{gift_name} | 数量：{num} | 总价格：{num * price}电池")
+                value_list[k].append(t("dialog.blind_box_gift", name=gift_name, num=num, total=num * price))
 
             blind_all_price = 0
             for gift_name, gift_value in v.items():
@@ -1181,18 +1181,18 @@ def blind_box_value_dialog():
 
         with value_card:
             for box_name in box_value.keys():
-                ui.label(f"{box_name} | 价格：{gift_price_list[box_name]}电池")
+                ui.label(t("dialog.blind_box_price", box=box_name, price=gift_price_list[box_name]))
                 for k,v in value_list.items():
                     if k == box_name:
                         for i in v:
                             ui.label(i)
-                        ui.label(f"盈亏：{price_list[k]}电池")
+                        ui.label(t("dialog.blind_box_profit", profit=price_list[k]))
                 ui.separator() # 分割线
 
             all_price = 0
             for i in price_list.values():
                 all_price += i
-            ui.label(f"总盈亏：{all_price}电池")
+            ui.label(t("dialog.blind_box_total_profit", profit=all_price))
 
     def clear_box_value():
         def do_clear():
@@ -1201,15 +1201,15 @@ def blind_box_value_dialog():
             value_card.clear()
             get_box_value()
             with main_card:
-                ui.notify("盲盒统计已清空", type="positive")
+                ui.notify(t("notify.blind_box_cleared"), type="positive")
 
         # 二次确认清空盲盒统计
         with ui.dialog() as clear_confirm_dialog, ui.card(align_items="center"):
-            ui.label("是否确认清空所有盲盒统计？")
+            ui.label(t("dialog.confirm_clear_blind_box"))
 
             with ui.row():
-                ui.button("确认清空", on_click=lambda: do_clear())
-                ui.button("取消", on_click=lambda: clear_confirm_dialog.close())
+                ui.button(t("dialog.confirm_clear"), on_click=lambda: do_clear())
+                ui.button(t("common.cancel"), on_click=lambda: clear_confirm_dialog.close())
 
         clear_confirm_dialog.open()
 
@@ -1219,7 +1219,7 @@ def blind_box_value_dialog():
     with ui.dialog() as value_dialog, ui.card(align_items="center") as value_card:
         ui.label().set_visibility(False)
         get_box_value()
-        ui.button("清空", on_click=lambda: clear_box_value())
+        ui.button(t("common.clear"), on_click=lambda: clear_box_value())
 
     value_dialog.open()
 
@@ -1252,7 +1252,7 @@ def add_time():
             new_seconds = countdown_timer.remaining_seconds + delta
             countdown_timer.set_remaining_seconds(new_seconds)
     except NameError:
-        ui.notify("请先开始计时", type="negative")
+        ui.notify(t("notify.start_timer_first"), type="negative")
 
 
 # 手动减时
@@ -1263,7 +1263,7 @@ def sub_time():
             new_seconds = countdown_timer.remaining_seconds - delta
             countdown_timer.set_remaining_seconds(new_seconds)
     except NameError:
-        ui.notify("请先开始计时", type="negative")
+        ui.notify(t("notify.start_timer_first"), type="negative")
 
 
 async def submit_ticket(ticket_type: str, title: str, description: str, room_id: int) -> tuple[bool, str, str]:
@@ -1365,14 +1365,14 @@ async def upload_log(room_id):
 
     if url is None or url == "":
         result = "未配置服务器地址，上传日志失败"
-        ui.notify(result, type="negative")
+        ui.notify(t("notify.no_server"), type="negative")
         logger.error(result)
         return
 
     # 验证文件是否存在
     if not os.path.exists(file_path):
         result = f"文件不存在: {file_path}"
-        ui.notify(result, type="negative")
+        ui.notify(t("notify.file_missing", path=file_path), type="negative")
         logger.error(result)
         return
 
@@ -1396,12 +1396,12 @@ async def upload_log(room_id):
             async with session.post(url, data=data) as response:
                 if response.status == 201:
                     result = await response.json()
-                    ui.notify(f"日志上传成功，状态码：{result.get('status', None)}", type="positive")
+                    ui.notify(t("notify.log_uploaded", status=result.get('status', None)), type="positive")
                     logger.info(f"日志上传成功：{result}")
                 else:
                     error = await response.text()
                     result = f"日志上传失败，状态码: {response.status}"
-                    ui.notify(result, type="negative")
+                    ui.notify(t("notify.log_upload_failed", status=response.status), type="negative")
                     logger.error(f"{result}")
                     logger.error(f"服务器返回错误: {error}")
 
@@ -1427,7 +1427,7 @@ async def check_b_connect_status():
 
     def disconnect_timer():
         if b_connect_switch.value == "null":
-            ui.notify("连接超时，请检查日志", type="negative")
+            ui.notify(t("notify.connect_timeout"), type="negative")
             b_connect_switch.set_value(False)
 
     # 开关关闭状态：断开连接
@@ -1448,7 +1448,7 @@ async def check_b_connect_status():
         else:
             logger.warning("弹幕服务器ws连接未建立，跳过断开")
 
-        ui.notify("已断开连接")
+        ui.notify(t("notify.disconnected"))
         b_connect_switch.set_value(False)
         b_connect_switch.set_text("连接至弹幕服务器")
         login_status.set_text(t("main.status.disconnected"))
@@ -1458,7 +1458,7 @@ async def check_b_connect_status():
     if switch_value == "null":
         # 检查身份码
         if not base_config.get("general", "auth_code"):
-            ui.notify("未填入身份码，无法连接弹幕服务器", type="negative")
+            ui.notify(t("notify.no_auth_code_connect"), type="negative")
             b_connect_switch.set_value(False)
             return
 
@@ -1476,7 +1476,7 @@ async def check_b_connect_status():
     # 开关打开状态：已连接
     if switch_value is True:
         if not base_config.get("general", "auth_code"):
-            ui.notify("请输入身份码", type="negative")
+            ui.notify(t("notify.enter_auth_code"), type="negative")
             b_connect_switch.set_value(False)
             return
 
@@ -1569,13 +1569,13 @@ async def refresh_gift_loop():
 async def refresh_gift(heartbeat=False):
     async def check_refresh():
         if base_config.get("general", "auth_code") is None:
-            ui.notify("请输入身份码", type="negative")
+            ui.notify(t("notify.enter_auth_code"), type="negative")
             return
 
         if not heartbeat:
             check_dialog.close()
 
-        ui.notify("正在更新礼物数据，请稍后...", type="info")
+        ui.notify(t("notify.updating_gift"), type="info")
 
         await asyncio.sleep(1)
 
@@ -1588,37 +1588,37 @@ async def refresh_gift(heartbeat=False):
             raise
 
         if gift_config is True:
-            ui.notify("礼物数据更新完成", type="positive")
+            ui.notify(t("notify.gift_updated"), type="positive")
         # 如果本地礼物配置数据不存在，则直接初始化
         elif gift_config is None:
-            ui.notify("未检测到本地礼物数据，将初始化礼物数据...", type="info")
+            ui.notify(t("notify.gift_init_local"), type="info")
             await init_config()
-            ui.notify("礼物数据初始化完成", type="positive")
+            ui.notify(t("notify.gift_initialized"), type="positive")
         # 如果礼物数据更新失败，则使用本地数据重置
         else:
-            ui.notify("礼物数据更新失败，请检查日志或稍后重试，或者使用本地数据重置", type="negative")
+            ui.notify(t("notify.gift_update_failed"), type="negative")
 
     async def reset_local_gift():
         # 重置本地数据
         try:
             await GiftManager.init_gift("data/gift_img.json")
             _invalidate_json_cache("data/gift_img.json")  # init_gift在外部写入文件,需失效缓存
-            ui.notify("重置成功", type="positive")
+            ui.notify(t("notify.reset_success"), type="positive")
         except Exception as e:
             logger.error(f"使用本地数据重置失败：{e}")
-            ui.notify("重置失败", type="negative")
+            ui.notify(t("notify.reset_failed"), type="negative")
 
     if heartbeat:
         await check_refresh()
         return
 
     with ui.dialog() as check_dialog, ui.card(align_items="center"):
-        ui.label("是否进行更新？")
+        ui.label(t("dialog.update_gift_confirm"))
 
         with ui.row():
-            ui.button("确定", on_click=lambda: check_refresh())
-            ui.button("取消", on_click=lambda: check_dialog.close())
-            ui.button("使用本地数据重置", on_click=lambda: reset_local_gift())
+            ui.button(t("common.confirm"), on_click=lambda: check_refresh())
+            ui.button(t("common.cancel"), on_click=lambda: check_dialog.close())
+            ui.button(t("dialog.reset_local_gift"), on_click=lambda: reset_local_gift())
 
     check_dialog.open()
 
@@ -1680,7 +1680,7 @@ def index():
                     data = response.json()
                     return data
                 else:
-                    ui.notify("获取更新源失败，尝试自动检测可用更新源", type="negative")
+                    ui.notify(t("notify.update_source_failed"), type="negative")
                     logger.error(f"获取更新源失败，状态码: {response.status_code}")
                     data = {"auto": "自动检测"}
 
@@ -1692,7 +1692,7 @@ def index():
 
         async def update(source: dict, server: str):
             if server == "auto":
-                ui.notify(f"测速中，请稍候...", progress=True, timeout=3000, type="ongoing", color="#8A9EB0")
+                ui.notify(t("notify.speed_testing"), progress=True, timeout=3000, type="ongoing", color="#8A9EB0")
                 source_copy = deepcopy(source)
                 urls = source_copy.get("url", {})
                 if urls != {}:
@@ -1701,14 +1701,14 @@ def index():
                     server = await ping_server(urls)  # pyright: ignore[reportAssignmentType]
 
                     if server is False:
-                        ui.notify("无法连接更新服务器", type="negative")
+                        ui.notify(t("notify.update_server_unreachable"), type="negative")
                         return
                 else:
                     server = ""
 
             if not server:
                 logger.error("更新源为空")
-                ui.notify("更新源为空，将尝试从Github获取更新", type="negative")
+                ui.notify(t("notify.update_source_empty"), type="negative")
                 server = "https://github.com/Nya-WSL/bili_travail/releases/download/update/update.zip"
 
             elif server in ["CN-QN"]:
@@ -1760,11 +1760,11 @@ def index():
 
         def version_dialog():
             with ui.dialog() as dialog, ui.card(align_items="center"):
-                ui.label(f"当前版本：{version} | 最新版本：{status}")
+                ui.label(t("dialog.update_version", current=version, latest=status))
                 source = get_source()
-                # server_select = ui.select(options={"auto": "自动检测", "hi168": "国内首选", "CN-HK": "国内备用", "CN-QN": "国内CDN", "GitHub": "GitHub"}, label="选择更新源", value="auto").classes("w-1/2")
-                server_select = ui.select(options=source.get("source", {"auto": "自动检测"}), label="选择更新源", value="auto").classes("w-1/2")  # pyright: ignore[reportArgumentType]
-                ui.button("更新", on_click=lambda: update(source, server_select.value))  # pyright: ignore[reportArgumentType]
+                # server_select = ui.select(options={"auto": "自动检测", "hi168": "国内首选", "CN-HK": "国内备用", "CN-QN": "国内CDN", "GitHub": "GitHub"}, label=t("dialog.select_update_source"), value="auto").classes("w-1/2")
+                server_select = ui.select(options=source.get("source", {"auto": "自动检测"}), label=t("dialog.select_update_source"), value="auto").classes("w-1/2")  # pyright: ignore[reportArgumentType]
+                ui.button(t("dialog.update"), on_click=lambda: update(source, server_select.value))  # pyright: ignore[reportArgumentType]
                 for k,v in get_version().items():
                     with ui.timeline(side="right", layout="dense", color="btn"):
                         with ui.timeline_entry(title=f"Release of {k}", subtitle=v["date"]):
@@ -1806,10 +1806,10 @@ def index():
                     version_dialog()
             else:
                 with main_card:
-                    ui.notify("检查更新失败", type="negative")
+                    ui.notify(t("notify.check_update_failed"), type="negative")
         else:
             with main_card:
-                ui.notify("已是最新版本", type="positive")
+                ui.notify(t("notify.already_latest"), type="positive")
 
     def save_time():
         def do_save(key):
@@ -1818,20 +1818,20 @@ def index():
             data[key] = app.storage.general["countdown_time"]
             with open("data/time.json", "wb+") as f:
                 f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
-            ui.notify("保存成功", type="positive")
+            ui.notify(t("notify.saved"), type="positive")
 
         def save(key):
             if key is None or key == "":
-                ui.notify("名称不能为空", type="negative")
+                ui.notify(t("notify.name_required"), type="negative")
                 return
             with open("data/time.json", "rb") as f:
                 data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
             if data.get(key, None) != None:
                 with ui.dialog() as overwrite_dialog, ui.card(align_items="center"):
-                    ui.label("该名称已存在，是否覆盖？")
+                    ui.label(t("dialog.overwrite_name"))
                     with ui.row():
-                        ui.button("是", on_click=lambda: do_save(key)).on_click(lambda: overwrite_dialog.close()).on_click(lambda: save_dialog.close())
-                        ui.button("否", on_click=lambda: overwrite_dialog.close())
+                        ui.button(t("common.yes"), on_click=lambda: do_save(key)).on_click(lambda: overwrite_dialog.close()).on_click(lambda: save_dialog.close())
+                        ui.button(t("common.no"), on_click=lambda: overwrite_dialog.close())
                 overwrite_dialog.open()
                 overwrite_dialog.on("hide", lambda: overwrite_dialog.delete())
             else:
@@ -1840,8 +1840,8 @@ def index():
                 save_dialog.on("hide", lambda: save_dialog.delete())
 
         with ui.dialog() as save_dialog, ui.card(align_items="center"):
-            name = ui.input("保存名称").style("width: 200px")
-            ui.button("保存", on_click=lambda: save(name.value))
+            name = ui.input(t("dialog.save_name")).style("width: 200px")
+            ui.button(t("common.save"), on_click=lambda: save(name.value))
 
         save_dialog.open()
         save_dialog.on("hide", lambda: save_dialog.delete())
@@ -1854,7 +1854,7 @@ def index():
             app.storage.general["countdown_time"] = seconds
             countdown_timer.set_remaining_seconds(seconds)
             load_dialog.close()
-            ui.notify("加载成功", type="positive")
+            ui.notify(t("notify.loaded"), type="positive")
 
         def delete(key):
             with open("data/time.json", "rb") as f:
@@ -1862,7 +1862,7 @@ def index():
             data.pop(key)
             with open("data/time.json", "wb+") as f:
                 f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
-            ui.notify("删除成功", type="positive")
+            ui.notify(t("notify.deleted"), type="positive")
 
         def reload() -> dict:
             with open("data/time.json", "rb") as f:
@@ -1873,10 +1873,10 @@ def index():
             data = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
         with ui.dialog() as load_dialog, ui.card(align_items="center"):
-            name_select = ui.select(options=list(data.keys()), label="选择名称").style("width: 200px")
+            name_select = ui.select(options=list(data.keys()), label=t("dialog.select_name")).style("width: 200px")
             with ui.row():
-                ui.button("加载", on_click=lambda: load(name_select.value))
-                ui.button("删除", on_click=lambda: delete(name_select.value)).on_click(lambda: name_select.set_options(list(reload().keys())))
+                ui.button(t("common.load"), on_click=lambda: load(name_select.value))
+                ui.button(t("common.delete"), on_click=lambda: delete(name_select.value)).on_click(lambda: name_select.set_options(list(reload().keys())))
 
         load_dialog.open()
         load_dialog.on("hide", lambda: load_dialog.delete())
@@ -2008,7 +2008,7 @@ def index():
         if base_config.get("bool", "check_update", True):
             asyncio.create_task(check_update())
         else:
-            ui.notify("已关闭自动检查更新", type="warning", timeout=3000)
+            ui.notify(t("notify.auto_update_off"), type="warning", timeout=3000)
 
         time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {config['color']['time_color']}") # 创建时钟
 
