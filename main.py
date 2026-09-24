@@ -191,6 +191,18 @@ config = base_config.load()
 i18n.set_language(i18n.resolve_language(config["general"].get("language", "auto")))
 logger.debug("界面语言: {}", i18n.get_language())
 
+# 标签栏所需宽度按当前语言估算，英文等语言下标签更长，需要更宽的窗口
+MAIN_TAB_KEYS = [
+    "main.tab.account", "main.tab.gift", "main.tab.display", "main.tab.appearance",
+    "main.tab.stats", "main.tab.program", "main.tab.simulator",
+]
+MIN_WINDOW_WIDTH = 600
+TAB_PADDING = 20 # 每个标签的左右内边距
+WINDOW_MARGIN = 60 # 主卡片与窗口边框的余量
+
+main_tab_width = int(sum(i18n.estimate_width(t(key)) + TAB_PADDING for key in MAIN_TAB_KEYS))
+window_width = max(MIN_WINDOW_WIDTH, main_tab_width + WINDOW_MARGIN)
+
 host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
 btn_color = config["color"]["btn_color"]  # type: ignore[index]
@@ -2061,6 +2073,9 @@ def index():
             for title, label in content.items():
                 ui.tab(title, label)
 
+        # 标签栏宽度不足时会溢出，这里按当前语言给出最小宽度
+        tabs.style(f"min-width: {main_tab_width}px")
+
         # 创建标签页内容
         with ui.tab_panels(tabs, value="1").classes('w-full'):
             with ui.tab_panel("1").classes("items-center").style("height: 210px;"):
@@ -2337,7 +2352,7 @@ if __name__ == "__main__":
             reload=False,
             show=False,
             native=True,
-            window_size=(600, 780),
+            window_size=(window_width, 780),
             reconnect_timeout=30,
             language=i18n.ui_language(),
             use_colors=False

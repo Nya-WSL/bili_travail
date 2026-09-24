@@ -1,5 +1,6 @@
 import os
 import locale as _locale
+import unicodedata
 from pathlib import Path
 
 import orjson
@@ -174,6 +175,28 @@ def ui_language() -> str:
     """
 
     return _UI_LANG_MAP.get(_current_lang, "en-US")
+
+
+def estimate_width(text: str, font_size: int = 14) -> float:
+    """
+    估算文本的渲染宽度，用于按语言推算界面所需宽度
+
+    全角字符按一个字宽计算，半角字符按0.6个字宽计算
+
+    :param text: 文本
+    :param font_size: 字号
+    :return float: 估算宽度（像素）
+    """
+
+    width = 0.0
+
+    for char in text:
+        if unicodedata.east_asian_width(char) in ("W", "F"):
+            width += font_size
+        else:
+            width += font_size * 0.6
+
+    return width
 
 
 def t(key: str, **kwargs) -> str:
