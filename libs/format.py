@@ -8,11 +8,12 @@ def format_cd(seconds):
     hour, minute = divmod(minute, 60)
     return ("%02d:%02d:%02d" % (hour, minute, second))
 
-def format_seconds(seconds) -> str:
+def format_seconds(seconds, lang: str | None = None) -> str:
     """
     格式化时间
 
     :param seconds: 秒数
+    :param lang: 指定语言，为空则使用当前语言
     """
 
     # 如果输入不是数字，直接返回
@@ -36,11 +37,11 @@ def format_seconds(seconds) -> str:
     # 格式化输出
     parts = []
     if hours > 0:
-        parts.append(t("format.hours", hours=hours))
+        parts.append(t("format.hours", lang=lang, hours=hours))
     if minutes > 0:  # 只有分钟 > 0 时才显示 "分"
-        parts.append(t("format.minutes", minutes=minutes))
+        parts.append(t("format.minutes", lang=lang, minutes=minutes))
     if seconds > 0 or (hours == 0 and minutes == 0):  # 有秒或时分均为 0 时，才显示秒
-        parts.append(t("format.seconds", seconds=seconds))
+        parts.append(t("format.seconds", lang=lang, seconds=seconds))
     return sign + "".join(parts)  # 返回结果，注意是字符串形式
 
 def sort_dict(dictionary, type_order=None, sort_within_type=False):

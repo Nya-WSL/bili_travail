@@ -18,6 +18,8 @@ def _build_default_config() -> tomlkit.TOMLDocument:
     general["auth_code"].comment("主播身份码")
     general.add("language", "auto")
     general["language"].comment("界面语言，auto 为跟随系统")
+    general.add("capture_language", "zh-CN")
+    general["capture_language"].comment("OBS叠加层语言，auto 为跟随界面语言")
     bg = array()
     bg.append("static/bg_vita.png")
     general.add("background_image", bg)

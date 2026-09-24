@@ -199,16 +199,17 @@ def estimate_width(text: str, font_size: int = 14) -> float:
     return width
 
 
-def t(key: str, **kwargs) -> str:
+def t(key: str, lang: str | None = None, **kwargs) -> str:
     """
-    翻译文案，当前语言不存在时回退默认语言，仍不存在则返回key本身
+    翻译文案，指定语言不存在时回退默认语言，仍不存在则返回key本身
 
     :param key: 文案key
+    :param lang: 指定语言，为空则使用当前语言（叠加层等需要独立语言的场景）
     :param kwargs: 占位符参数
     :return str: 翻译后的文案
     """
 
-    text = _load(_current_lang).get(key)
+    text = _load(lang or _current_lang).get(key)
 
     if text is None:
         text = _load(DEFAULT_LANG).get(key)

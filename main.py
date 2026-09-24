@@ -203,6 +203,18 @@ WINDOW_MARGIN = 60 # 主卡片与窗口边框的余量
 main_tab_width = int(sum(i18n.estimate_width(t(key)) + TAB_PADDING for key in MAIN_TAB_KEYS))
 window_width = max(MIN_WINDOW_WIDTH, main_tab_width + WINDOW_MARGIN)
 
+
+def capture_language() -> str | None:
+    """
+    获取OBS叠加层使用的语言
+
+    :return: 语言代码，auto 或空则返回None表示跟随界面语言
+    """
+
+    lang = base_config.get("general", "capture_language", "auto")
+
+    return None if not lang or lang == "auto" else lang
+
 host = config["general"]["host"]  # type: ignore[index]
 port = config["general"]["port"]  # type: ignore[index]
 btn_color = config["color"]["btn_color"]  # type: ignore[index]
@@ -713,7 +725,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.double_times", num=int(num)), message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.double_times", capture_language(), num=int(num)), message)
 
                         if special[gift] == "half":
                             new_seconds = current_seconds / (2 ** num) # 新倒计时为浮点数，不能使用位运算
@@ -722,7 +734,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.half_times", num=int(num)), message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.half_times", capture_language(), num=int(num)), message)
 
                         if special[gift] == "clear":
                             new_seconds = 3
@@ -731,7 +743,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("gift.play.clear"), message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, t("gift.play.clear", capture_language()), message)
 
                         if type(special[gift]) == list:
                             total_changed_time = 0
@@ -1639,7 +1651,7 @@ async def refresh_gift(heartbeat=False):
 
 
 # 倒计时预览
-@ui.page("/capture_cd", title=t("capture.page_title"), response_timeout=30)
+@ui.page("/capture_cd", title=t("capture.page_title", capture_language()), response_timeout=30)
 async def _():
     await capture_cd.capture_cd_page(get_notes, init_config, base_config)
 
@@ -2141,6 +2153,23 @@ def index():
                     with ui.switch(t("main.switch.borderless_cd"), value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
                         ui.tooltip(t("main.tooltip.borderless"))
 
+                with ui.row(align_items="center"):
+                    def capture_language_options() -> dict:
+                        return {"auto": t("settings.capture_language_auto"), **i18n.available_languages()}
+
+                    capture_lang_select = ui.select(
+                        label=t("settings.capture_language"),
+                        options=capture_language_options(),
+                        value=config["general"].get("capture_language", "auto"),
+                    ).style("width: 160px")
+
+                    def change_capture_language(e):
+                        config["general"]["capture_language"] = e.value
+                        base_config.save(config)
+                        ui.notify(t("settings.capture_language_restart"), type="info")
+
+                    capture_lang_select.on_value_change(change_capture_language)
+
             with ui.tab_panel("4").classes("items-center").style("height: 210px;"):
                 with ui.row():
                     ui.color_input(label=t("main.color.time"), value="#9BA89A", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
@@ -2186,8 +2215,12 @@ def index():
 
                     lang_select.on_value_change(change_language)
 
-                    # 切到本标签页时重新扫描语言目录，运行中新增的语言文件会立即出现
-                    tabs.on_value_change(lambda e: lang_select.set_options(language_options()) if e.value == "6" else None)
+                    # 切到显示设置或程序设置时重新扫描语言目录，运行中新增的语言文件会立即出现
+                    def refresh_language_options(e):
+                        lang_select.set_options(language_options())
+                        capture_lang_select.set_options(capture_language_options())
+
+                    tabs.on_value_change(lambda e: refresh_language_options(e) if e.value in ("3", "6") else None)
 
             with ui.tab_panel("7").classes("items-center").style("height: 210px;") as sim_panel:
                 global simulator
