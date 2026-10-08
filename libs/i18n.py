@@ -80,7 +80,14 @@ def available_languages() -> dict[str, str]:
 
     for path in sorted(LOCALES_DIR.glob("*.json")):
         code = path.stem
-        langs[code] = _load(code).get(LANG_NAME_KEY, code)
+        data = _load(code)
+
+        # _load() 仅在成功加载为字典时写入缓存，失败（格式错误、无法读取、根节点非字典）不会缓存，
+        # 此时跳过该文件，避免 set_language() 接受一个实际未加载成功的语言
+        if code not in _translations:
+            continue
+
+        langs[code] = data.get(LANG_NAME_KEY, code)
 
     if not langs:
         _warn_missing_dir()
