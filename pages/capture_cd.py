@@ -10,6 +10,7 @@ from libs import log
 from libs import gift
 from libs import styles
 from libs.format import format_cd, format_seconds, sort_dict
+from libs.i18n import t
 
 logger = log.logger
 
@@ -27,6 +28,11 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
     ui.query("body").style("background: transparent; background-color: transparent;")  # OBS叠加层保持透明
 
     config = base_config.load()
+
+    # 叠加层可独立选择语言，auto 表示跟随界面语言
+    capture_lang = base_config.get("general", "capture_language", "auto")
+    if not capture_lang or capture_lang == "auto":
+        capture_lang = None
 
     # 检查是否需要刷新页面
     def check_cd_refresh():
@@ -73,24 +79,24 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
         if v_type == "normal":
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
-            v_label.set_text(format_seconds(v))
+            v_label.set_text(format_seconds(v, capture_lang))
             k_label.classes(replace="text-3xl font-extrabold")
             v_label.classes(replace="text-3xl font-extrabold")
 
         if v_type == "list":
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
-            v_label.set_text(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}")
+            v_label.set_text(f"{format_seconds(v[0], capture_lang)} ~ {format_seconds(v[1], capture_lang)}")
             k_label.classes(replace="text-base font-extrabold")
             v_label.classes(replace="text-base font-extrabold")
 
         if v_type == "special":
             if v == "clear":
-                v = "清空"
+                v = t("gift.play.clear", capture_lang)
             if v == "double":
-                v = "加倍"
+                v = t("gift.play.double", capture_lang)
             if v == "half":
-                v = "减半"
+                v = t("gift.play.half", capture_lang)
 
             gift_img_avatar.set_source(gift_img.get(k, ""))
             k_label.set_text(k)
@@ -147,7 +153,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
                 k_label = ui.label(k).classes("text-3xl font-extrabold")  # type: ignore[index]
                 ui.space()
-                v_label = ui.label(format_seconds(v)).classes("text-3xl font-extrabold")  # type: ignore[index]
+                v_label = ui.label(format_seconds(v, capture_lang)).classes("text-3xl font-extrabold")  # type: ignore[index]
 
         if v_type == "list":
             with ui.row().classes('w-full'):
@@ -155,7 +161,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                     gift_img_avatar = ui.image(gift_img.get(k, ""))
                 k_label = ui.label(k).classes("text-3xl font-extrabold")  # type: ignore[index]
                 ui.space()
-                v_label = ui.label(f"{format_seconds(v[0])} ~ {format_seconds(v[1])}").classes("text-3xl font-extrabold")  # type: ignore[index]
+                v_label = ui.label(f"{format_seconds(v[0], capture_lang)} ~ {format_seconds(v[1], capture_lang)}").classes("text-3xl font-extrabold")  # type: ignore[index]
 
         if v_type == "special":
             with ui.row().classes('w-full'):
@@ -164,11 +170,11 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 k_label = ui.label(k).classes("text-3xl font-extrabold")  # type: ignore[index]
                 ui.space()
                 if v == "clear":
-                    v = "清空"
+                    v = t("gift.play.clear", capture_lang)
                 if v == "double":
-                    v = "加倍"
+                    v = t("gift.play.double", capture_lang)
                 if v == "half":
-                    v = "减半"
+                    v = t("gift.play.half", capture_lang)
                 v_label = ui.label(v).classes("text-3xl font-extrabold")  # type: ignore[index]
 
     capture_cd_is_created = True
@@ -233,16 +239,16 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 with open("data/gift_img.json", "rb") as f:
                     gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
-                if "倍" in time:
+                if re.search(r"\d+\^", time):
                     tmp_time = app.storage.general["countdown_time"]
-                    if re.search(r"-2\^(\d+)倍", time):
+                    if re.search(r"-\d+\^", time):
                         for _ in range(num):
                             tmp_time -= tmp_time / 2
-                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"))
+                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"), capture_lang)
                     else:
                         for _ in range(num):
                             tmp_time += tmp_time
-                        time = format_seconds(tmp_time - app.storage.general["countdown_time"])
+                        time = format_seconds(tmp_time - app.storage.general["countdown_time"], capture_lang)
 
                 gift_history["cd"].append({
                     "name": name,
@@ -301,17 +307,17 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 minutes = 0
                 seconds = 0
 
-                hour_match = re.search(r'(\d+)(?:小时|时)', rule)
+                hour_match = re.search(r'(\d+)(?:小时|时|h)', rule)
                 if hour_match:
                     hours = int(hour_match.group(1))
                     rule = rule.replace(hour_match.group(0), '')
 
-                minute_match = re.search(r'(\d+)分', rule)
+                minute_match = re.search(r'(\d+)(?:分|m)', rule)
                 if minute_match:
                     minutes = int(minute_match.group(1))
                     rule = rule.replace(minute_match.group(0), '')
 
-                second_match = re.search(r'(\d+)秒', rule)
+                second_match = re.search(r'(\d+)(?:秒|s)', rule)
                 if second_match:
                     seconds = int(second_match.group(1))
                     rule = rule.replace(second_match.group(0), '')
@@ -352,7 +358,7 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                         trophy_color.pop(0)
                         ui.label(f"{name}").classes("text-xl font-extrabold")  # type: ignore[index]
                         ui.space()
-                        ui.label(format_seconds(seconds)).classes("text-xl font-extrabold")  # type: ignore[index]
+                        ui.label(format_seconds(seconds, capture_lang)).classes("text-xl font-extrabold")  # type: ignore[index]
 
             capture_rank_scroll.scroll_to(percent=1, duration=0.5)
 

@@ -176,6 +176,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     shutil.copy("check_runtime.ps1", Path("dist", "start", "check_runtime.ps1"))
     shutil.copy("LICENSE", Path("dist", "start", "LICENSE"))
     shutil.copytree("static", Path("dist", "start", "static"), dirs_exist_ok=True)
+    shutil.copytree("locales", Path("dist", "start", "locales"), dirs_exist_ok=True)
 
     data = ["guard-level-3.png", "guard-level-2.png", "guard-level-1.png", "latiao.png"]
 

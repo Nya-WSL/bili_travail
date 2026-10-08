@@ -4,6 +4,7 @@ import datetime
 from nicegui import ui, app
 
 from libs.log import logger
+from libs.i18n import t
 import libs.config as travail_config
 
 base_config = travail_config.Config()
@@ -86,7 +87,7 @@ class CountdownTimer:
                 logger.info("倒计时开始，停止计时器")
                 self.exit_timer.cancel(with_current_invocation=True)  # 关闭退出计时器
         else:
-            ui.notify("请输入时间", type="negative")
+            ui.notify(t("cd.enter_time"), type="negative")
             self._running = False
 
     # 暂停倒计时
@@ -128,7 +129,7 @@ class CountdownTimer:
             if reset_inherit_status:
                 app.storage.general["countdown_time"] = 0
                 self.remaining_time = datetime.timedelta(0)
-                self._cancel_button.set_text("停止")
+                self._cancel_button.set_text(t("main.btn.stop"))
                 self._cancel_button.disable()
 
     # 程序退出时的清理，只取消计时相关的 task/timer，
