@@ -777,7 +777,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 gift = origin_gift
 
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time), message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time, capture_language()), message)
 
                         countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
 
@@ -792,7 +792,7 @@ class BiliHandler(blivedm.BaseHandler):
 
                         if gifts.get(gift, None) != None or is_blind_box:
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
-                                capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time), message)
+                                capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time, capture_language()), message)
 
                         countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
                 else:
