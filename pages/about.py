@@ -23,7 +23,7 @@ async def about_page():
 
     # Card框
     with ui.card(align_items="center").classes("absolute-center"):
-        ui.label(f"B站加班姬").classes("text-3xl")  # type: ignore[index]
+        ui.label(t("about.title")).classes("text-3xl")  # type: ignore[index]
 
         # 私货
         def read_or_create_file(file_path, default_content):

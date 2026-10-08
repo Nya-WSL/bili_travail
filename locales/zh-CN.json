@@ -195,6 +195,7 @@
     "main.btn.reset": "重置",
     "sim.success": "成功: {msg}",
     "sim.failure": "失败: {msg}",
+    "about.title": "B站加班姬",
     "about.development": "程序开发",
     "about.thanks": "特别鸣谢",
     "about.contact": "联系我们",
@@ -217,6 +218,6 @@
     "cd.enter_time": "请输入时间",
     "capture.double_times": "2^{num}倍",
     "capture.half_times": "-2^{num}倍",
-    "capture.page_title": "倒计时 | bili_travail",
+    "capture.page_title": "倒计时 | Bili Travail",
     "update.failed_error": "更新失败：{error}"
 }

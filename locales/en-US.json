@@ -195,6 +195,7 @@
     "main.btn.reset": "Reset",
     "sim.success": "Success: {msg}",
     "sim.failure": "Failed: {msg}",
+    "about.title": "Bili Travail",
     "about.development": "Development",
     "about.thanks": "Special thanks",
     "about.contact": "Contact",
@@ -217,6 +218,6 @@
     "cd.enter_time": "Please enter a time",
     "capture.double_times": "2^{num}x",
     "capture.half_times": "-2^{num}x",
-    "capture.page_title": "Countdown | bili_travail",
+    "capture.page_title": "Countdown | Bili Travail",
     "update.failed_error": "Update failed: {error}"
 }
