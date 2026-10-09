@@ -62,8 +62,12 @@ class CountdownTimer:
             delta = max_delta
 
         if delta >= max_delta:
-            logger.warning(f"倒计时超过上限，已限制到能表示的最大时间，当前秒数：{seconds}")
             delta = max_delta
+            # 同时记录请求值与被钳后的真实值，避免只看「请求秒数」误判成倒计时没变化
+            logger.warning(
+                f"倒计时超过上限，已限制到能表示的最大时间，请求秒数：{seconds}，"
+                f"实际生效秒数：{delta.total_seconds():.0f}，目标时间：{now + delta}"
+            )
 
         self.target_time = now + delta
         self.remaining_time = delta

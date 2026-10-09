@@ -245,14 +245,18 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                     # 原实现按 num 次循环翻倍/减半，num 过大时数值会溢出成 inf，导致 format_seconds 报错；
                     # 这里改为一次幂运算（浮点乘 2 / 除 2 结果一致），并限制指数
                     exponent = min(int(num), MAX_GIFT_EXPONENT)
-                    # 超过 datetime 上限的秒数没有意义，格式化前先钳制
-                    max_seconds = (datetime.datetime.max - datetime.datetime.now()).total_seconds()
                     if re.search(r"-\d+\^", time):
-                        tmp_time = current / (2 ** exponent)
-                        time = format_seconds(float(f"-{min(current - tmp_time, max_seconds)}"), capture_lang)
+                        delta = -(current - current / (2 ** exponent))
                     else:
-                        tmp_time = current * (2 ** exponent)
-                        time = format_seconds(min(tmp_time - current, max_seconds), capture_lang)
+                        delta = current * (2 ** exponent) - current
+
+                    # 超过 datetime 上限的秒数没有意义（inf 也走这里），格式化前钳制并记录实际秒数
+                    max_seconds = (datetime.datetime.max - datetime.datetime.now()).total_seconds()
+                    if abs(delta) > max_seconds:
+                        logger.warning(f"礼物时长超出上限，实际秒数：{delta}，已限制为 {max_seconds}")
+                        delta = max_seconds if delta > 0 else -max_seconds
+
+                    time = format_seconds(delta, capture_lang)
 
                 gift_history["cd"].append({
                     "name": name,
