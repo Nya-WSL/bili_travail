@@ -12,6 +12,11 @@ base_config = travail_config.Config()
 cd_status = False
 reset_inherit_status = False
 
+# 礼物翻倍/减半的指数上限：float 能表示的最大值约为 2 ** 1024，所以 2 ** 1023 以上的指数
+# 与浮点数相乘时会抛 OverflowError（int too large to convert to float），这里取 1023 作为安全上限；
+# 倒计时秒数本身的上限由 set_remaining_seconds 统一钳制
+MAX_GIFT_EXPONENT = 1023
+
 
 class CountdownTimer:
     def __init__(self, update_btn_state_func=None, cancel_button_ref=None):
@@ -48,9 +53,21 @@ class CountdownTimer:
         if seconds < 0:
             seconds = 0
         now = datetime.datetime.now()
-        self.target_time = now + datetime.timedelta(seconds=seconds)
-        self.remaining_time = datetime.timedelta(seconds=seconds)
-        app.storage.general["countdown_time"] = seconds
+        # datetime 能表示的最大时长，now + delta 超出该值会抛 OverflowError: date value out of range
+        max_delta = datetime.datetime.max - now
+
+        try:
+            delta = datetime.timedelta(seconds=seconds)
+        except OverflowError:  # 秒数大到 timedelta 无法表示（如礼物翻倍叠加），直接取上限
+            delta = max_delta
+
+        if delta >= max_delta:
+            logger.warning(f"倒计时超过上限，已限制到能表示的最大时间，当前秒数：{seconds}")
+            delta = max_delta
+
+        self.target_time = now + delta
+        self.remaining_time = delta
+        app.storage.general["countdown_time"] = delta.total_seconds()
 
     # 倒计时运行函数
     async def update(self):

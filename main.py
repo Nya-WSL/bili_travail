@@ -57,12 +57,10 @@ from pages import count, about, capture_cd
 from blivedm import blivedm
 
 # Third Party Packages
-import time
 import orjson
 import shutil
 import random
 import psutil
-import webview
 import cpuinfo
 import asyncio
 import aiohttp
@@ -719,7 +717,7 @@ class BiliHandler(blivedm.BaseHandler):
                         new_seconds = current_seconds  # 初始化为当前剩余秒数
 
                         if special[gift] == "double":
-                            new_seconds = current_seconds * (2 ** num) # 新倒计时为浮点数，不能使用位运算
+                            new_seconds = current_seconds * (2 ** min(int(num), ct.MAX_GIFT_EXPONENT)) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -728,7 +726,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.double_times", capture_language(), num=int(num)), message)
 
                         if special[gift] == "half":
-                            new_seconds = current_seconds / (2 ** num) # 新倒计时为浮点数，不能使用位运算
+                            new_seconds = current_seconds / (2 ** min(int(num), ct.MAX_GIFT_EXPONENT)) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift

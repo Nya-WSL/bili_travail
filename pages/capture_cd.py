@@ -10,6 +10,7 @@ from libs import log
 from libs import gift
 from libs import styles
 from libs.format import format_cd, format_seconds, sort_dict
+from libs.countdown_timer import MAX_GIFT_EXPONENT
 from libs.i18n import t
 
 logger = log.logger
@@ -240,15 +241,18 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                     gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                 if re.search(r"\d+\^", time):
-                    tmp_time = app.storage.general["countdown_time"]
+                    current = app.storage.general["countdown_time"]
+                    # 原实现按 num 次循环翻倍/减半，num 过大时数值会溢出成 inf，导致 format_seconds 报错；
+                    # 这里改为一次幂运算（浮点乘 2 / 除 2 结果一致），并限制指数
+                    exponent = min(int(num), MAX_GIFT_EXPONENT)
+                    # 超过 datetime 上限的秒数没有意义，格式化前先钳制
+                    max_seconds = (datetime.datetime.max - datetime.datetime.now()).total_seconds()
                     if re.search(r"-\d+\^", time):
-                        for _ in range(num):
-                            tmp_time -= tmp_time / 2
-                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"), capture_lang)
+                        tmp_time = current / (2 ** exponent)
+                        time = format_seconds(float(f"-{min(current - tmp_time, max_seconds)}"), capture_lang)
                     else:
-                        for _ in range(num):
-                            tmp_time += tmp_time
-                        time = format_seconds(tmp_time - app.storage.general["countdown_time"], capture_lang)
+                        tmp_time = current * (2 ** exponent)
+                        time = format_seconds(min(tmp_time - current, max_seconds), capture_lang)
 
                 gift_history["cd"].append({
                     "name": name,
