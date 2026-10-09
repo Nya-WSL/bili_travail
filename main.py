@@ -2038,7 +2038,7 @@ def index():
         else:
             ui.notify(t("notify.auto_update_off"), type="warning", timeout=3000)
 
-        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {config['color']['time_color']}") # 创建时钟
+        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl countdown-display").style(f"color: {config['color']['time_color']}") # 创建时钟
 
         # 时间输入框
         with ui.row():

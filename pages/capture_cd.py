@@ -194,9 +194,9 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
 
     with ui.card(align_items="center").classes("bg-transparent w-full").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
         if not config['bool']['borderless_cd']:  # type: ignore[index]
-            ui.badge(outline=True, color="", text_color=config['color']['time_color']).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl")  # type: ignore[arg-type]
+            ui.badge(outline=True, color="", text_color=config['color']['time_color']).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl countdown-display")  # type: ignore[arg-type]
         else:
-            ui.label().bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl").style(f"color: {config['color']['time_color']}")  # type: ignore[index]
+            ui.label().bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl countdown-display").style(f"color: {config['color']['time_color']}")  # type: ignore[index]
 
         ui.separator()
 
