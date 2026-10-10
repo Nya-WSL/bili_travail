@@ -26,6 +26,92 @@ from libs import hash_utils
 from version import base_version
 from qiniu import Auth, put_file, etag
 
+# scp 上传参数：CI 上网络抖动较常见，允许重试
+SCP_RETRY_TIMES = 3
+SCP_TIMEOUT = 120 # 单次 scp 的超时时间（秒）
+
+# 出现这些字样说明是认证/私钥问题，重试不会有不同结果，直接放弃
+SCP_AUTH_ERROR_KEYWORDS = (
+    "Permission denied",
+    "no such identity",
+    "Load key",
+    "invalid format",
+    "Too many authentication failures",
+    "Host key verification failed",
+)
+
+def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bool:
+    '''
+    用 scp 上传文件到服务器，失败只告警不中断构建（本地产物已生成）
+
+    原先直接 subprocess.run(..., check=True) 且不捕获输出，失败时只能看到
+    "returned non-zero exit status 255"，无法判断是私钥缺失、认证失败还是网络问题，
+    这里把 scp 的 stdout/stderr 完整打印出来，并在上传前检查私钥是否存在。
+
+    files: 待上传的本地文件
+    target: 形如 user@host:/path 的目标地址
+    key_file: SSH 私钥路径
+    label: 日志中用于区分用途的名称
+    '''
+    if not target:
+        print(f"未配置 {label} 的目标地址，跳过上传")
+        return False
+
+    if not key_file.exists():
+        print(f"上传{label}失败：SSH 私钥不存在 {key_file}")
+        print("请检查 GitHub Secrets 中该用途的私钥是否已配置（配置后由 gh_action.setup_ssh_key 写入）")
+        return False
+
+    # 用列表传参而不是拼接字符串，避免路径含空格时被 shell 拆错
+    command = [
+        "scp",
+        "-o", "StrictHostKeyChecking=no", # 跳过 host key 确认，避免 CI 交互挂起
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "BatchMode=yes", # 非交互：认证失败立即报错，不等待输入密码
+        "-o", "ConnectTimeout=15",
+        "-o", "ServerAliveInterval=15",
+        "-o", "ServerAliveCountMax=4",
+        "-i", str(key_file),
+        *(str(file) for file in files),
+        target,
+    ]
+
+    for attempt in range(1, SCP_RETRY_TIMES + 1):
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=SCP_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            print(f"第 {attempt} 次上传{label}超时（超过 {SCP_TIMEOUT} 秒）")
+        except OSError as e:
+            # scp 不可用（如路径不存在）等环境问题，同样不能中断构建
+            print(f"第 {attempt} 次上传{label}失败：{e}")
+        else:
+            if result.returncode == 0:
+                print(f"已上传{label}到服务器：{target.rsplit(':', 1)[-1]}")
+                return True
+            print(f"第 {attempt} 次上传{label}失败（退出码 {result.returncode}）")
+            if result.stdout.strip():
+                print(f"scp 输出：{result.stdout.strip()}")
+            if result.stderr.strip():
+                print(f"scp 错误：{result.stderr.strip()}")
+            if result.returncode == 255:
+                print("退出码 255 一般是 SSH 层问题：私钥未授权、主机/端口/用户名有误或网络不可达")
+                if any(keyword in result.stderr for keyword in SCP_AUTH_ERROR_KEYWORDS):
+                    print("检测到认证/私钥问题，重试不会有不同结果，直接结束")
+                    break
+
+        if attempt < SCP_RETRY_TIMES:
+            time.sleep(attempt * 3)
+
+    print(f"上传{label}失败（不影响构建产物）")
+    return False
+
 def upload(localfile, file_path, version="v1"):
     '''
     localfile: 本地文件路径
@@ -208,47 +294,24 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
         upload(Path("dist", f"{version}.sha256"), f"bili_travail/update/{version}.sha256", "v1")
 
     if upload_status == 'y' or upload_status == '':
-        if env_data.get("scp_url", ""):
-            # scp 使用显式指定的 SSH 私钥（setup_ssh_key 已写入 ~/.ssh/id_rsa），
-            # 避免 Windows OpenSSH 因默认 key 找不到/权限问题导致退出码 255。
-            #  - -o StrictHostKeyChecking=no / UserKnownHostsFile=/dev/null：跳过 host key 确认，避免 CI 挂起
-            #  - -o BatchMode=yes：非交互模式，认证失败立即报错而不是等待密码输入
-            # 上传失败仅告警，不中断整个构建流程（本地已产出 zip / sha256 产物）。
-            ssh_key = Path(Path.home(), ".ssh", "id_rsa")
-            scp_flags = (
-                f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-                f"-o BatchMode=yes -i {ssh_key}"
-            )
-            try:
-                subprocess.run(
-                    f'scp {scp_flags} {Path("dist", "update.zip")} {Path("dist", "update.sha256")} {env_data["scp_url"]}',
-                    check=True,
-                )
-                print(f"已上传到服务器：{env_data['scp_url'].split(':')[1]}")
-            except Exception as e:
-                print(f"上传到服务器失败（不影响构建产物）：{e}")
-                print(traceback.format_exc())
+        # 更新包：scp 使用显式指定的 SSH 私钥（gh_action.setup_ssh_key 已写入 ~/.ssh/id_rsa），
+        # 避免 Windows OpenSSH 因默认 key 找不到/权限问题导致退出码 255
+        scp_upload(
+            [Path("dist", "update.zip"), Path("dist", "update.sha256")],
+            env_data.get("scp_url", ""),
+            Path(Path.home(), ".ssh", "id_rsa"),
+            "更新包",
+        )
 
         # 构建完成后将 changelog.json 与 version.json 推送到 version_url（secrets）。
         # 使用独立的 SSH key（gh_action.setup_ssh_key 写入 ~/.ssh/version_id_rsa），
         # 与 scp_url 的 id_rsa 分离，避免密钥混用。
-        if env_data.get("version_url", ""):
-            version_ssh_key = Path(Path.home(), ".ssh", "version_id_rsa")
-            version_scp_flags = (
-                f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-                f"-o BatchMode=yes -i {version_ssh_key}"
-            )
-            try:
-                subprocess.run(
-                    f'scp {version_scp_flags} {Path("changelog.json")} {Path("version.json")} {env_data["version_url"]}',
-                    check=True,
-                )
-                print(f"已推送 changelog.json / version.json 到服务器：{env_data['version_url'].split(':')[1]}")
-            except Exception as e:
-                print(f"推送 changelog.json / version.json 失败（不影响构建产物）：{e}")
-                print(traceback.format_exc())
-        else:
-            print("未配置version_url，跳过推送 changelog.json / version.json")
+        scp_upload(
+            [Path("changelog.json"), Path("version.json")],
+            env_data.get("version_url", ""),
+            Path(Path.home(), ".ssh", "version_id_rsa"),
+            "版本信息",
+        )
 
 def create_version(full: bool = False):
     '''

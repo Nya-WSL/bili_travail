@@ -125,11 +125,20 @@ def write_ssh_key(secret_name: str, key_filename: str) -> Path | None:
     key_file.write_bytes((ssh_key + "\n").encode("utf-8"))
 
     # Windows OpenSSH 私钥权限加固：仅当前用户可访问
+    # 收紧失败不能让后续 scp 只报一个退出码 255，这里把原因打印出来
     if os.name == "nt":
-        subprocess.run(
-            ["icacls", str(key_file), "/inheritance:r", "/grant:r", f"{os.environ.get('USERNAME', '')}:(R)"],
-            check=False,
-        )
+        user = os.environ.get("USERNAME", "")
+        if user:
+            result = subprocess.run(
+                ["icacls", str(key_file), "/inheritance:r", "/grant:r", f"{user}:(R)"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                print(f"警告：收紧 {key_file} 权限失败，OpenSSH 可能拒绝使用该私钥：{result.stderr.strip()}")
+        else:
+            print(f"警告：未取到当前用户名，跳过 {key_file} 的权限收紧")
     print(f"SSH key 已配置：{key_file}")
     return key_file
 
