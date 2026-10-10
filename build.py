@@ -238,10 +238,18 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     os.environ["NUITKA_CACHE_DIR"] = nuitka_cache_dir
     nuitka_perf_flags = f"--jobs={os.cpu_count()} --lto=no"
 
+    # 不要给 Nuitka 传 --include-package=webview：Nuitka 内置的 pywebview 插件
+    # （isAlwaysEnabled）会自行决定 webview.platforms.* 里哪些平台模块要纳入，若再用
+    # --include-package 强制跟随整个 webview 包，就会与它“排除 android/cocoa/gtk/qt”的
+    # 决定冲突并直接 FATAL（实测 4.0.8）：
+    #   Conflict between user and plugin decision for module 'webview.platforms.android'
+    # 因此只保留 --include-package-data=webview 拿 js/lib 等数据文件，Windows 平台模块
+    # 由插件自动纳入（已验证包含 winforms/edgechromium/mshtml/cef）。
+
     if manager == "poetry":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"poetry run python -m nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --include-package=webview --include-package-data=webview --windows-console-mode=disable --windows-uac-admin --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
+            subprocess.run(f"poetry run python -m nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --include-package-data=webview --windows-console-mode=disable --windows-uac-admin --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             _verify_start_exe()
@@ -251,7 +259,7 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     elif manager == "uv":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"uv run nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --include-package=webview --include-package-data=webview --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
+            subprocess.run(f"uv run nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --include-package-data=webview --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             _verify_start_exe()
