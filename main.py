@@ -67,6 +67,8 @@ import aiohttp
 import requests
 import datetime
 import traceback
+import socket
+import sys
 
 from copy import deepcopy
 from nicegui import ui, app
@@ -2329,6 +2331,22 @@ async def create_job():
     scheduler.add_job(refresh_gift_loop, trigger='cron', minute=0) # 每个整点更新一次礼物数据
     scheduler.start()
 
+# 框架自身的任务前缀：关闭时清理残留任务需要避开它们，否则会中断框架的关闭流程
+_FRAMEWORK_MODULE_PREFIXES = ("uvicorn", "starlette", "nicegui", "fastapi", "anyio", "asyncio")
+
+
+def _is_own_task(task: asyncio.Task) -> bool:
+    """判断任务是否由本项目代码创建（关闭时只清理自己的任务）
+
+    :param task: 待判断的任务
+    """
+    coro = task.get_coro()
+    frame = getattr(coro, "cr_frame", None) or getattr(coro, "gi_frame", None)
+    if frame is None:
+        return False
+    return not frame.f_globals.get("__name__", "").startswith(_FRAMEWORK_MODULE_PREFIXES)
+
+
 @app.on_shutdown
 async def shutdown():
     # 取消倒计时相关的 task 和 timer
@@ -2352,10 +2370,12 @@ async def shutdown():
     scheduler.shutdown()
     logger.debug("已停止调度器")
 
-    # 取消所有残留的 asyncio 任务，确保事件循环可以退出
+    # 取消本项目残留的 asyncio 任务，确保事件循环可以退出
+    # 注意：不能取消 uvicorn/starlette 等框架自身的任务（如 lifespan 任务），
+    # 否则会中断框架的关闭流程，把真正的错误掩盖成 CancelledError
     try:
         tasks = [t for t in asyncio.all_tasks()
-                if t is not asyncio.current_task()]
+                if t is not asyncio.current_task() and _is_own_task(t)]
         if tasks:
             logger.debug(f"[shutdown] 取消 {len(tasks)} 个残留任务")
             for task in tasks:
@@ -2365,12 +2385,49 @@ async def shutdown():
     except Exception:
         pass
 
+# 端口无法绑定时 uvicorn 会在绑定阶段直接退出（窗口尚未创建、打包后也没有控制台），
+# 真实错误（WinError 10048）会彻底丢失，因此启动前先检查并给出明确提示
+def _port_in_use(host: str, port: int) -> bool:
+    """检测监听地址与端口是否可用
+
+    :param host: 监听地址
+    :param port: 监听端口
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        try:
+            probe.bind((host, port))
+        except OSError:
+            return True
+    return False
+
+
+def _notify_startup_error(message: str) -> None:
+    """启动阶段的致命错误提示：写日志之外再弹窗，避免用户只看到闪退
+
+    :param message: 提示内容
+    """
+    logger.error(message)
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, message, f"bili_travail | {version}", 0x10) # 0x10 为 MB_ICONERROR
+    except Exception:
+        pass
+
+
 # 运行NiceGUI
 if __name__ == "__main__":
     try:
         freeze_support()
         logger.info("正在检查Edge WebView2 runtime...")
         asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
+
+        if _port_in_use(host, port):
+            _notify_startup_error(
+                f"无法监听 {host}:{port} 端口可能已被占用（程序已在运行），"
+                f"或 config.toml 中 [general] 的 host 不是本机地址。\n"
+                f"请关闭已运行的实例，或修改 config.toml 后重试。"
+            )
+            sys.exit()
 
         app.native.start_args['private_mode'] = False  # 禁用强删缓存文件夹行为，绕过 NoneType 崩溃
         app.native.start_args['storage_path'] = safe_storage_dir
@@ -2386,7 +2443,17 @@ if __name__ == "__main__":
             window_size=(window_width, 780),
             reconnect_timeout=30,
             language=i18n.ui_language(),
-            use_colors=False
+            use_colors=False,
+            log_config=None # uvicorn 默认会在启动时用 dictConfig 重置自己的 logger handler，
+                            # 清掉项目桥接给 loguru 的 handler，导致启动阶段的错误（如端口被占用）只输出到控制台，
+                            # 打包后没有控制台就会彻底丢失
         )  # pyright: ignore[reportArgumentType]
-    except Exception:
+    except KeyboardInterrupt:
+        pass
+    except SystemExit:
+        # 主动退出（如端口被占用、启动失败）已在前面记录过原因，不作为运行错误
+        raise
+    except BaseException:
+        # CancelledError 等不属于 Exception，需单独兜住，避免错误被静默丢弃
         logger.error(f"run error: {traceback.format_exc()}")
+        raise

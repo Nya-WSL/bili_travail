@@ -212,3 +212,8 @@ def route_logging_to_loguru(logger_name: str | None = None, level: int = logging
 
 _webview_handler = route_logging_to_loguru("pywebview")
 _blivedm_handler = route_logging_to_loguru("blivedm")
+# uvicorn/starlette 的日志汇入项目日志：启动阶段（如端口被占用）的真实错误只由它们输出，
+# 打包后没有控制台，不桥接就会导致日志里只剩无关的报错，查不到原因
+_uvicorn_error_handler = route_logging_to_loguru("uvicorn.error")
+_uvicorn_access_handler = route_logging_to_loguru("uvicorn.access")
+_starlette_handler = route_logging_to_loguru("starlette")
