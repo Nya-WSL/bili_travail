@@ -42,8 +42,42 @@ async def about_page():
         AVATAR_B = (
             "https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"
         )
+        AVATAR_VITA = (
+            "https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"
+        )
+        AVATAR_QIANZHONG = (
+            "https://i1.hdslb.com/bfs/face/316685ff90898018d3bb0eb7f0649db73e109e9b.jpg"
+        )
+        AVATAR_BAZHONG = (
+            "https://i1.hdslb.com/bfs/face/29b2132e3371d0c9a90a21edf6a0ad87a122a831.jpg"
+        )
+        AVATAR_ICEBLUE = (
+            "https://i0.hdslb.com/bfs/face/7b2a5c03e0caaa516dda9e238a82ebeef0e2f56d.jpg"
+        )
+        AVATAR_YUE = (
+            "https://i2.hdslb.com/bfs/face/fe6af62cc07e1d6e493da480d903df754771ebca.jpg"
+        )
         NAME_A = "高橋はるき"
         NAME_B = "狐日泽"
+
+        # 并发预取所有头像：图床不可达时返回空串，不影响页面其余内容渲染
+        avatar_urls = (
+            AVATAR_A,
+            AVATAR_B,
+            AVATAR_VITA,
+            AVATAR_QIANZHONG,
+            AVATAR_BAZHONG,
+            AVATAR_ICEBLUE,
+            AVATAR_YUE,
+        )
+        avatar_images = dict(
+            zip(
+                avatar_urls,
+                await asyncio.gather(
+                    *(bili_api.get_bili_img(url) for url in avatar_urls)
+                ),
+            )
+        )
 
         async def fetch_text(session, url):
             """异步获取文本内容"""
@@ -176,23 +210,16 @@ async def about_page():
                             target="https://space.bilibili.com/16748991", new_tab=True
                         ):
                             with ui.avatar():
-                                ui.image(
-                                    await bili_api.get_bili_img(
-                                        "https://i0.hdslb.com/bfs/face/33c2e2be3e1dac286b6c13fedebd7d2b23b41df1.jpg"
-                                    )
-                                )
+                                ui.image(avatar_images[AVATAR_A])
                         ui.badge("高橋はるき", outline=True)
                     with ui.column(align_items="center"):
                         with ui.link(
                             target="https://space.bilibili.com/8907402", new_tab=True
                         ):
                             with ui.avatar():
-                                ui.image(
-                                    await bili_api.get_bili_img(
-                                        "https://i0.hdslb.com/bfs/face/ca91a679a9f14d2b38788671d63d0e311406e516.jpg"
-                                    )
-                                )
+                                ui.image(avatar_images[AVATAR_B])
                         ui.badge("狐日泽", outline=True)
+
             ui.separator().props("vertical")
             with ui.column(align_items="center"):
                 ui.label(t("about.thanks")).classes("text-blue")
@@ -203,46 +230,42 @@ async def about_page():
                             new_tab=True,
                         ):
                             with ui.avatar():
-                                ui.image(
-                                    await bili_api.get_bili_img(
-                                        "https://i1.hdslb.com/bfs/face/1c90e9c3a52b13b898f4025a5282a394b09eeda0.jpg"
-                                    )
-                                )
+                                ui.image(avatar_images[AVATAR_VITA])
                         ui.badge("千蚀vita", outline=True)
                     with ui.column(align_items="center"):
                         with ui.link(
                             target="https://space.bilibili.com/15104516/", new_tab=True
                         ):
                             with ui.avatar():
-                                ui.image(
-                                    await bili_api.get_bili_img(
-                                        "https://i1.hdslb.com/bfs/face/316685ff90898018d3bb0eb7f0649db73e109e9b.jpg"
-                                    )
-                                )
+                                ui.image(avatar_images[AVATAR_QIANZHONG])
                         ui.badge("青岚千柊", outline=True)
                     with ui.column(align_items="center"):
                         with ui.link(
                             target="https://space.bilibili.com/4015420/", new_tab=True
                         ):
                             with ui.avatar():
-                                ui.image(
-                                    await bili_api.get_bili_img(
-                                        "https://i1.hdslb.com/bfs/face/29b2132e3371d0c9a90a21edf6a0ad87a122a831.jpg"
-                                    )
-                                )
+                                ui.image(avatar_images[AVATAR_BAZHONG])
                         ui.badge("天苍八重", outline=True)
                     with ui.column(align_items="center"):
                         with ui.link(
                             target="https://space.bilibili.com/11236317/", new_tab=True
                         ):
                             with ui.avatar():
-                                ui.image(
-                                    await bili_api.get_bili_img(
-                                        "https://i0.hdslb.com/bfs/face/7b2a5c03e0caaa516dda9e238a82ebeef0e2f56d.jpg"
-                                    )
-                                )
+                                ui.image(avatar_images[AVATAR_ICEBLUE])
                         ui.badge("冰蓝IceBlue", outline=True)
 
+            ui.separator().props("vertical")
+            with ui.column(align_items="center"):
+                ui.label(t("about.translator")).classes("text-blue")
+                with ui.row(align_items="center"):
+                    with ui.column(align_items="center"):
+                        with ui.link(
+                            target="https://space.bilibili.com/3707066032064527/",
+                            new_tab=True,
+                        ):
+                            with ui.avatar():
+                                ui.image(avatar_images[AVATAR_YUE])
+                        ui.badge("朧月Yue", outline=True)
         ui.separator()
 
         # 联系我们
