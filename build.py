@@ -26,6 +26,98 @@ from libs import hash_utils
 from version import base_version
 from qiniu import Auth, put_file, etag
 
+# scp 上传参数：CI 上网络抖动较常见，允许重试
+SCP_RETRY_TIMES = 3
+SCP_TIMEOUT = 120 # 单次 scp 的超时时间（秒）
+
+# 出现这些字样说明是认证/私钥问题，重试不会有不同结果，直接放弃
+SCP_AUTH_ERROR_KEYWORDS = (
+    "Permission denied",
+    "no such identity",
+    "Load key",
+    "invalid format",
+    "Too many authentication failures",
+    "Host key verification failed",
+)
+
+def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bool | None:
+    '''
+    用 scp 上传文件到服务器
+
+    返回值：True=上传成功；None=未配置目标地址，按“无需上传”跳过；False=上传失败。
+
+    原先直接 subprocess.run(..., check=True) 且不捕获输出，失败时只能看到
+    "returned non-zero exit status 255"，无法判断是私钥缺失、认证失败还是网络问题，
+    这里把 scp 的 stdout/stderr 完整打印出来，并在上传前检查私钥是否存在。
+    本函数只负责如实反馈结果，是否中断构建由调用方决定。
+
+    files: 待上传的本地文件
+    target: 形如 user@host:/path 的目标地址
+    key_file: SSH 私钥路径
+    label: 日志中用于区分用途的名称
+    '''
+    if not target:
+        print(f"未配置 {label} 的目标地址，跳过上传")
+        return None
+
+    if not key_file.exists():
+        print(f"上传{label}失败：SSH 私钥不存在 {key_file}")
+        print("请检查 GitHub Secrets 中该用途的私钥是否已配置（配置后由 gh_action.setup_ssh_key 写入）")
+        return False
+
+    # 用列表传参而不是拼接字符串，避免路径含空格时被 shell 拆错；
+    # 操作数前加 -- 结束选项解析：target 来自 secret（SCP_URL），万一它以 - 开头，
+    # 不加 -- 会被 scp 当成选项（例如 -oProxyCommand=... 可在 runner 上执行命令）
+    command = [
+        "scp",
+        "-o", "StrictHostKeyChecking=no", # 跳过 host key 确认，避免 CI 交互挂起
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "BatchMode=yes", # 非交互：认证失败立即报错，不等待输入密码
+        "-o", "ConnectTimeout=15",
+        "-o", "ServerAliveInterval=15",
+        "-o", "ServerAliveCountMax=4",
+        "-i", str(key_file),
+        "--",
+        *(str(file) for file in files),
+        target,
+    ]
+
+    for attempt in range(1, SCP_RETRY_TIMES + 1):
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=SCP_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            print(f"第 {attempt} 次上传{label}超时（超过 {SCP_TIMEOUT} 秒）")
+        except OSError as e:
+            # scp 不可用（如路径不存在）等环境问题，同样按失败处理并打印原因
+            print(f"第 {attempt} 次上传{label}失败：{e}")
+        else:
+            if result.returncode == 0:
+                print(f"已上传{label}到服务器：{target.rsplit(':', 1)[-1]}")
+                return True
+            print(f"第 {attempt} 次上传{label}失败（退出码 {result.returncode}）")
+            if result.stdout.strip():
+                print(f"scp 输出：{result.stdout.strip()}")
+            if result.stderr.strip():
+                print(f"scp 错误：{result.stderr.strip()}")
+            if result.returncode == 255:
+                print("退出码 255 一般是 SSH 层问题：私钥未授权、主机/端口/用户名有误或网络不可达")
+                if any(keyword in result.stderr for keyword in SCP_AUTH_ERROR_KEYWORDS):
+                    print("检测到认证/私钥问题，重试不会有不同结果，直接结束")
+                    break
+
+        if attempt < SCP_RETRY_TIMES:
+            time.sleep(attempt * 3)
+
+    print(f"上传{label}失败")
+    return False
+
 def upload(localfile, file_path, version="v1"):
     '''
     localfile: 本地文件路径
@@ -150,28 +242,74 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     # 实现跨构建复用；本地若未设置则默认到 dist/nuitka-cache 启用缓存。
     nuitka_cache_dir = os.environ.get("NUITKA_CACHE_DIR", "dist/nuitka-cache")
     os.environ["NUITKA_CACHE_DIR"] = nuitka_cache_dir
-    nuitka_perf_flags = f"--jobs={os.cpu_count()} --lto=no"
+    # 用列表而不是拼成一整条命令字符串：参数由调用方逐个给出，
+    # 不会因为参数里含空格/引号/前缀 - 而被二次解析（下面统一用 *nuitka_perf_flags 展开）
+    nuitka_perf_flags = [f"--jobs={os.cpu_count()}", "--lto=no"]
+
+    # 不要给 Nuitka 传 --include-package=webview：Nuitka 内置的 pywebview 插件
+    # （isAlwaysEnabled）会自行决定 webview.platforms.* 里哪些平台模块要纳入，若再用
+    # --include-package 强制跟随整个 webview 包，就会与它“排除 android/cocoa/gtk/qt”的
+    # 决定冲突并直接 FATAL（实测 4.0.8）：
+    #   Conflict between user and plugin decision for module 'webview.platforms.android'
+    # 因此只保留 --include-package-data=webview 拿 js/lib 等数据文件，Windows 平台模块
+    # 由插件自动纳入（已验证包含 winforms/edgechromium/mshtml/cef）。
 
     if manager == "poetry":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"poetry run python -m nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --include-package=webview --include-package-data=webview --windows-console-mode=disable --windows-uac-admin --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
+            subprocess.run(
+                [
+                    "poetry", "run", "python", "-m", "nuitka",
+                    "--onefile", "--msvc=latest",
+                    *nuitka_perf_flags, nuitka_download_flag,
+                    "--windows-icon-from-ico=static/logo.ico", main_py,
+                    "--include-package=nicegui", "--include-package-data=nicegui",
+                    "--include-package-data=webview",
+                    "--windows-console-mode=disable", "--windows-uac-admin",
+                    "--product-name=B站加班姬", f"--product-version={product_version}",
+                    "--copyright=Nya-WSL",
+                    "--output-dir=dist", "--output-filename=start.exe",
+                ],
+                check=True,
+            )
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             _verify_start_exe()
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            subprocess.run(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}", check=True)
+            subprocess.run(
+                ["poetry", "run", "python", "package.py", "--name", "start", "--windowed",
+                 "--icon", "static/logo.ico", main_py],
+                check=True,
+            )
     elif manager == "uv":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"uv run nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
+            subprocess.run(
+                [
+                    "uv", "run", "nuitka",
+                    "--onefile", "--msvc=latest",
+                    *nuitka_perf_flags, nuitka_download_flag,
+                    "--windows-icon-from-ico=static/logo.ico", main_py,
+                    "--include-package=nicegui", "--include-package-data=nicegui",
+                    "--include-package-data=webview",
+                    "--windows-console-mode=disable",
+                    "--product-name=B站加班姬", f"--product-version={product_version}",
+                    "--copyright=Nya-WSL",
+                    "--output-dir=dist", "--output-filename=start.exe",
+                ],
+                check=True,
+            )
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             _verify_start_exe()
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            subprocess.run(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}", check=True)
+            subprocess.run(
+                ["uv", "run", "package.py", "--name", "start", "--windowed",
+                 "--icon", "static/logo.ico", main_py],
+                check=True,
+            )
 
     shutil.copy("check_runtime.ps1", Path("dist", "start", "check_runtime.ps1"))
     shutil.copy("LICENSE", Path("dist", "start", "LICENSE"))
@@ -208,47 +346,38 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
         upload(Path("dist", f"{version}.sha256"), f"bili_travail/update/{version}.sha256", "v1")
 
     if upload_status == 'y' or upload_status == '':
-        if env_data.get("scp_url", ""):
-            # scp 使用显式指定的 SSH 私钥（setup_ssh_key 已写入 ~/.ssh/id_rsa），
-            # 避免 Windows OpenSSH 因默认 key 找不到/权限问题导致退出码 255。
-            #  - -o StrictHostKeyChecking=no / UserKnownHostsFile=/dev/null：跳过 host key 确认，避免 CI 挂起
-            #  - -o BatchMode=yes：非交互模式，认证失败立即报错而不是等待密码输入
-            # 上传失败仅告警，不中断整个构建流程（本地已产出 zip / sha256 产物）。
-            ssh_key = Path(Path.home(), ".ssh", "id_rsa")
-            scp_flags = (
-                f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-                f"-o BatchMode=yes -i {ssh_key}"
-            )
-            try:
-                subprocess.run(
-                    f'scp {scp_flags} {Path("dist", "update.zip")} {Path("dist", "update.sha256")} {env_data["scp_url"]}',
-                    check=True,
-                )
-                print(f"已上传到服务器：{env_data['scp_url'].split(':')[1]}")
-            except Exception as e:
-                print(f"上传到服务器失败（不影响构建产物）：{e}")
-                print(traceback.format_exc())
+        # 上传失败一律中断构建：服务器没收到更新包就该让工作流报红，而不是打一行告警
+        # 继续跑完并发布 Release，让人误以为发布成功。
+        # 两个通道都会尝试，最后统一汇总失败项，避免“修一个才发现还有一个”。
+        failed_channels = []
+
+        # 更新包：scp 使用显式指定的 SSH 私钥（gh_action.setup_ssh_key 已写入 ~/.ssh/id_rsa），
+        # 避免 Windows OpenSSH 因默认 key 找不到/权限问题导致退出码 255
+        if scp_upload(
+            [Path("dist", "update.zip"), Path("dist", "update.sha256")],
+            env_data.get("scp_url", ""),
+            Path(Path.home(), ".ssh", "id_rsa"),
+            "更新包",
+        ) is False:
+            failed_channels.append("更新包（scp_url + id_rsa）")
 
         # 构建完成后将 changelog.json 与 version.json 推送到 version_url（secrets）。
         # 使用独立的 SSH key（gh_action.setup_ssh_key 写入 ~/.ssh/version_id_rsa），
         # 与 scp_url 的 id_rsa 分离，避免密钥混用。
-        if env_data.get("version_url", ""):
-            version_ssh_key = Path(Path.home(), ".ssh", "version_id_rsa")
-            version_scp_flags = (
-                f"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-                f"-o BatchMode=yes -i {version_ssh_key}"
+        if scp_upload(
+            [Path("changelog.json"), Path("version.json")],
+            env_data.get("version_url", ""),
+            Path(Path.home(), ".ssh", "version_id_rsa"),
+            "版本信息",
+        ) is False:
+            failed_channels.append("版本信息（version_url + version_id_rsa）")
+
+        if failed_channels:
+            raise RuntimeError(
+                "上传失败，中断工作流："
+                + "、".join(failed_channels)
+                + "。请确认服务器 authorized_keys 含对应公钥，且目标地址与用户名正确"
             )
-            try:
-                subprocess.run(
-                    f'scp {version_scp_flags} {Path("changelog.json")} {Path("version.json")} {env_data["version_url"]}',
-                    check=True,
-                )
-                print(f"已推送 changelog.json / version.json 到服务器：{env_data['version_url'].split(':')[1]}")
-            except Exception as e:
-                print(f"推送 changelog.json / version.json 失败（不影响构建产物）：{e}")
-                print(traceback.format_exc())
-        else:
-            print("未配置version_url，跳过推送 changelog.json / version.json")
 
 def create_version(full: bool = False):
     '''

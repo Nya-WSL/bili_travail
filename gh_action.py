@@ -7,6 +7,7 @@ GitHub Actions 构建入口。
     uv run python gh_action.py --variant pyinstaller --no-release  # 仅编译，跳过后续收尾
 """
 
+import re
 import argparse
 import os
 import sys
@@ -125,11 +126,25 @@ def write_ssh_key(secret_name: str, key_filename: str) -> Path | None:
     key_file.write_bytes((ssh_key + "\n").encode("utf-8"))
 
     # Windows OpenSSH 私钥权限加固：仅当前用户可访问
+    # 收紧失败不能让后续 scp 只报一个退出码 255，这里把原因打印出来
     if os.name == "nt":
-        subprocess.run(
-            ["icacls", str(key_file), "/inheritance:r", "/grant:r", f"{os.environ.get('USERNAME', '')}:(R)"],
-            check=False,
-        )
+        user = os.environ.get("USERNAME", "")
+        # USERNAME 来自环境变量：列表传参已经排除命令注入，这里只做形态校验，
+        # 拦掉含 ":"、"("、"/" 等会改变 icacls 授权规格语义的字符。
+        # 本函数只在 GitHub Actions 上跑（用户名固定是 runneradmin），不受该限制影响。
+        if user and re.fullmatch(r"[A-Za-z0-9._\- ]{1,64}", user):
+            result = subprocess.run(
+                ["icacls", str(key_file), "/inheritance:r", "/grant:r", f"{user}:(R)"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                print(f"警告：收紧 {key_file} 权限失败，OpenSSH 可能拒绝使用该私钥：{result.stderr.strip()}")
+        elif user:
+            print(f"警告：用户名 {user!r} 含异常字符，跳过 {key_file} 的权限收紧")
+        else:
+            print(f"警告：未取到当前用户名，跳过 {key_file} 的权限收紧")
     print(f"SSH key 已配置：{key_file}")
     return key_file
 

@@ -9,7 +9,8 @@ from nicegui import ui, app
 from libs import log
 from libs import gift
 from libs import styles
-from libs.format import format_cd, format_seconds, sort_dict
+from libs.format import format_cd, format_seconds, rule_to_seconds, sort_dict
+from libs.countdown_timer import MAX_GIFT_EXPONENT
 from libs.i18n import t
 
 logger = log.logger
@@ -194,9 +195,9 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
 
     with ui.card(align_items="center").classes("bg-transparent w-full").style("box-shadow: None; left: 50%; transform: translate(-50%, 0%);"):
         if not config['bool']['borderless_cd']:  # type: ignore[index]
-            ui.badge(outline=True, color="", text_color=config['color']['time_color']).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl")  # type: ignore[arg-type]
+            ui.badge(outline=True, color="", text_color=config['color']['time_color']).bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl countdown-display")  # type: ignore[arg-type]
         else:
-            ui.label().bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl").style(f"color: {config['color']['time_color']}")  # type: ignore[index]
+            ui.label().bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-8xl countdown-display").style(f"color: {config['color']['time_color']}")  # type: ignore[index]
 
         ui.separator()
 
@@ -240,15 +241,22 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                     gifts = orjson.loads(f.read().decode("utf-8").encode("utf-8"))
 
                 if re.search(r"\d+\^", time):
-                    tmp_time = app.storage.general["countdown_time"]
+                    current = app.storage.general["countdown_time"]
+                    # 原实现按 num 次循环翻倍/减半，num 过大时数值会溢出成 inf，导致 format_seconds 报错；
+                    # 这里改为一次幂运算（浮点乘 2 / 除 2 结果一致），并限制指数
+                    exponent = min(int(num), MAX_GIFT_EXPONENT)
                     if re.search(r"-\d+\^", time):
-                        for _ in range(num):
-                            tmp_time -= tmp_time / 2
-                        time = format_seconds(float(f"-{app.storage.general['countdown_time'] - tmp_time}"), capture_lang)
+                        delta = -(current - current / (2 ** exponent))
                     else:
-                        for _ in range(num):
-                            tmp_time += tmp_time
-                        time = format_seconds(tmp_time - app.storage.general["countdown_time"], capture_lang)
+                        delta = current * (2 ** exponent) - current
+
+                    # 超过 datetime 上限的秒数没有意义（inf 也走这里），格式化前钳制并记录实际秒数
+                    max_seconds = (datetime.datetime.max - datetime.datetime.now()).total_seconds()
+                    if abs(delta) > max_seconds:
+                        logger.warning(f"礼物时长超出上限，实际秒数：{delta}，已限制为 {max_seconds}")
+                        delta = max_seconds if delta > 0 else -max_seconds
+
+                    time = format_seconds(delta, capture_lang)
 
                 gift_history["cd"].append({
                     "name": name,
@@ -290,45 +298,6 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 capture_cd_rank_list_show()
 
         def capture_cd_rank_list_show():
-            def rule_to_seconds(rule):
-                """将规则字符串转换为秒数"""
-                if not isinstance(rule, str):
-                    return None
-                rule = rule.strip()
-
-                sign = 1
-                if rule.startswith('-'):
-                    sign = -1
-                    rule = rule[1:]
-                elif rule.startswith('+'):
-                    rule = rule[1:]
-
-                hours = 0
-                minutes = 0
-                seconds = 0
-
-                hour_match = re.search(r'(\d+)(?:小时|时|h)', rule)
-                if hour_match:
-                    hours = int(hour_match.group(1))
-                    rule = rule.replace(hour_match.group(0), '')
-
-                minute_match = re.search(r'(\d+)(?:分|m)', rule)
-                if minute_match:
-                    minutes = int(minute_match.group(1))
-                    rule = rule.replace(minute_match.group(0), '')
-
-                second_match = re.search(r'(\d+)(?:秒|s)', rule)
-                if second_match:
-                    seconds = int(second_match.group(1))
-                    rule = rule.replace(second_match.group(0), '')
-
-                remaining = rule.strip()
-                if remaining.isdigit():
-                    seconds += int(remaining)
-
-                total_seconds = hours * 3600 + minutes * 60 + seconds
-                return sign * total_seconds
-
             if not base_config.get("bool", "show_capture_rank_list", False):
                 rank_card.set_visibility(False)
             else:

@@ -35,6 +35,15 @@ def page_styles(text_color=None):
             font-family: "Custom Font", sans-serif;
             color: {text_color};
         }}
+
+        /* 倒计时数字使用等宽数字并预留固定宽度，避免秒数变化时标签宽度跳动 */
+        .countdown-display {{
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum" 1;
+            min-width: 8ch;
+            justify-content: center;
+            text-align: center;
+        }}
         </style>
         """,
         shared=True,

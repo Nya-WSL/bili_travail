@@ -57,18 +57,20 @@ from pages import count, about, capture_cd
 from blivedm import blivedm
 
 # Third Party Packages
-import time
 import orjson
 import shutil
 import random
 import psutil
-import webview
 import cpuinfo
 import asyncio
 import aiohttp
 import requests
 import datetime
 import traceback
+import socket
+import sys
+import time
+import threading
 
 from copy import deepcopy
 from nicegui import ui, app
@@ -118,6 +120,28 @@ if origin_script_path != os.getcwd(): # 如果是直播姬唤起的不会相等�
     logger.info("检测到加班姬可能通过直播姬唤起")
 
 scheduler = AsyncIOScheduler() # 创建调度器
+
+# ================================
+# 后台任务与退出清理
+# ================================
+# 退出时的超时上限：避免网络操作或个别任务卡住导致进程一直挂起
+WS_CLOSE_TIMEOUT = 5.0 # 断开弹幕服务器ws连接的等待上限（秒）
+TASK_CLEANUP_TIMEOUT = 5.0 # 等待残留任务结束的上限（秒）
+PROCESS_EXIT_TIMEOUT = 5.0 # 仍有非守护线程存活时，强制退出前等待的上限（秒）
+
+# 本项目创建的后台任务：退出时统一取消，避免残留任务让进程挂起
+_background_tasks: set[asyncio.Task] = set()
+
+
+def create_background_task(coro) -> asyncio.Task:
+    """创建后台任务并登记，程序退出时统一取消清理
+
+    :param coro: 协程对象
+    """
+    task = asyncio.ensure_future(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
 
 # ================================
 # 检查环境状态
@@ -430,9 +454,9 @@ async def init_config():
             f.write(orjson.dumps({}, option=orjson.OPT_INDENT_2))
 
 try:
-    loop = asyncio.get_running_loop()
+    asyncio.get_running_loop()
     # 如果已有运行中的事件循环（如NiceGUI环境），创建任务执行
-    loop.create_task(init_config())
+    create_background_task(init_config())
 except RuntimeError:
     # 没有运行中的事件循环，直接执行
     asyncio.run(init_config())
@@ -719,7 +743,7 @@ class BiliHandler(blivedm.BaseHandler):
                         new_seconds = current_seconds  # 初始化为当前剩余秒数
 
                         if special[gift] == "double":
-                            new_seconds = current_seconds * (2 ** num) # 新倒计时为浮点数，不能使用位运算
+                            new_seconds = current_seconds * (2 ** min(int(num), ct.MAX_GIFT_EXPONENT)) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -728,7 +752,7 @@ class BiliHandler(blivedm.BaseHandler):
                                 capture_cd.capture_cd_gift_list_show(uname, gift, num, t("capture.double_times", capture_language(), num=int(num)), message)
 
                         if special[gift] == "half":
-                            new_seconds = current_seconds / (2 ** num) # 新倒计时为浮点数，不能使用位运算
+                            new_seconds = current_seconds / (2 ** min(int(num), ct.MAX_GIFT_EXPONENT)) # 新倒计时为浮点数，不能使用位运算
 
                             if is_blind_box:
                                 gift = origin_gift
@@ -1491,7 +1515,7 @@ async def check_b_connect_status():
 
         # 启动连接
         if not b_connect_status:
-            asyncio.create_task(start_handler())
+            create_background_task(start_handler())
             ui.timer(60, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
             b_connect_switch.set_text(t("main.status.connecting"))
@@ -1950,7 +1974,7 @@ def index():
 
             with ui.row().classes("justify-end w-full mt-2"):
                 ui.button(t("common.cancel"), on_click=lambda: ticket_dialog.close())
-                ui.button(t("common.submit"), on_click=lambda: asyncio.create_task(do_submit()), color=base_config.get("color", "btn_color", "btn"))
+                ui.button(t("common.submit"), on_click=lambda: create_background_task(do_submit()), color=base_config.get("color", "btn_color", "btn"))
 
         return ticket_dialog
 
@@ -1965,7 +1989,7 @@ def index():
         with ui.dialog() as ticket_list_dialog, ui.card(align_items="center").style("min-width: 550px; max-width: 650px; max-height: 70vh;"):
             with ui.row().classes("items-center justify-between w-full"):
                 ui.label(t("ticket.my_tickets")).classes("text-h6 text-bold")
-                ui.button(icon="refresh", on_click=lambda: asyncio.create_task(refresh_list())).props("flat round")
+                ui.button(icon="refresh", on_click=lambda: create_background_task(refresh_list())).props("flat round")
 
             tickets_container = ui.column().classes("w-full gap-3 overflow-auto").style("max-height: 50vh;")
 
@@ -2005,7 +2029,7 @@ def index():
                                     ui.label(ticket["admin_comment"]).classes("text-caption text-grey")
 
             # 初始加载
-            asyncio.create_task(refresh_list())
+            create_background_task(refresh_list())
 
             with ui.row().classes("justify-end w-full mt-2"):
                 ui.button(t("common.close"), on_click=lambda: ticket_list_dialog.close())
@@ -2034,11 +2058,11 @@ def index():
     # 创建主界面
     with ui.card(align_items="center").classes("absolute-center").style("width: 95%; height: 730px;") as main_card:
         if base_config.get("bool", "check_update", True):
-            asyncio.create_task(check_update())
+            create_background_task(check_update())
         else:
             ui.notify(t("notify.auto_update_off"), type="warning", timeout=3000)
 
-        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl").style(f"color: {config['color']['time_color']}") # 创建时钟
+        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl countdown-display").style(f"color: {config['color']['time_color']}") # 创建时钟
 
         # 时间输入框
         with ui.row():
@@ -2288,7 +2312,7 @@ def index():
                             sim_status.set_text(t("sim.failure", msg=msg))
                             sim_status.classes(replace="text-red")
 
-                    ui.button(t("sim.send"), on_click=lambda: asyncio.ensure_future(do_simulate_gift()))
+                    ui.button(t("sim.send"), on_click=lambda: create_background_task(do_simulate_gift()))
 
                 # 动态刷新礼物选择列表
                 def refresh_sim_gift_options():
@@ -2331,6 +2355,22 @@ async def create_job():
     scheduler.add_job(refresh_gift_loop, trigger='cron', minute=0) # 每个整点更新一次礼物数据
     scheduler.start()
 
+# 框架自身的任务前缀：关闭时清理残留任务需要避开它们，否则会中断框架的关闭流程
+_FRAMEWORK_MODULE_PREFIXES = ("uvicorn", "starlette", "nicegui", "fastapi", "anyio", "asyncio")
+
+
+def _is_own_task(task: asyncio.Task) -> bool:
+    """判断任务是否由本项目代码创建（关闭时只清理自己的任务）
+
+    :param task: 待判断的任务
+    """
+    coro = task.get_coro()
+    frame = getattr(coro, "cr_frame", None) or getattr(coro, "gi_frame", None)
+    if frame is None:
+        return False
+    return not frame.f_globals.get("__name__", "").startswith(_FRAMEWORK_MODULE_PREFIXES)
+
+
 @app.on_shutdown
 async def shutdown():
     # 取消倒计时相关的 task 和 timer
@@ -2344,28 +2384,95 @@ async def shutdown():
         pass
 
     # 断开弹幕服务器ws连接
+    # stop_and_close 内部用 asyncio.shield 等待网络协程，对端不响应时可能一直不返回，
+    # 因此加超时保护，超时后直接取消网络任务，避免拖住整个关闭流程
     if "client" in globals() and client is not None:
-        await client.stop_and_close() # 彻底断开弹幕服务器ws连接
-        logger.info("[shutdown] 弹幕服务器ws连接已断开")
+        try:
+            await asyncio.wait_for(client.stop_and_close(), timeout=WS_CLOSE_TIMEOUT)
+            logger.info("[shutdown] 弹幕服务器ws连接已断开")
+        except asyncio.TimeoutError:
+            logger.warning(f"[shutdown] 关闭弹幕连接超时（{WS_CLOSE_TIMEOUT:.0f}秒），改为强制取消网络任务")
+            client.stop()
+        except Exception as e:
+            logger.warning(f"[shutdown] 关闭弹幕连接失败，已忽略: {e}")
     else:
         logger.warning("[shutdown] 弹幕服务器ws连接未建立，跳过断开")
 
-    # 停止调度器
-    scheduler.shutdown()
+    # 停止调度器：不等待正在执行的作业跑完，避免个别作业卡住导致进程无法退出
+    scheduler.shutdown(wait=False)
     logger.debug("已停止调度器")
 
-    # 取消所有残留的 asyncio 任务，确保事件循环可以退出
+    # 取消本项目残留的 asyncio 任务，确保事件循环可以退出
+    # 注意：不能取消 uvicorn/starlette 等框架自身的任务（如 lifespan 任务），
+    # 否则会中断框架的关闭流程，把真正的错误掩盖成 CancelledError
     try:
-        tasks = [t for t in asyncio.all_tasks()
-                if t is not asyncio.current_task()]
+        current_task = asyncio.current_task()
+        tasks = {t for t in asyncio.all_tasks() if t is not current_task and _is_own_task(t)}
+        # 用显式登记的任务兜住启发式判断可能漏掉的情况（如协程来自框架模块）
+        tasks |= {t for t in _background_tasks if not t.done()}
         if tasks:
             logger.debug(f"[shutdown] 取消 {len(tasks)} 个残留任务")
             for task in tasks:
                 task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            logger.debug("[shutdown] 所有残留任务已取消")
+            # 带超时等待，任务不响应取消时也不会让进程一直挂起
+            _, pending = await asyncio.wait(tasks, timeout=TASK_CLEANUP_TIMEOUT)
+            if pending:
+                logger.warning(f"[shutdown] 仍有 {len(pending)} 个任务未响应取消，交由事件循环回收")
+            else:
+                logger.debug("[shutdown] 所有残留任务已取消")
     except Exception:
         pass
+
+# 端口无法绑定时 uvicorn 会在绑定阶段直接退出（窗口尚未创建、打包后也没有控制台），
+# 真实错误（WinError 10048）会彻底丢失，因此启动前先检查并给出明确提示
+def _port_in_use(host: str, port: int) -> bool:
+    """检测监听地址与端口是否可用
+
+    :param host: 监听地址
+    :param port: 监听端口
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        try:
+            probe.bind((host, port))
+        except OSError:
+            return True
+    return False
+
+
+def _notify_startup_error(message: str) -> None:
+    """启动阶段的致命错误提示：写日志之外再弹窗，避免用户只看到闪退
+
+    :param message: 提示内容
+    """
+    logger.error(message)
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, message, f"bili_travail | {version}", 0x10) # 0x10 为 MB_ICONERROR
+    except Exception:
+        pass
+
+
+def _finalize_process() -> None:
+    """ui.run 返回后的进程收尾
+
+    正常情况下这里只做检查；若仍有非守护线程存活（即残留的后台任务没退出），
+    先等待一段时间，超时后强制结束进程，避免关闭窗口后进程一直挂在后台。
+    """
+    threads = [t for t in threading.enumerate()
+               if t is not threading.main_thread() and t.is_alive() and not t.daemon]
+    if not threads:
+        return
+
+    logger.warning(f"检测到 {len(threads)} 个残留后台线程: {', '.join(t.name for t in threads)}")
+    for thread in threads:
+        thread.join(timeout=PROCESS_EXIT_TIMEOUT)
+
+    remaining = [t for t in threads if t.is_alive()]
+    if remaining:
+        logger.warning(f"仍有 {len(remaining)} 个线程未退出: {', '.join(t.name for t in remaining)}，强制结束进程")
+        logger.complete()  # 等待日志队列落盘，避免强制退出时丢失日志
+        os._exit(0)
+
 
 # 运行NiceGUI
 if __name__ == "__main__":
@@ -2373,6 +2480,14 @@ if __name__ == "__main__":
         freeze_support()
         logger.info("正在检查Edge WebView2 runtime...")
         asyncio.run(check_runtime.check_runtime()) # 检查Edge WebView2 runtime
+
+        if _port_in_use(host, port):
+            _notify_startup_error(
+                f"无法监听 {host}:{port} 端口可能已被占用（程序已在运行），"
+                f"或 config.toml 中 [general] 的 host 不是本机地址。\n"
+                f"请关闭已运行的实例，或修改 config.toml 后重试。"
+            )
+            sys.exit(1)
 
         app.native.start_args['private_mode'] = False  # 禁用强删缓存文件夹行为，绕过 NoneType 崩溃
         app.native.start_args['storage_path'] = safe_storage_dir
@@ -2388,7 +2503,19 @@ if __name__ == "__main__":
             window_size=(window_width, 780),
             reconnect_timeout=30,
             language=i18n.ui_language(),
-            use_colors=False
+            use_colors=False,
+            log_config=None # uvicorn 默认会在启动时用 dictConfig 重置自己的 logger handler，
+                            # 清掉项目桥接给 loguru 的 handler，导致启动阶段的错误（如端口被占用）只输出到控制台，
+                            # 打包后没有控制台就会彻底丢失
         )  # pyright: ignore[reportArgumentType]
-    except Exception:
+    except KeyboardInterrupt:
+        pass
+    except SystemExit:
+        # 主动退出（如端口被占用、启动失败）已在前面记录过原因，不作为运行错误
+        raise
+    except BaseException:
+        # CancelledError 等不属于 Exception，需单独兜住，避免错误被静默丢弃
         logger.error(f"run error: {traceback.format_exc()}")
+        raise
+    finally:
+        _finalize_process()
