@@ -47,7 +47,12 @@ def _parse_proxy_server(server: str) -> str | None:
 
 
 def _from_env() -> str | None:
-    """从环境变量读取代理"""
+    """从环境变量读取代理
+
+    遇到不支持的协议只跳过该变量、继续看后面的变量：常见写法是 ALL_PROXY 放
+    socks5（aiohttp 不支持）、HTTP_PROXY 放可用的 http 代理，若在这里直接 return，
+    可用的那个就被前面的 socks5 盖掉，最终回落到注册表或直连。
+    """
     for name in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"):
         value = os.environ.get(name, "").strip()
         if not value:
@@ -57,7 +62,6 @@ def _from_env() -> str | None:
         if value.startswith(("http://", "https://")):
             return value
         logger.debug("暂不支持的代理协议，已忽略: {}", value)
-        return None
     return None
 
 
