@@ -2487,7 +2487,7 @@ if __name__ == "__main__":
                 f"或 config.toml 中 [general] 的 host 不是本机地址。\n"
                 f"请关闭已运行的实例，或修改 config.toml 后重试。"
             )
-            sys.exit()
+            sys.exit(1)
 
         app.native.start_args['private_mode'] = False  # 禁用强删缓存文件夹行为，绕过 NoneType 崩溃
         app.native.start_args['storage_path'] = safe_storage_dir
