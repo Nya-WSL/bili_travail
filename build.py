@@ -65,7 +65,9 @@ def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bo
         print("请检查 GitHub Secrets 中该用途的私钥是否已配置（配置后由 gh_action.setup_ssh_key 写入）")
         return False
 
-    # 用列表传参而不是拼接字符串，避免路径含空格时被 shell 拆错
+    # 用列表传参而不是拼接字符串，避免路径含空格时被 shell 拆错；
+    # 操作数前加 -- 结束选项解析：target 来自 secret（SCP_URL），万一它以 - 开头，
+    # 不加 -- 会被 scp 当成选项（例如 -oProxyCommand=... 可在 runner 上执行命令）
     command = [
         "scp",
         "-o", "StrictHostKeyChecking=no", # 跳过 host key 确认，避免 CI 交互挂起
@@ -75,6 +77,7 @@ def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bo
         "-o", "ServerAliveInterval=15",
         "-o", "ServerAliveCountMax=4",
         "-i", str(key_file),
+        "--",
         *(str(file) for file in files),
         target,
     ]
@@ -239,7 +242,9 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     # 实现跨构建复用；本地若未设置则默认到 dist/nuitka-cache 启用缓存。
     nuitka_cache_dir = os.environ.get("NUITKA_CACHE_DIR", "dist/nuitka-cache")
     os.environ["NUITKA_CACHE_DIR"] = nuitka_cache_dir
-    nuitka_perf_flags = f"--jobs={os.cpu_count()} --lto=no"
+    # 用列表而不是拼成一整条命令字符串：参数由调用方逐个给出，
+    # 不会因为参数里含空格/引号/前缀 - 而被二次解析（下面统一用 *nuitka_perf_flags 展开）
+    nuitka_perf_flags = [f"--jobs={os.cpu_count()}", "--lto=no"]
 
     # 不要给 Nuitka 传 --include-package=webview：Nuitka 内置的 pywebview 插件
     # （isAlwaysEnabled）会自行决定 webview.platforms.* 里哪些平台模块要纳入，若再用
@@ -252,23 +257,59 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
     if manager == "poetry":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"poetry run python -m nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --include-package-data=webview --windows-console-mode=disable --windows-uac-admin --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
+            subprocess.run(
+                [
+                    "poetry", "run", "python", "-m", "nuitka",
+                    "--onefile", "--msvc=latest",
+                    *nuitka_perf_flags, nuitka_download_flag,
+                    "--windows-icon-from-ico=static/logo.ico", main_py,
+                    "--include-package=nicegui", "--include-package-data=nicegui",
+                    "--include-package-data=webview",
+                    "--windows-console-mode=disable", "--windows-uac-admin",
+                    "--product-name=B站加班姬", f"--product-version={product_version}",
+                    "--copyright=Nya-WSL",
+                    "--output-dir=dist", "--output-filename=start.exe",
+                ],
+                check=True,
+            )
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             _verify_start_exe()
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            subprocess.run(f"poetry run python package.py --name start --windowed --icon static/logo.ico {main_py}", check=True)
+            subprocess.run(
+                ["poetry", "run", "python", "package.py", "--name", "start", "--windowed",
+                 "--icon", "static/logo.ico", main_py],
+                check=True,
+            )
     elif manager == "uv":
         if nuitka == 'y':
             start_time = time.time()
-            subprocess.run(f"uv run nuitka --onefile --msvc=latest {nuitka_perf_flags} {nuitka_download_flag} --windows-icon-from-ico=static/logo.ico {main_py} --include-package=nicegui --include-package-data=nicegui --include-package-data=webview --windows-console-mode=disable --product-name=B站加班姬 --product-version={product_version} --copyright=Nya-WSL --output-dir=dist --output-filename=start.exe", check=True)
+            subprocess.run(
+                [
+                    "uv", "run", "nuitka",
+                    "--onefile", "--msvc=latest",
+                    *nuitka_perf_flags, nuitka_download_flag,
+                    "--windows-icon-from-ico=static/logo.ico", main_py,
+                    "--include-package=nicegui", "--include-package-data=nicegui",
+                    "--include-package-data=webview",
+                    "--windows-console-mode=disable",
+                    "--product-name=B站加班姬", f"--product-version={product_version}",
+                    "--copyright=Nya-WSL",
+                    "--output-dir=dist", "--output-filename=start.exe",
+                ],
+                check=True,
+            )
             end_time = time.time()
             print(f"Nuitka编译完成，耗时{end_time - start_time:.2f}秒")
             _verify_start_exe()
             shutil.copy(Path("dist", "start.exe"), Path("dist", "start", "start.exe"))
         else:
-            subprocess.run(f"uv run package.py --name start --windowed --icon static/logo.ico {main_py}", check=True)
+            subprocess.run(
+                ["uv", "run", "package.py", "--name", "start", "--windowed",
+                 "--icon", "static/logo.ico", main_py],
+                check=True,
+            )
 
     shutil.copy("check_runtime.ps1", Path("dist", "start", "check_runtime.ps1"))
     shutil.copy("LICENSE", Path("dist", "start", "LICENSE"))
