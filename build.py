@@ -40,13 +40,16 @@ SCP_AUTH_ERROR_KEYWORDS = (
     "Host key verification failed",
 )
 
-def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bool:
+def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bool | None:
     '''
-    用 scp 上传文件到服务器，失败只告警不中断构建（本地产物已生成）
+    用 scp 上传文件到服务器
+
+    返回值：True=上传成功；None=未配置目标地址，按“无需上传”跳过；False=上传失败。
 
     原先直接 subprocess.run(..., check=True) 且不捕获输出，失败时只能看到
     "returned non-zero exit status 255"，无法判断是私钥缺失、认证失败还是网络问题，
     这里把 scp 的 stdout/stderr 完整打印出来，并在上传前检查私钥是否存在。
+    本函数只负责如实反馈结果，是否中断构建由调用方决定。
 
     files: 待上传的本地文件
     target: 形如 user@host:/path 的目标地址
@@ -55,7 +58,7 @@ def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bo
     '''
     if not target:
         print(f"未配置 {label} 的目标地址，跳过上传")
-        return False
+        return None
 
     if not key_file.exists():
         print(f"上传{label}失败：SSH 私钥不存在 {key_file}")
@@ -89,7 +92,7 @@ def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bo
         except subprocess.TimeoutExpired:
             print(f"第 {attempt} 次上传{label}超时（超过 {SCP_TIMEOUT} 秒）")
         except OSError as e:
-            # scp 不可用（如路径不存在）等环境问题，同样不能中断构建
+            # scp 不可用（如路径不存在）等环境问题，同样按失败处理并打印原因
             print(f"第 {attempt} 次上传{label}失败：{e}")
         else:
             if result.returncode == 0:
@@ -109,7 +112,7 @@ def scp_upload(files: list[Path], target: str, key_file: Path, label: str) -> bo
         if attempt < SCP_RETRY_TIMES:
             time.sleep(attempt * 3)
 
-    print(f"上传{label}失败（不影响构建产物）")
+    print(f"上传{label}失败")
     return False
 
 def upload(localfile, file_path, version="v1"):
@@ -302,24 +305,38 @@ def build(qiniu_status: str ='y', manager: str = "uv", nuitka: str ='n', upload_
         upload(Path("dist", f"{version}.sha256"), f"bili_travail/update/{version}.sha256", "v1")
 
     if upload_status == 'y' or upload_status == '':
+        # 上传失败一律中断构建：服务器没收到更新包就该让工作流报红，而不是打一行告警
+        # 继续跑完并发布 Release，让人误以为发布成功。
+        # 两个通道都会尝试，最后统一汇总失败项，避免“修一个才发现还有一个”。
+        failed_channels = []
+
         # 更新包：scp 使用显式指定的 SSH 私钥（gh_action.setup_ssh_key 已写入 ~/.ssh/id_rsa），
         # 避免 Windows OpenSSH 因默认 key 找不到/权限问题导致退出码 255
-        scp_upload(
+        if scp_upload(
             [Path("dist", "update.zip"), Path("dist", "update.sha256")],
             env_data.get("scp_url", ""),
             Path(Path.home(), ".ssh", "id_rsa"),
             "更新包",
-        )
+        ) is False:
+            failed_channels.append("更新包（scp_url + id_rsa）")
 
         # 构建完成后将 changelog.json 与 version.json 推送到 version_url（secrets）。
         # 使用独立的 SSH key（gh_action.setup_ssh_key 写入 ~/.ssh/version_id_rsa），
         # 与 scp_url 的 id_rsa 分离，避免密钥混用。
-        scp_upload(
+        if scp_upload(
             [Path("changelog.json"), Path("version.json")],
             env_data.get("version_url", ""),
             Path(Path.home(), ".ssh", "version_id_rsa"),
             "版本信息",
-        )
+        ) is False:
+            failed_channels.append("版本信息（version_url + version_id_rsa）")
+
+        if failed_channels:
+            raise RuntimeError(
+                "上传失败，中断工作流："
+                + "、".join(failed_channels)
+                + "。请确认服务器 authorized_keys 含对应公钥，且目标地址与用户名正确"
+            )
 
 def create_version(full: bool = False):
     '''
