@@ -66,6 +66,7 @@ import asyncio
 import aiohttp
 import requests
 import datetime
+import faulthandler
 import traceback
 import socket
 import sys
@@ -80,6 +81,15 @@ from multiprocessing import freeze_support
 from packaging import version as pack_version
 from nicegui import __version__ as gui_version
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+# 打包版（Nuitka --windows-console-mode=disable）是没有控制台的 GUI 进程，sys.stdout/sys.stderr 为 None。
+# nicegui 关闭流程的最后几步是 sys.stdout.flush() → os._exit(0)，在 None 上 flush 会抛 AttributeError；
+# 该异常位于 daemon 线程、stderr 同为 None，traceback 无处输出，于是进程永远走不到 os._exit(0)——
+# 表现为关闭窗口后进程驻留、端口不释放，日志里也没有任何线索。补上可用的流，保证收尾流程能走完。
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 ver_strftime = env.get_key().get("version", datetime.datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%y%m%d%H%M"))
 version = f"{base_ver.base_version}.{ver_strftime}"
@@ -128,6 +138,7 @@ scheduler = AsyncIOScheduler() # 创建调度器
 WS_CLOSE_TIMEOUT = 5.0 # 断开弹幕服务器ws连接的等待上限（秒）
 TASK_CLEANUP_TIMEOUT = 5.0 # 等待残留任务结束的上限（秒）
 PROCESS_EXIT_TIMEOUT = 5.0 # 仍有非守护线程存活时，强制退出前等待的上限（秒）
+SHUTDOWN_WATCHDOG_TIMEOUT = 20.0 # 关闭流程未在此时限内结束则记录现场并强制退出（秒）
 
 # 本项目创建的后台任务：退出时统一取消，避免残留任务让进程挂起
 _background_tasks: set[asyncio.Task] = set()
@@ -2422,6 +2433,41 @@ async def shutdown():
                 logger.debug("[shutdown] 所有残留任务已取消")
     except Exception:
         pass
+
+    # 框架收尾阶段若卡住，由看门狗记录现场并强制结束进程
+    _start_shutdown_watchdog()
+
+
+def _start_shutdown_watchdog() -> None:
+    """启动关闭看门狗：框架收尾阶段卡住时记录现场并强制结束进程
+
+    nicegui 的关闭链路是 App.stop → run.tear_down → atexit._run_exitfuncs → os._exit(0)，
+    后三步在框架内部、不受本项目控制：打包版没有控制台时 sys.stdout 为 None，曾使
+    sys.stdout.flush() 抛 AttributeError，进程永远到不了 os._exit(0)，表现为关闭窗口后
+    进程驻留、端口不释放。更麻烦的是此时 atexit 已把 loguru 的异步队列收尾关闭，
+    任何日志记录都会静默丢失（兜底写 stderr，而 stderr 也是 None），日志里查不到一点线索。
+    因此这里在关闭最开始（日志尚可用）起一个守护线程，超时后直接追加写文件记录各线程堆栈，
+    再强制结束进程：既保证进程不会驻留，也留下可查的现场。
+    """
+
+    def watchdog() -> None:
+        time.sleep(SHUTDOWN_WATCHDOG_TIMEOUT)
+
+        # 绕开 logger 直接追加写文件：此时 loguru 的队列可能已被 atexit 收尾关闭
+        try:
+            with open(log.file_name, "a", encoding="utf-8") as f:
+                f.write(
+                    f"\n{datetime.datetime.now():%Y-%m-%d %H:%M:%S} [WARNING]: 关闭流程超过 "
+                    f"{SHUTDOWN_WATCHDOG_TIMEOUT:.0f} 秒未结束，以下为各线程堆栈，随后强制结束进程\n"
+                )
+                faulthandler.dump_traceback(file=f, all_threads=True)
+        except Exception:
+            pass
+
+        os._exit(0)
+
+    threading.Thread(target=watchdog, name="shutdown-watchdog", daemon=True).start()
+
 
 # 端口无法绑定时 uvicorn 会在绑定阶段直接退出（窗口尚未创建、打包后也没有控制台），
 # 真实错误（WinError 10048）会彻底丢失，因此启动前先检查并给出明确提示
