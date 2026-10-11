@@ -9,7 +9,7 @@ from nicegui import ui, app
 from libs import log
 from libs import gift
 from libs import styles
-from libs.format import format_cd, format_seconds, sort_dict
+from libs.format import format_cd, format_seconds, rule_to_seconds, sort_dict
 from libs.countdown_timer import MAX_GIFT_EXPONENT
 from libs.i18n import t
 
@@ -298,45 +298,6 @@ async def capture_cd_page(get_notes_func, init_config_func, base_config):
                 capture_cd_rank_list_show()
 
         def capture_cd_rank_list_show():
-            def rule_to_seconds(rule):
-                """将规则字符串转换为秒数"""
-                if not isinstance(rule, str):
-                    return None
-                rule = rule.strip()
-
-                sign = 1
-                if rule.startswith('-'):
-                    sign = -1
-                    rule = rule[1:]
-                elif rule.startswith('+'):
-                    rule = rule[1:]
-
-                hours = 0
-                minutes = 0
-                seconds = 0
-
-                hour_match = re.search(r'(\d+)(?:小时|时|h)', rule)
-                if hour_match:
-                    hours = int(hour_match.group(1))
-                    rule = rule.replace(hour_match.group(0), '')
-
-                minute_match = re.search(r'(\d+)(?:分|m)', rule)
-                if minute_match:
-                    minutes = int(minute_match.group(1))
-                    rule = rule.replace(minute_match.group(0), '')
-
-                second_match = re.search(r'(\d+)(?:秒|s)', rule)
-                if second_match:
-                    seconds = int(second_match.group(1))
-                    rule = rule.replace(second_match.group(0), '')
-
-                remaining = rule.strip()
-                if remaining.isdigit():
-                    seconds += int(remaining)
-
-                total_seconds = hours * 3600 + minutes * 60 + seconds
-                return sign * total_seconds
-
             if not base_config.get("bool", "show_capture_rank_list", False):
                 rank_card.set_visibility(False)
             else:

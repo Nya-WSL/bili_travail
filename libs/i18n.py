@@ -174,6 +174,20 @@ def get_language() -> str:
     return _current_lang
 
 
+def raw(key: str, lang: str) -> str | None:
+    """
+    读取指定语言包的原始模板，不做默认语言回退
+
+    供需要从模板派生信息的场景使用（如从 format.hours 派生时长单位字面量）
+
+    :param key: 文案key
+    :param lang: 语言代码
+    :return str | None: 原始模板，该语言包中不存在时返回 None
+    """
+
+    return _load(lang).get(key)
+
+
 def ui_language() -> str:
     """
     获取Quasar组件使用的语言代码
