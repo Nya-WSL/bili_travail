@@ -16,10 +16,27 @@ logger = log.logger
 # 单张图片的请求超时：连接 5s、整体 10s，避免图床不可达时长时间卡住页面
 FETCH_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)
 
+# 只声明当前 aiohttp 真能解码的编码：
+#   - br 需要 brotli（或 brotlicffi）
+#   - zstd 需要 compression.zstd（Python 3.14+）或 backports.zstd；
+#     本项目装的是 zstandard 包，aiohttp 并不认，此环境下 HAS_ZSTD 为 False
+# 声明了却解不了，会在 response.read() 抛 ContentEncodingError，图片直接变空串，
+# 所以这里按 aiohttp 自己的能力表来拼，和它内部 _gen_default_accept_encoding() 一致。
+try:
+    from aiohttp.compression_utils import HAS_BROTLI, HAS_ZSTD
+except ImportError:  # aiohttp 内部模块路径变动时保守退化为 gzip/deflate
+    HAS_BROTLI = HAS_ZSTD = False
+
+ACCEPT_ENCODING = ", ".join(
+    ["gzip", "deflate"]
+    + (["br"] if HAS_BROTLI else [])
+    + (["zstd"] if HAS_ZSTD else [])
+)
+
 # 模拟浏览器加载图片时的请求头，避免图床因缺少 Referer/UA 等字段拒绝请求
 IMG_HEADERS = {
     "Accept": "image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5",
-    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Encoding": ACCEPT_ENCODING,
     "Accept-Language": "zh-CN,zh;q=0.9,zh-TW;q=0.8,zh-HK;q=0.7,en-US;q=0.6,en;q=0.5",
     "Connection": "keep-alive",
     "Sec-Fetch-Dest": "image",
@@ -71,6 +88,32 @@ async def _get_b64(url):
         raise last_error
     raise aiohttp.ClientError(f"图片请求失败: {url}")
 
+# 头像缓存文件
+IMG_CACHE_FILE = "data/bili_img.json"
+
+# 缓存读写锁：关于页会用 asyncio.gather 并发预取多个头像，若不串行化缓存更新，
+# 每个协程都基于自己读到的旧快照写回「只含自己那一条」的缓存，最后一次写入会
+# 丢掉其他条目，导致后续访问全部重新下载
+_img_cache_lock = asyncio.Lock()
+
+
+def _load_img_cache() -> dict:
+    """读取头像缓存，文件不存在时初始化"""
+    if not os.path.exists(IMG_CACHE_FILE):
+        with open(IMG_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+        return {}
+
+    with open(IMG_CACHE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_img_cache(cache: dict) -> None:
+    """写入头像缓存"""
+    with open(IMG_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=4)
+
+
 # GET方式请求B站图片数据并转换为base64
 async def get_bili_img(url):
     """
@@ -81,36 +124,29 @@ async def get_bili_img(url):
 
     :param url: 图片url
     """
-
-    if not os.path.exists("data/bili_img.json"):
-        with open("data/bili_img.json", "w", encoding="utf-8") as f:
-            json.dump({}, f)
-
-    # 获取图片数据
-    if url != "":
-        status = False
-        with open("data/bili_img.json", "r", encoding="utf-8") as f:
-            bili_img_data = json.load(f)
-
-        if url not in bili_img_data.keys():
-            try:
-                bili_img = await _get_b64(url)
-            except (asyncio.TimeoutError, aiohttp.ClientError, OSError) as e:
-                # 失败结果不写入缓存，网络恢复后下次访问仍会重试
-                logger.warning(f"获取B站图片失败: {url} - {e}")
-                return ""
-            except Exception as e:
-                logger.error(f"获取B站图片时发生未知错误: {url} - {e}")
-                return ""
-            bili_img_data[url] = bili_img
-            status = True
-        else:
-            bili_img = bili_img_data[url]
-
-        if status:
-            with open("data/bili_img.json", "w", encoding="utf-8") as f:
-                json.dump(bili_img_data, f, ensure_ascii=False, indent=4)
-
-        return f"data:image/jpeg;base64,{bili_img}"
-    else:
+    if url == "":
         return ""
+
+    async with _img_cache_lock:
+        cache = _load_img_cache()
+        if url in cache:
+            return f"data:image/jpeg;base64,{cache[url]}"
+
+    # 下载放在锁外：多个头像依然并发拉取，只有缓存更新被串行化
+    try:
+        bili_img = await _get_b64(url)
+    except (asyncio.TimeoutError, aiohttp.ClientError, OSError) as e:
+        # 失败结果不写入缓存，网络恢复后下次访问仍会重试
+        logger.warning(f"获取B站图片失败: {url} - {e}")
+        return ""
+    except Exception as e:
+        logger.error(f"获取B站图片时发生未知错误: {url} - {e}")
+        return ""
+
+    async with _img_cache_lock:
+        # 重新读取最新缓存再合并，避免覆盖并发下载期间其他协程写入的头像
+        cache = _load_img_cache()
+        cache[url] = bili_img
+        _save_img_cache(cache)
+
+    return f"data:image/jpeg;base64,{bili_img}"

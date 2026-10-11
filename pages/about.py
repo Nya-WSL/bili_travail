@@ -145,7 +145,7 @@ async def about_page():
                     # 显示本地消息
                     ui.chat_message(
                         text_a,
-                        avatar=await bili_api.get_bili_img(AVATAR_A),
+                        avatar=avatar_images[AVATAR_A],
                         name=NAME_A,
                         text_html=True,
                         sent=True,
@@ -153,7 +153,7 @@ async def about_page():
                     )
                     ui.chat_message(
                         text_b,
-                        avatar=await bili_api.get_bili_img(AVATAR_B),
+                        avatar=avatar_images[AVATAR_B],
                         name=NAME_B,
                         text_html=True,
                         sanitize=False,
@@ -166,8 +166,10 @@ async def about_page():
 
         async def display_message_pair(msg):
             """显示一对聊天消息"""
-            avatar_a = await bili_api.get_bili_img(AVATAR_A)
-            avatar_b = await bili_api.get_bili_img(AVATAR_B)
+            # 复用预取结果：预取失败时 get_bili_img 不缓存失败结果，这里再取会重新走一次
+            # 完整超时（最多 10s ×2）并串行阻塞页面渲染
+            avatar_a = avatar_images[AVATAR_A]
+            avatar_b = avatar_images[AVATAR_B]
 
             ui.chat_message(
                 msg.get("text_a", "默认消息A"),
