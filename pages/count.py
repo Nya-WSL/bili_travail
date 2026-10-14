@@ -9,6 +9,7 @@ logger = log.logger
 
 def count_page():
     styles.page_styles() # 加载自定义样式
+    styles.doc_styles() # 卡片保持浅色外观，不跟随主界面配色
     ui.query('body').style(f'background: url("static/bg_vita.png") fixed')
     try:
         with open("data/gift_statistics.json", "rb") as f:
@@ -25,7 +26,7 @@ def count_page():
             }
         }
 
-    with ui.card(align_items="center").classes("w-80").style("top: 50%; left: 50%; transform: translate(-50%);"):
+    with ui.card(align_items="center").classes("w-80 bt-doc-card").style("top: 50%; left: 50%; transform: translate(-50%);"):
     # with ui.scroll_area().classes('absolute-center w-80 h-96'):
         for gift, value in count.items():
             with ui.row():

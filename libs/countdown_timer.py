@@ -49,6 +49,16 @@ class CountdownTimer:
             return 0.0
         return max((self.target_time - datetime.datetime.now()).total_seconds(), 0.0)
 
+    @property
+    def is_running(self) -> bool:
+        """倒计时是否已启动（暂停中同样视为已启动）"""
+        return self._running
+
+    @property
+    def is_paused(self) -> bool:
+        """倒计时是否处于暂停状态"""
+        return self._running and self._paused
+
     def set_remaining_seconds(self, seconds: float) -> None:
         if seconds < 0:
             seconds = 0
@@ -150,7 +160,7 @@ class CountdownTimer:
             if reset_inherit_status:
                 app.storage.general["countdown_time"] = 0
                 self.remaining_time = datetime.timedelta(0)
-                self._cancel_button.set_text(t("main.btn.stop"))
+                self._cancel_button.props("icon=stop") # 停止按钮从重置图标恢复为停止图标
                 self._cancel_button.disable()
 
     # 程序退出时的清理，只取消计时相关的 task/timer，
