@@ -41,6 +41,7 @@ import blivedm.blivedm.models.open_live as open_models
 from libs import log
 from libs import ping
 from libs import styles
+from libs import activity
 from libs import travail_stat
 from libs import dns_resolver
 from libs import check_runtime
@@ -207,6 +208,27 @@ def init_storage():
             os.mkdir("data/blind_box")
         shutil.move("data/blind_box_value.json", f"data/blind_box/{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
 
+    # 活动日志：先把上一次运行的记录备份到 data/history，再重新开始记录
+    if os.path.exists(activity.LOG_PATH):
+        entries = None
+
+        try:
+            with open(activity.LOG_PATH, "rb") as f:
+                entries = orjson.loads(f.read()).get("entries", [])
+        except Exception:
+            logger.opt(exception=True).warning("读取上一次运行的活动日志失败，直接清理")
+
+        if entries:
+            if not os.path.exists("data/history"):
+                os.mkdir("data/history")
+
+            shutil.move(
+                activity.LOG_PATH,
+                f"data/history/activity_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+            )
+        else:
+            os.remove(activity.LOG_PATH)
+
     app.storage.general["countdown_time"] = app.storage.general.get("countdown_time", 0)
     app.storage.general["version"] = app.storage.general.get("version", version)
     app.storage.general["startup_check_bili_auth"] = app.storage.general.get("startup_check_bili_auth", False)
@@ -226,14 +248,14 @@ config = base_config.load()
 i18n.set_language(i18n.resolve_language(config["general"].get("language", "auto")))
 logger.debug("界面语言: {}", i18n.get_language())
 
-# 标签栏所需宽度按当前语言估算，英文等语言下标签更长，需要更宽的窗口
+# 顶栏分段控件所需宽度按当前语言估算，英文等语言下标签更长，需要更宽的窗口
 MAIN_TAB_KEYS = [
-    "main.tab.account", "main.tab.gift", "main.tab.display", "main.tab.appearance",
-    "main.tab.stats", "main.tab.program", "main.tab.simulator",
+    "main.tab.timer", "main.tab.settings", "main.tab.simulator",
 ]
-MIN_WINDOW_WIDTH = 600
-TAB_PADDING = 20 # 每个标签的左右内边距
-WINDOW_MARGIN = 60 # 主卡片与窗口边框的余量
+MIN_WINDOW_WIDTH = 480
+WINDOW_HEIGHT = 800
+TAB_PADDING = 30 # 每个分段的内边距与图标占位
+WINDOW_MARGIN = 170 # 房间徽标与窗口边框的余量
 
 main_tab_width = int(sum(i18n.estimate_width(t(key)) + TAB_PADDING for key in MAIN_TAB_KEYS))
 window_width = max(MIN_WINDOW_WIDTH, main_tab_width + WINDOW_MARGIN)
@@ -295,16 +317,16 @@ if base_config.get("open_live", "APP_ID", 0) != 0:
 else:
     APP_ID = bili_keys.get("APP_ID", 0)
 
-bg_color = base_config.get("color", "bg_color", "#FCFCFA")
+bg_color = base_config.get("color", "bg_color", "#141219")
 
 ui.add_css(
     f"""
 .text-btn {{
-color: {btn_color};
+color: {btn_color} !important;
 }}
 
 .bg-btn {{
-background: {btn_color};
+background: {btn_color} !important;
 }}
 
 /* ===== 低饱和配色覆写 ===== */
@@ -361,27 +383,18 @@ color: #9BA89A !important;
 .q-card {{
 background-color: {bg_color} !important;
 }}
-/* 标签页(Tabs/TabPanels)适配 */
+/* 标签页(Tabs/TabPanels)：页面背景由容器提供，标签栏样式见 libs/styles.py */
 .q-tab-panel {{
-background: {bg_color} !important;
+background: transparent !important;
 }}
 .q-tabs {{
 background: transparent !important;
 }}
+.q-tab__indicator {{
+display: none !important;
+}}
 .q-panel {{
 background: {bg_color} !important;
-}}
-.q-tab__indicator {{
-background: #8BA89A !important;
-}}
-.q-tab--active {{
-color: #4A4A4A !important;
-}}
-.q-tab .q-tab__label {{
-color: #8B8B8B;
-}}
-.q-tab--active .q-tab__label {{
-color: #4A4A4A;
 }}
 """,
     shared=True,
@@ -394,7 +407,7 @@ color: #4A4A4A;
 if pack_version.parse(gui_version) < pack_version.parse("3.5.0"):
     ui.button.__init__.__kwdefaults__['color'] = btn_color  # pyright: ignore[reportOptionalSubscript]
 else:
-    ui.button.default_props(f'color={btn_color} text-color="black"')
+    ui.button.default_props(f'color={btn_color} text-color="white"')
 
 GiftManager = get_gift.BiliGiftManager()
 
@@ -588,15 +601,13 @@ class BiliHandler(blivedm.BaseHandler):
             if uid != None:
                 now_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 await travail_stat.stat(room_id, uid, version, now_time)
-                login_status.set_text(room_id)  # pyright: ignore[reportArgumentType]
-                login_status.classes("text-green")
+                set_connect_state("connected", room_id)
+                activity.log_event("connect", room_id)
                 async with b_connect_status_lock:
                     b_connect_status = True # 在第一次心跳时设置状态为已连接至弹幕服务器
                 b_connect_switch.set_value(True)
-                b_connect_switch.set_text(t("main.status.connected_dm"))
             else:
-                login_status.set_text(t("main.status.disconnected"))
-                login_status.classes(replace="text-red")
+                set_connect_state("disconnected")
 
     # 礼物数据
     async def _on_open_live_gift(self, client: blivedm.OpenLiveClient, message: open_models.GiftMessage):  # pyright: ignore[reportIncompatibleMethodOverride]
@@ -814,7 +825,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
                                 capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(total_changed_time, capture_language()), message)
 
-                        countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
+                        apply_cd_change(new_seconds, uname, gift, num) # 重设倒计时数据并写入活动日志
 
                     if gift in gifts:
                         delta_seconds = gifts[gift] * int(num)
@@ -829,7 +840,7 @@ class BiliHandler(blivedm.BaseHandler):
                             if show_capture_gift_list_switch.value and capture_cd.capture_cd_is_created:
                                 capture_cd.capture_cd_gift_list_show(uname, gift, num, format_seconds(gift_list_show_time, capture_language()), message)
 
-                        countdown_timer.set_remaining_seconds(new_seconds) # 重设倒计时数据
+                        apply_cd_change(new_seconds, uname, gift, num) # 重设倒计时数据并写入活动日志
                 else:
                     logger.error("计时失败，未找到礼物数据文件")
 
@@ -933,6 +944,64 @@ class GiftSimulator:
 # 全局模拟器实例
 simulator: GiftSimulator | None = None
 
+# ================================
+# 主界面元素引用
+# 由 index() 创建，供运行时的状态更新（连接状态、按钮显隐）使用
+# ================================
+room_badge_label: ui.label | None = None # 顶栏房间徽标文字
+room_dot: ui.element | None = None # 顶栏连接状态圆点
+login_status: ui.label | None = None # 账号分区右侧的连接状态文字
+log_area: ui.column | None = None # 活动日志列表容器
+log_total: ui.label | None = None # 活动日志「今日」合计
+
+
+def set_connect_state(state: str = "disconnected", room: str | int | None = None) -> None:
+    """更新界面上的弹幕服务器连接状态
+
+    :param state: connected / connecting / disconnected
+    :param room: 房间号，连接成功时显示在顶栏徽标上
+    """
+
+    connected = state == "connected"
+    text = t(f"status.{state}")
+
+    if room_badge_label is not None:
+        if connected and room:
+            room_badge_label.set_text(t("main.label.room", room=room))
+        else:
+            room_badge_label.set_text(text)
+
+    if room_dot is not None:
+        room_dot.classes(replace="bt-dot bt-dot--on" if connected else "bt-dot")
+
+    if login_status is not None:
+        login_status.set_text(text)
+
+
+def apply_cd_change(new_seconds: float, uname: str, gift: str, num: int) -> None:
+    """应用礼物带来的倒计时变化，并写入活动日志
+
+    :param new_seconds: 变化后的剩余秒数
+    :param uname: 送礼用户
+    :param gift: 礼物名（与OBS投喂记录保持一致）
+    :param num: 礼物数量
+    """
+
+    delta = new_seconds - countdown_timer.remaining_seconds
+    countdown_timer.set_remaining_seconds(new_seconds)
+    activity.log_gift(uname, gift, num, delta)
+
+
+def _show_timer_button(name: str) -> None:
+    """开始/暂停/继续三个按钮占同一个位置，只显示当前可用的那一个
+
+    :param name: start / pause / resume
+    """
+
+    for key, element in (("start", start_button), ("pause", pause_button), ("resume", resume_button)):
+        if element is not None:
+            element.set_visibility(key == name)
+
 
 def update_btn_state(state: str):
     if state == "start":
@@ -946,17 +1015,20 @@ def update_btn_state(state: str):
         pause_button.enable()
         add_button.enable()
         sub_button.enable()
-        cancel_button.set_text(t("main.btn.stop"))
+        cancel_button.props("icon=stop")
+        _show_timer_button("pause")
     elif state == "pause":
         resume_button.enable()
         pause_button.disable()
         add_button.disable()
         sub_button.disable()
+        _show_timer_button("resume")
     elif state == "resume":
         pause_button.enable()
         resume_button.disable()
         add_button.enable()
         sub_button.enable()
+        _show_timer_button("pause")
     elif state == "stop":
         start_button.enable()
         cancel_button.disable()
@@ -968,6 +1040,7 @@ def update_btn_state(state: str):
         input_hour.set_value(0)
         input_minute.set_value(0)
         input_second.set_value(0)
+        _show_timer_button("start")
 
 
 # ================================
@@ -1290,7 +1363,7 @@ def init_task():
     global countdown_timer
     countdown_timer = ct.CountdownTimer(update_btn_state, cancel_button)
     if app.storage.general.get("countdown_time", 0) != 0: # 如果存在可继承的倒计时
-        cancel_button.set_text(t("main.btn.reset"))
+        cancel_button.props("icon=restart_alt") # 停止按钮此时的作用是重置继承来的倒计时
         cancel_button.enable()
         ct.reset_inherit_status = True # 设置重置继承倒计时状态为True
 
@@ -1313,6 +1386,7 @@ def add_time():
             delta = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
             new_seconds = countdown_timer.remaining_seconds + delta
             countdown_timer.set_remaining_seconds(new_seconds)
+            activity.log_manual(delta)
     except NameError:
         ui.notify(t("notify.start_timer_first"), type="negative")
 
@@ -1324,6 +1398,7 @@ def sub_time():
             delta = (input_hour.value * 3600) + (input_minute.value * 60) + input_second.value
             new_seconds = countdown_timer.remaining_seconds - delta
             countdown_timer.set_remaining_seconds(new_seconds)
+            activity.log_manual(-delta)
     except NameError:
         ui.notify(t("notify.start_timer_first"), type="negative")
 
@@ -1512,9 +1587,8 @@ async def check_b_connect_status():
 
         ui.notify(t("notify.disconnected"))
         b_connect_switch.set_value(False)
-        b_connect_switch.set_text(t("main.switch.connect"))
-        login_status.set_text(t("main.status.disconnected"))
-        login_status.classes(replace="text-red")
+        set_connect_state("disconnected")
+        activity.log_event("disconnect")
 
     # 开关为"null"状态：尝试连接
     if switch_value == "null":
@@ -1529,9 +1603,7 @@ async def check_b_connect_status():
             create_background_task(start_handler())
             ui.timer(60, lambda: disconnect_timer(), once=True) # 如果超时仍未连接强制断开
             b_connect_switch.set_value("null")
-            b_connect_switch.set_text(t("main.status.connecting"))
-            login_status.set_text(t("main.status.disconnected"))
-            login_status.classes(replace="text-red")
+            set_connect_state("connecting")
         else:
             b_connect_switch.set_value(True)
 
@@ -1706,9 +1778,12 @@ def index():
     # 主界面GUI
     # ================================
 
-    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, pause_button, resume_button, add_button, sub_button, short_switch
+    global show_capture_gift_list_switch, auth_code, main_card, start_button, b_connect_switch, cancel_button, input_hour, input_minute, input_second, login_status, pause_button, resume_button, add_button, sub_button
+    global room_badge_label, room_dot, log_area, log_total
 
     styles.page_styles(config['color']['main_text_color']) # 加载自定义样式，主界面使用主界面字体颜色
+    styles.app_styles() # 加载主界面设计变量与组件样式，颜色跟随自定义配色
+    styles.doc_styles() # 更新日志弹窗的卡片保持浅色外观
     ui.query("body").style(f"background-color: {config['color']['bg_color']}")  # type: ignore[index]
     async def ping_server(servers):
         server = await ping.ping(servers.values())
@@ -1945,7 +2020,7 @@ def index():
         load_dialog.on("hide", lambda: load_dialog.delete())
 
     def changelog_dialog() -> ui.dialog:
-        with ui.dialog() as changelog_dialog, ui.card(align_items="center"):
+        with ui.dialog() as changelog_dialog, ui.card(align_items="center").classes("bt-doc-card"):
             changelog()
 
         return changelog_dialog
@@ -1997,12 +2072,13 @@ def index():
     }
 
     def ticket_list_dialog() -> ui.dialog:
-        with ui.dialog() as ticket_list_dialog, ui.card(align_items="center").style("min-width: 550px; max-width: 650px; max-height: 70vh;"):
+        # 宽度按窗口百分比给出，避免在窄窗口（主窗口 560px）下超出可视范围
+        with ui.dialog() as ticket_list_dialog, ui.card(align_items="center").style("width: 90%; max-width: 520px; max-height: 70vh;"):
             with ui.row().classes("items-center justify-between w-full"):
                 ui.label(t("ticket.my_tickets")).classes("text-h6 text-bold")
                 ui.button(icon="refresh", on_click=lambda: create_background_task(refresh_list())).props("flat round")
 
-            tickets_container = ui.column().classes("w-full gap-3 overflow-auto").style("max-height: 50vh;")
+            tickets_container = ui.column().classes("w-full gap-3 overflow-auto").style("max-height: 50vh; word-break: break-word;")
 
             async def refresh_list():
                 room_id = base_config.get("general", "room_id", 3)
@@ -2067,244 +2143,511 @@ def index():
         changelog_dialog().open() # 打开更新日志弹窗
 
     # 创建主界面
-    with ui.card(align_items="center").classes("absolute-center").style("width: 95%; height: 730px;") as main_card:
+    with ui.column().classes("bt-app w-full h-screen gap-3 no-wrap") as main_card:
         if base_config.get("bool", "check_update", True):
             create_background_task(check_update())
         else:
             ui.notify(t("notify.auto_update_off"), type="warning", timeout=3000)
 
-        time_badge = ui.badge("00:00:00", outline=True, color="").bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("text-9xl countdown-display").style(f"color: {config['color']['time_color']}") # 创建时钟
+        def format_delta(seconds: float) -> str:
+            """把时间变化格式化为活动日志里的紧凑写法（1:00:00 / 5:00）
 
-        # 时间输入框
-        with ui.row():
-            input_hour = ui.number(t("main.input.hour"), value=0, min=0).style("width: 100px")
-            input_minute = ui.number(t("main.input.minute"), value=0, min=0).style("width: 100px")
-            input_second = ui.number(t("main.input.second"), value=0, min=0).style("width: 100px")
+            :param seconds: 变化秒数，正为加时负为减时
+            """
 
-        # 倒计时按钮
-        with ui.row():
-            # Start button
-            start_button = ui.button(t('main.btn.start'), on_click=lambda: start_task())
-            start_button.disable()
+            sign = "-" if seconds < 0 else "+"
+            hours, remainder = divmod(int(abs(seconds)), 3600)
+            minutes, secs = divmod(remainder, 60)
 
-            # Pause button
-            pause_button = ui.button(t('main.btn.pause'), on_click=lambda: countdown_timer.pause())
-            pause_button.disable()
+            if hours:
+                return f"{sign}{hours}:{minutes:02d}:{secs:02d}"
 
-            # Resume button
-            resume_button = ui.button(t('main.btn.resume'), on_click=lambda: countdown_timer.resume())
-            resume_button.disable()
+            return f"{sign}{minutes}:{secs:02d}"
 
-            # Stop button
-            cancel_button = ui.button(t('main.btn.stop'), on_click=lambda: countdown_timer.stop())
-            cancel_button.disable()
+        def render_activity_log():
+            """按当前记录重建活动日志列表"""
 
-        with ui.row():
-            # Add time Button
-            add_button = ui.button(t("main.btn.add"), on_click=lambda: add_time())
-            add_button.disable()
+            entries, today_total = activity.snapshot()
 
-            # Sub Time Button
-            sub_button = ui.button(t("main.btn.sub"), on_click=lambda: sub_time())
-            sub_button.disable()
+            if log_total is not None:
+                log_total.set_text(t("main.log.today", time=format_delta(today_total)) if entries else "")
 
-            save_button = ui.button(t("main.btn.save"), on_click=lambda: save_time())
-            load_button = ui.button(t("main.btn.load"), on_click=lambda: load_time())
+            if log_area is None:
+                return
 
-        ui.separator()
+            log_area.clear()
 
-        content = {"1": t("main.tab.account"), "2": t("main.tab.gift"), "3": t("main.tab.display"), "4": t("main.tab.appearance"), "5": t("main.tab.stats"), "6": t("main.tab.program"), "7": t("main.tab.simulator")} # 所有tab的标题
+            with log_area:
+                if not entries:
+                    ui.label(t("main.log.empty")).classes("bt-muted text-xs q-pa-sm")
+                    return
 
-        # 创建标签页
-        with ui.tabs() as tabs:
-            for title, label in content.items():
-                ui.tab(title, label)
+                for entry in entries:
+                    kind = entry.get("kind")
+                    timestamp = datetime.datetime.fromtimestamp(entry["ts"]).strftime("%H:%M")
 
-        # 标签栏宽度不足时会溢出，这里按当前语言给出最小宽度
-        tabs.style(f"min-width: {main_tab_width}px")
+                    with ui.row().classes("bt-log-row w-full items-center no-wrap gap-2"):
+                        ui.label(timestamp).classes("bt-log-time")
 
-        # 创建标签页内容
-        with ui.tab_panels(tabs, value="1").classes('w-full'):
-            with ui.tab_panel("1").classes("items-center").style("height: 210px;"):
-                with ui.row(align_items="center"):
-                    with ui.column(align_items="center").classes("gap-0"):
-                        # 身份码
-                        auth_code = ui.input(t("main.input.auth_code"), on_change=lambda: base_config.save(config), password=True, password_toggle_button=True).style("width: 120px")
-                        auth_code.bind_value(config["general"], "auth_code") # 实时写入身份码到配置文件
-                        with ui.row().classes("gap-0"):
-                            ui.label(t("main.label.room_id"))
-                            login_status = ui.label(t("main.status.disconnected")).classes("text-red")
+                        with ui.column().classes("gap-0"):
+                            if kind == "system":
+                                ui.label(t(f"log.event.{entry.get('event', 'unknown')}")).classes("bt-log-title")
 
-                with ui.column(align_items="center").classes("gap-0"):
-                    b_connect_switch = ui.switch(t("main.switch.connect"), on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="#7BA08B" unchecked-icon="clear"')
+                                if entry.get("room"):
+                                    ui.label(t("main.label.room", room=entry["room"])).classes("bt-log-detail")
+                            elif kind == "manual":
+                                ui.label(t("log.manual_adjust")).classes("bt-log-title")
+                                ui.label(t("log.by_you")).classes("bt-log-detail")
+                            else:
+                                ui.label(entry.get("user") or "").classes("bt-log-title")
+                                ui.label(f"{entry.get('gift', '')} ×{entry.get('num', 1)}").classes("bt-log-detail")
 
-                    with ui.row(align_items="center"):
-                        with ui.switch(t("main.switch.ignore_cd"), value=app.storage.general.get("ignore_cd", False), on_change=lambda e: change_ignore_cd("ignore_cd", e.value)).bind_value(app.storage.general, "ignore_cd").props('color="btn"') as ignore_cd_switch:
-                            ui.tooltip(t("main.tooltip.ignore_cd"))
+                        ui.space()
 
-                        with ui.switch(t("main.switch.exit_timer"), value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)) as exit_timer_switch:
-                            ui.tooltip(t("main.tooltip.exit_timer"))
-                        exit_timer_switch.bind_value(config["bool"], "exit_timer").props('color="btn"')
-                        exit_timer_switch.on_value_change(lambda e: exit_timer_delay.set_visibility(e.value))
-                        exit_timer_switch.on_value_change(lambda e: change_ignore_cd("exit_timer", e.value))
+                        if entry.get("delta"):
+                            ui.label(format_delta(entry["delta"])).classes("bt-log-delta")
 
-                        # 启动时恢复退出前的互斥状态
-                        if exit_timer_switch.value:
-                            change_ignore_cd("exit_timer", True)
-                        elif ignore_cd_switch.value:
-                            change_ignore_cd("ignore_cd", True)
+        def clear_activity_log():
+            """清空活动日志"""
 
-                        with ui.number(value=base_config.get("num", "exit_time", 0), min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "exit_time") as exit_timer_delay:
-                            ui.tooltip(t("main.tooltip.exit_delay"))
-                        exit_timer_delay.style("width: 60px")
-                        exit_timer_delay.set_visibility(exit_timer_switch.value)
+            activity.clear()
+            render_activity_log()
 
+        def collapsible(icon: str, title: str, summary: str = "", expanded: bool = False):
+            """构建设置页的可折叠分区
 
-            with ui.tab_panel("2").classes("items-center").style("height: 210px;"):
-                # with ui.row():
-                #     with ui.switch("礼物列表简洁模式", value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "short_list").props('color="btn"') as short_switch:
-                #         ui.tooltip("存在bug，暂时禁用")
-                #     short_switch.on_value_change(lambda e: short_time.set_visibility(True) if e.value else short_time.set_visibility(False))
-                #     short_switch.set_value(False)
-                #     short_switch.disable()
-                #     short_time = ui.number("滚动间隔", min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "short_time")
-                #     if short_switch.value:
-                #         short_time.set_visibility(True)
-                #     else:
-                #         short_time.set_visibility(False)
+            :param icon: 左侧图标
+            :param title: 分区标题
+            :param summary: 折叠时展示的摘要
+            :param expanded: 初始是否展开
+            :return: (内容容器, 摘要标签, 展开/收起函数)
+            """
 
-                with ui.row():
-                    ui.button(t("main.btn.gift_setting"), on_click=lambda: cd_setting_dialog())
-                    ui.button(t("main.btn.gift_refresh"), on_click=lambda: refresh_gift())
+            state = {"open": expanded}
 
-            with ui.tab_panel("3").classes("items-center").style("height: 210px;"):
-                with ui.row(align_items="center").classes("gap-0"):
-                    show_capture_rank_list_switch = ui.switch(t("main.switch.capture_rank"), value=False, on_change=lambda: base_config.save(config))
-                    show_capture_rank_list_switch.bind_value(config["bool"], "show_capture_rank_list").props('color="btn"')
+            def set_open(open_: bool):
+                state["open"] = open_
+                body.set_visibility(open_)
+                chevron.classes(replace="bt-chevron bt-chevron--open" if open_ else "bt-chevron")
 
-                    show_capture_gift_list_switch = ui.switch(t("main.switch.capture_gift"), value=False, on_change=lambda: base_config.save(config))
-                    show_capture_gift_list_switch.bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
+            with ui.column().classes("bt-section w-full gap-0"):
+                with ui.row().classes("bt-section-head w-full items-center no-wrap gap-2").on("click", lambda: set_open(not state["open"])):
+                    ui.icon(icon).classes("bt-section-icon")
+                    ui.label(title).classes("bt-caps")
+                    ui.space()
+                    summary_label = ui.label(summary).classes("bt-muted text-xs")
+                    chevron = ui.icon("chevron_right").classes("bt-chevron")
+                body = ui.column().classes("bt-section-body w-full gap-2")
 
-                    with ui.switch(t("main.switch.borderless_cd"), value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"'):
-                        ui.tooltip(t("main.tooltip.borderless"))
+            set_open(expanded)
 
-                with ui.row(align_items="center"):
-                    def capture_language_options() -> dict:
-                        return {"auto": t("settings.capture_language_auto"), **i18n.available_languages()}
+            return body, summary_label, set_open
 
-                    capture_lang_select = ui.select(
-                        label=t("settings.capture_language"),
-                        options=capture_language_options(),
-                        value=config["general"].get("capture_language", "auto"),
-                    ).style("width: 160px")
+        # ================================
+        # 顶栏：时间段分段控件 + 房间徽标
+        # ================================
+        with ui.row().classes("bt-topbar w-full items-center no-wrap"):
+            with ui.tabs() as tabs:
+                ui.tab("timer", label=t("main.tab.timer"), icon="timer")
+                ui.tab("settings", label=t("main.tab.settings"), icon="settings")
+                ui.tab("simulator", label=t("main.tab.simulator"), icon="science")
 
-                    def change_capture_language(e):
-                        config["general"]["capture_language"] = e.value
-                        base_config.save(config)
-                        ui.notify(t("settings.capture_language_restart"), type="info")
+            tabs.classes("bt-seg")
 
-                    capture_lang_select.on_value_change(change_capture_language)
+            ui.space()
 
-            with ui.tab_panel("4").classes("items-center").style("height: 210px;"):
-                with ui.row():
-                    ui.color_input(label=t("main.color.time"), value="#9BA89A", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style(f"width: 120px").bind_value(config["color"], "time_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label=t("main.color.btn"), value="#7A8FA0", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style(f"width: 120px").bind_value(config["color"], "btn_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label=t("main.color.bg"), value="#FCFCFA", on_change=lambda: base_config.save(config), preview=config["color"]["bg_color"]).style(f"width: 120px").bind_value(config["color"], "bg_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+            with ui.row().classes("bt-badge items-center no-wrap gap-2"):
+                room_dot = ui.element("div").classes("bt-dot")
+                room_badge_label = ui.label(t("status.disconnected")).classes("bt-badge-text")
 
-                with ui.row():
-                    ui.color_input(label=t("main.color.main_text"), value="#000000", on_change=lambda: base_config.save(config), preview=config["color"]["main_text_color"]).style(f"width: 140px").bind_value(config["color"], "main_text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
-                    ui.color_input(label=t("main.color.sub_text"), value="#4A4A4A", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style(f"width: 140px").bind_value(config["color"], "text_color")  # pyright: ignore[reportIndexIssue, reportArgumentType]
+        # ================================
+        # 计时
+        # ================================
+        with ui.tab_panels(tabs, value="timer").classes("bt-panels w-full"):
+            with ui.tab_panel("timer").classes("bt-panel w-full gap-2"):
+                # 状态行
+                with ui.row().classes("w-full items-center no-wrap"):
+                    with ui.row().classes("items-center no-wrap gap-2"):
+                        timer_dot = ui.element("div").classes("bt-dot")
+                        timer_state_label = ui.label(t("status.idle")).classes("bt-caps")
+                    ui.space()
+                    timer_ends_label = ui.label("").classes("bt-muted").style("font-size: 12px")
 
-            with ui.tab_panel("5").classes("items-center").style("height: 210px;"):
-                with ui.row():
-                    ui.button(t("main.btn.blind_box"), on_click=lambda: blind_box_value_dialog())
-                    ui.button(t("main.btn.gift_stats"), on_click=lambda: ui.navigate.to("/count", True))
+                # 倒计时
+                ui.label().bind_text_from(app.storage.general, "countdown_time", lambda x: format_cd(x)).classes("countdown-display bt-timer").style(f"color: {config['color']['time_color']}")
 
-            with ui.tab_panel("6").classes("items-center gap-1").style("height: 210px;"):
-                with ui.row():
-                    # Login bilibili button
-                    ui.button(t("main.btn.login"), on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True))
-                    # Update version button
-                    ui.button(t("main.btn.check_update"), on_click=lambda: check_update())
-                    # Changelog button
-                    ui.button(t("main.btn.changelog"), on_click=lambda: changelog_dialog().open())
-                    ui.button(t("main.btn.upload_log"), on_click=lambda: upload_log(base_config.get("general", "room_id", 3)))
+                # 控制区：开始/暂停、停止、时长、加减
+                with ui.row().classes("w-full items-center no-wrap justify-center gap-2"):
+                    # Start button
+                    start_button = ui.button(icon="play_arrow", on_click=lambda: start_task()).classes("bt-btn bt-btn--square bt-btn--accent").tooltip(t("main.btn.start"))
+                    start_button.disable()
 
-                with ui.row(align_items="center"):
-                    ui.switch(t("main.switch.auto_update"), value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
+                    # Pause button
+                    pause_button = ui.button(icon="pause", on_click=lambda: countdown_timer.pause()).classes("bt-btn bt-btn--square bt-btn--accent").tooltip(t("main.btn.pause"))
+                    pause_button.disable()
+                    pause_button.set_visibility(False)
 
-                with ui.row(align_items="center"):
-                    def language_options() -> dict:
-                        return {"auto": t("settings.language_auto"), **i18n.available_languages()}
+                    # Resume button
+                    resume_button = ui.button(icon="play_arrow", on_click=lambda: countdown_timer.resume()).classes("bt-btn bt-btn--square bt-btn--accent").tooltip(t("main.btn.resume"))
+                    resume_button.disable()
+                    resume_button.set_visibility(False)
 
-                    lang_select = ui.select(
-                        label=t("settings.language"),
-                        options=language_options(),
-                        value=config["general"].get("language", "auto"),
-                    ).style("width: 160px")
+                    # Stop button
+                    cancel_button = ui.button(icon="stop", on_click=lambda: countdown_timer.stop()).classes("bt-btn bt-btn--square bt-btn--surface").tooltip(t("main.btn.stop"))
+                    cancel_button.disable()
 
-                    def change_language(e):
-                        config["general"]["language"] = e.value
-                        base_config.save(config)
-                        ui.notify(t("settings.language_restart"), type="info")
+                    # 时间设置：折叠时为 0h 5m 0s 的时长框，点击展开为时分秒输入框
+                    with ui.row().classes("items-center no-wrap gap-2"):
+                        with ui.row().classes("bt-time-box items-center no-wrap gap-1").on("click", lambda: toggle_time_editor(True)) as time_box:
+                            time_box_label = ui.label().classes("bt-time-text")
 
-                    lang_select.on_value_change(change_language)
+                        with ui.row().classes("bt-time-inputs items-center no-wrap gap-2") as time_inputs:
+                            # 开始前作为初始时长，运行中作为加减时的步长
+                            input_hour = ui.number(value=0, min=0, suffix=t("main.input.hour")).props("borderless dense hide-bottom-space").classes("bt-num").style("width: 74px")
+                            input_minute = ui.number(value=0, min=0, suffix=t("main.input.minute")).props("borderless dense hide-bottom-space").classes("bt-num").style("width: 74px")
+                            input_second = ui.number(value=0, min=0, suffix=t("main.input.second")).props("borderless dense hide-bottom-space").classes("bt-num").style("width: 74px")
+                            # ui.button(icon="check", on_click=lambda: toggle_time_editor(False)).classes("bt-btn bt-btn--square bt-btn--surface").tooltip(t("main.btn.done"))
 
-                    # 切到显示设置或程序设置时重新扫描语言目录，运行中新增的语言文件会立即出现
-                    def refresh_language_options(e):
-                        lang_select.set_options(language_options())
-                        capture_lang_select.set_options(capture_language_options())
+                        time_inputs.set_visibility(False)
 
-                    tabs.on_value_change(lambda e: refresh_language_options(e) if e.value in ("3", "6") else None)
+                    def update_time_box():
+                        """把当前的时分秒同步到折叠框上"""
 
-            with ui.tab_panel("7").classes("items-center").style("height: 210px;") as sim_panel:
+                        time_box_label.set_text(
+                            f"{int(input_hour.value or 0)}{t('main.input.hour')} "
+                            f"{int(input_minute.value or 0)}{t('main.input.minute')} "
+                            f"{int(input_second.value or 0)}{t('main.input.second')}"
+                        )
+
+                    for time_input in (input_hour, input_minute, input_second):
+                        time_input.on_value_change(lambda _: update_time_box())
+
+                    def toggle_time_editor(expand: bool | None = None):
+                        """展开/折叠时间输入框
+
+                        :param expand: True 展开，False 折叠，None 取反
+                        """
+
+                        opened = (not time_inputs.visible) if expand is None else expand
+                        time_inputs.set_visibility(opened)
+                        time_box.set_visibility(not opened)
+
+                    update_time_box()
+
+                    # 点击时长框以外的地方自动收起
+                    def collapse_time_editor(event=None):
+                        if time_inputs.visible:
+                            toggle_time_editor(False)
+
+                    main_card.on(
+                        "click",
+                        collapse_time_editor,
+                        js_handler=(
+                            "(event) => {"
+                            " if (!event.target.closest('.bt-time-box')"
+                            " && !event.target.closest('.bt-time-inputs')) emit({});"
+                            " }"
+                        ),
+                    )
+
+                    # Add time Button
+                    add_button = ui.button(icon="add", on_click=lambda: add_time()).classes("bt-btn bt-btn--square bt-btn--surface").tooltip(t("main.btn.add"))
+                    add_button.disable()
+
+                    # Sub Time Button
+                    sub_button = ui.button(icon="remove", on_click=lambda: sub_time()).classes("bt-btn bt-btn--square bt-btn--surface").tooltip(t("main.btn.sub"))
+                    sub_button.disable()
+
+                # 保存 / 读取
+                with ui.row().classes("w-full justify-center gap-3"):
+                    ui.button(t("main.btn.save"), on_click=lambda: save_time()).classes("bt-btn bt-btn--outline")
+                    ui.button(t("main.btn.load"), on_click=lambda: load_time()).classes("bt-btn bt-btn--outline")
+
+                # 活动日志
+                with ui.row().classes("w-full items-center no-wrap gap-2"):
+                    ui.label(t("main.log.title")).classes("bt-caps")
+                    ui.space()
+                    log_total = ui.label("").classes("bt-log-total")
+                    ui.button(t("main.log.clear"), on_click=lambda: clear_activity_log()).props("flat dense no-caps").classes("bt-link")
+
+                # 日志区域占满剩余高度，窗口缩放时自动跟随
+                with ui.scroll_area().classes("w-full").style("height: calc(100vh - 400px); min-height: 200px;"):
+                    log_area = ui.column().classes("w-full gap-0")
+
+                render_activity_log()
+
+                def refresh_timer_state():
+                    """刷新倒计时状态与结束时间"""
+
+                    timer = globals().get("countdown_timer")
+                    running = bool(timer) and timer.is_running
+                    paused = running and timer.is_paused
+                    state = "paused" if paused else ("running" if running else "idle")
+
+                    if timer_state_label.text != t(f"status.{state}"):
+                        timer_state_label.set_text(t(f"status.{state}"))
+                        timer_dot.classes(replace="bt-dot bt-dot--on" if state == "running" else "bt-dot")
+
+                    ends_text = ""
+
+                    if state == "running":
+                        ends_at = datetime.datetime.now() + datetime.timedelta(seconds=timer.remaining_seconds)
+                        ends_text = t("main.status.ends_at", time=ends_at.strftime("%H:%M"))
+
+                    if timer_ends_label.text != ends_text:
+                        timer_ends_label.set_text(ends_text)
+
+                ui.timer(1.0, refresh_timer_state)
+                # 有新事件时才重建日志列表
+                ui.timer(1.0, lambda: render_activity_log() if activity.take_dirty() else None)
+
+            # ================================
+            # 设置：账号 / 礼物 / 显示 / 外观 / 统计 / 通用
+            # ================================
+            with ui.tab_panel("settings").classes("bt-panel w-full"):
+                with ui.scroll_area().classes("w-full").style("height: calc(100vh - 118px)"):
+                    with ui.column().classes("w-full gap-0"):
+                        # ---------- 账号 ----------
+                        account_body, login_status, _ = collapsible("person", t("main.tab.account"), t("status.disconnected"), expanded=True)
+
+                        with account_body:
+                            ui.label(t("main.input.auth_code")).classes("bt-label")
+
+                            # 身份码
+                            auth_code = ui.input(on_change=lambda: base_config.save(config), password=True, password_toggle_button=True).props("borderless dense hide-bottom-space").classes("bt-input w-full")
+                            auth_code.bind_value(config["general"], "auth_code") # 实时写入身份码到配置文件
+
+                            # 连接开关
+                            with ui.row().classes("bt-row w-full items-center no-wrap").style("margin-top: 10px;"):
+                                ui.label(t("main.switch.connect")).classes("bt-row-label")
+                                ui.space()
+                                b_connect_switch = ui.switch(on_change=lambda: check_b_connect_status()).props('checked-icon="check" color="btn" unchecked-icon="clear"')
+
+                            # 忽略倒计时
+                            with ui.row().classes("bt-row w-full items-center no-wrap"):
+                                with ui.label(t("main.switch.ignore_cd")).classes("bt-row-label"):
+                                    ui.tooltip(t("main.tooltip.ignore_cd"))
+                                ui.space()
+                                ignore_cd_switch = ui.switch(value=app.storage.general.get("ignore_cd", False), on_change=lambda e: change_ignore_cd("ignore_cd", e.value)).bind_value(app.storage.general, "ignore_cd").props('color="btn"')
+
+                            # 倒计时结束后断开连接
+                            with ui.row().classes("bt-row w-full items-center no-wrap"):
+                                with ui.label(t("main.switch.exit_timer")).classes("bt-row-label"):
+                                    ui.tooltip(t("main.tooltip.exit_timer"))
+                                ui.space()
+                                exit_timer_switch = ui.switch(value=config["bool"].get("exit_timer", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "exit_timer").props('color="btn"')
+
+                            # 启动时恢复退出前的互斥状态
+                            if exit_timer_switch.value:
+                                change_ignore_cd("exit_timer", True)
+                            elif ignore_cd_switch.value:
+                                change_ignore_cd("ignore_cd", True)
+
+                            # 断开连接等待：关闭「倒计时结束后断开连接」时，标签与输入框一起隐藏
+                            with ui.column().classes("w-full gap-0") as exit_timer_delay_box:
+                                ui.label(t("settings.disconnect_after")).classes("bt-label").style("margin-top: 8px;")
+
+                                with ui.number(value=base_config.get("num", "exit_time", 0), min=0, on_change=lambda: base_config.save(config)).bind_value(config["num"], "exit_time") as exit_timer_delay:
+                                    ui.tooltip(t("main.tooltip.exit_delay"))
+                                exit_timer_delay.props("borderless dense hide-bottom-space").classes("bt-input w-full")
+
+                            exit_timer_delay_box.set_visibility(exit_timer_switch.value)
+
+                            exit_timer_switch.on_value_change(lambda e: exit_timer_delay_box.set_visibility(e.value))
+                            exit_timer_switch.on_value_change(lambda e: change_ignore_cd("exit_timer", e.value))
+
+                            # OBS浏览器源
+                            ui.label(t("settings.obs_source")).classes("bt-label").style("margin-top: 8px;")
+
+                            with ui.row().classes("bt-card w-full items-center no-wrap gap-2").style("padding: 6px 8px; margin-top: 4px;"):
+                                ui.label(f"http://{host}:{port}/capture_cd").classes("bt-row-label").style("font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;") \
+                                    .on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")') \
+                                    .on("click", lambda: ui.notify(t("notify.copied"), type="info")) \
+                                    .tooltip(t("main.tooltip.obs_url"))
+                                ui.space()
+                                ui.button(t("settings.copy"), on_click=lambda: ui.notify(t("notify.copied"), type="info")) \
+                                    .on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")') \
+                                    .props("dense no-caps").classes("bt-btn bt-btn--surface")
+
+                        # ---------- 礼物 ----------
+                        gift_rules = len(_read_json_cached("data/gifts.json") or {}) + len(_read_json_cached("data/special.json") or {})
+                        gift_body, _, _ = collapsible("card_giftcard", t("main.tab.gift"), t("settings.rules", num=gift_rules), expanded=False)
+
+                        with gift_body:
+                            with ui.row().classes("w-full gap-2"):
+                                ui.button(t("main.btn.gift_setting"), on_click=lambda: cd_setting_dialog()).classes("bt-btn bt-btn--surface")
+                                ui.button(t("main.btn.gift_refresh"), on_click=lambda: refresh_gift()).classes("bt-btn bt-btn--surface")
+
+                        # ---------- 显示 ----------
+                        display_body, _, _ = collapsible("desktop_windows", t("main.tab.display"), "", expanded=False)
+
+                        with display_body:
+                            with ui.row().classes("bt-row w-full items-center no-wrap"):
+                                ui.label(t("main.switch.capture_rank")).classes("bt-row-label")
+                                ui.space()
+                                show_capture_rank_list_switch = ui.switch(value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "show_capture_rank_list").props('color="btn"')
+
+                            with ui.row().classes("bt-row w-full items-center no-wrap"):
+                                ui.label(t("main.switch.capture_gift")).classes("bt-row-label")
+                                ui.space()
+                                show_capture_gift_list_switch = ui.switch(value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "show_capture_gift_list").props('color="btn"')
+
+                            with ui.row().classes("bt-row w-full items-center no-wrap"):
+                                with ui.label(t("main.switch.borderless_cd")).classes("bt-row-label"):
+                                    ui.tooltip(t("main.tooltip.borderless"))
+                                ui.space()
+                                ui.switch(value=False, on_change=lambda: base_config.save(config)).bind_value(config["bool"], "borderless_cd").props('color="btn"')
+
+                            def language_options() -> dict:
+                                return {"auto": t("settings.language_auto"), **i18n.available_languages()}
+
+                            ui.label(t("settings.language")).classes("bt-label").style("margin-top: 8px;")
+
+                            lang_select = ui.select(
+                                options=language_options(),
+                                value=config["general"].get("language", "auto"),
+                            ).props("borderless dense").classes("bt-select w-full")
+
+                            def change_language(e):
+                                config["general"]["language"] = e.value
+                                base_config.save(config)
+                                ui.notify(t("settings.language_restart"), type="info")
+
+                            lang_select.on_value_change(change_language)
+
+                            def capture_language_options() -> dict:
+                                return {"auto": t("settings.capture_language_auto"), **i18n.available_languages()}
+
+                            ui.label(t("settings.capture_language")).classes("bt-label").style("margin-top: 8px;")
+
+                            capture_lang_select = ui.select(
+                                options=capture_language_options(),
+                                value=config["general"].get("capture_language", "auto"),
+                            ).props("borderless dense").classes("bt-select w-full")
+
+                            def change_capture_language(e):
+                                config["general"]["capture_language"] = e.value
+                                base_config.save(config)
+                                ui.notify(t("settings.capture_language_restart"), type="info")
+
+                            capture_lang_select.on_value_change(change_capture_language)
+
+                            # 切到设置页或模拟器页时重新扫描语言目录，运行中新增的语言文件会立即出现
+                            def refresh_language_options(e):
+                                lang_select.set_options(language_options())
+                                capture_lang_select.set_options(capture_language_options())
+
+                            tabs.on_value_change(lambda e: refresh_language_options(e) if e.value in ("settings", "simulator") else None)
+
+                        # ---------- 外观 ----------
+                        appearance_body, _, _ = collapsible("palette", t("main.tab.appearance"), "", expanded=False)
+
+                        with appearance_body:
+                            with ui.row().classes("w-full gap-2"):
+                                ui.color_input(label=t("main.color.time"), value="#F2529A", on_change=lambda: base_config.save(config), preview=config["color"]["time_color"]).style("width: 148px").bind_value(config["color"], "time_color")
+                                ui.color_input(label=t("main.color.btn"), value="#F2529A", on_change=lambda: base_config.save(config), preview=config["color"]["btn_color"]).style("width: 148px").bind_value(config["color"], "btn_color")
+                                ui.color_input(label=t("main.color.bg"), value="#141219", on_change=lambda: base_config.save(config), preview=config["color"]["bg_color"]).style("width: 148px").bind_value(config["color"], "bg_color")
+
+                            with ui.row().classes("w-full gap-2"):
+                                ui.color_input(label=t("main.color.main_text"), value="#F2F0F5", on_change=lambda: base_config.save(config), preview=config["color"]["main_text_color"]).style("width: 148px").bind_value(config["color"], "main_text_color")
+                                ui.color_input(label=t("main.color.sub_text"), value="#D8D5DE", on_change=lambda: base_config.save(config), preview=config["color"]["text_color"]).style("width: 148px").bind_value(config["color"], "text_color")
+
+                        # ---------- 统计 ----------
+                        stats_body, _, _ = collapsible("bar_chart", t("main.tab.stats"), "", expanded=False)
+
+                        with stats_body:
+                            with ui.row().classes("w-full gap-2"):
+                                ui.button(t("main.btn.blind_box"), on_click=lambda: blind_box_value_dialog()).classes("bt-btn bt-btn--surface")
+                                ui.button(t("main.btn.gift_stats"), on_click=lambda: ui.navigate.to("/count", True)).classes("bt-btn bt-btn--surface")
+
+                        # ---------- 通用 ----------
+                        general_body, _, _ = collapsible("tune", t("main.tab.program"), "", expanded=False)
+
+                        with general_body:
+                            with ui.row().classes("w-full gap-2 flex-wrap"):
+                                # Login bilibili button
+                                ui.button(t("main.btn.login"), on_click=lambda: ui.navigate.to("https://play-live.bilibili.com", new_tab=True)).classes("bt-btn bt-btn--surface")
+                                # Update version button
+                                ui.button(t("main.btn.check_update"), on_click=lambda: check_update()).classes("bt-btn bt-btn--surface")
+                                # Changelog button
+                                ui.button(t("main.btn.changelog"), on_click=lambda: changelog_dialog().open()).classes("bt-btn bt-btn--surface")
+                                ui.button(t("main.btn.upload_log"), on_click=lambda: upload_log(base_config.get("general", "room_id", 3))).classes("bt-btn bt-btn--surface")
+
+                            with ui.row().classes("bt-row w-full items-center no-wrap"):
+                                ui.label(t("main.switch.auto_update")).classes("bt-row-label")
+                                ui.space()
+                                ui.switch(value=base_config.get("bool", "check_update", True), on_change=lambda: base_config.save(config)).bind_value(config["bool"], "check_update").props('color="btn"')
+
+                        # ---------- 页脚：工单 / 工单列表 / 关于 / 文档 ----------
+                        with ui.row().classes("w-full no-wrap gap-2").style("margin-top: 10px;"):
+                            ui.button(t("main.tooltip.ticket"), on_click=lambda: ticket_dialog().open()).classes("bt-btn bt-btn--outline col")
+                            ui.button(t("main.tooltip.ticket_list"), on_click=lambda: ticket_list_dialog().open()).classes("bt-btn bt-btn--outline col")
+                            ui.button(t("main.btn.about"), on_click=lambda: ui.navigate.to("/about", new_tab=True)).classes("bt-btn bt-btn--outline col")
+                            ui.link(t("main.link.docs"), "https://docs.travail.nya-wsl.com", True) \
+                                .classes("bt-btn bt-btn--outline col flex items-center justify-center") \
+                                .style("text-decoration: none;") \
+                                .tooltip(t("main.tooltip.docs"))
+
+            # ================================
+            # 模拟器
+            # ================================
+            with ui.tab_panel("simulator").classes("bt-panel w-full"):
                 global simulator
                 simulator = GiftSimulator()
 
-                with ui.row(align_items="center"):
+                with ui.column().classes("bt-card w-full gap-3"):
                     # 礼物选择
+                    ui.label(t("sim.gift")).classes("bt-label")
+
                     sim_gift_select = ui.select(
-                        label=t("sim.gift"),
                         options=[],
                         with_input=True,
                         clearable=True,
-                    ).style("width: 160px")
+                    ).props("borderless dense").classes("bt-select w-full")
 
                     # 盲盒礼物开关与盲盒选择
-                    with ui.switch(t("sim.blind_box_switch"), value=False).props('color="btn"') as sim_box_switch:
-                        ui.tooltip(t("sim.tooltip_box"))
+                    with ui.row().classes("bt-row w-full items-center no-wrap"):
+                        with ui.label(t("sim.blind_box_switch")).classes("bt-row-label"):
+                            ui.tooltip(t("sim.tooltip_box"))
+                        ui.space()
+                        sim_box_switch = ui.switch(value=False).props('color="btn"')
 
                     sim_box_select = ui.select(
-                        label=t("sim.box"),
                         options=[],
                         with_input=True,
                         clearable=True,
-                    ).style("width: 150px")
+                    ).props("borderless dense").classes("bt-select w-full")
                     sim_box_select.set_visibility(False)
 
                     sim_box_switch.on_value_change(lambda e: sim_box_select.set_visibility(e.value))
 
-                with ui.row(align_items="center"):
-                    sim_num = ui.number(t("sim.num"), value=1, min=1, max=9999).style("width: 100px")
-                    sim_price = ui.number(t("sim.price"), value=0, min=0, max=999999).style("width: 120px")
-                    sim_uname = ui.input(t("sim.uname"), value=t("sim.default_uname")).style("width: 130px")
+                    with ui.row().classes("w-full items-start no-wrap gap-2"):
+                        with ui.column().classes("col gap-0"):
+                            ui.label(t("sim.num")).classes("bt-label")
+                            sim_num = ui.number(value=1, min=1, max=9999).props("borderless dense hide-bottom-space").classes("bt-num w-full")
 
-                with ui.row(align_items="center"):
+                        with ui.column().classes("col gap-0"):
+                            ui.label(t("sim.price")).classes("bt-label")
+                            sim_price = ui.number(value=0, min=0, max=999999).props("borderless dense hide-bottom-space").classes("bt-num w-full")
+
+                        with ui.column().classes("col gap-0"):
+                            ui.label(t("sim.uname")).classes("bt-label")
+                            sim_uname = ui.input(value=t("sim.default_uname")).props("borderless dense hide-bottom-space").classes("bt-input w-full")
+
                     sim_status = ui.label(t("sim.ready")).classes("text-grey text-caption")
 
-                with ui.row():
                     async def do_simulate_gift():
                         gift = sim_gift_select.value
                         if not gift:
                             sim_status.set_text(t("sim.select_gift"))
-                            sim_status.classes(replace="text-red")
+                            sim_status.classes(replace="text-red text-caption")
                             return
 
                         box_name = sim_box_select.value if sim_box_switch.value else None
 
                         if sim_box_switch.value and not box_name:
                             sim_status.set_text(t("sim.select_box"))
-                            sim_status.classes(replace="text-red")
+                            sim_status.classes(replace="text-red text-caption")
                             return
 
                         success, msg = await simulator.simulate_gift(
@@ -2316,14 +2659,14 @@ def index():
                         )
                         if success:
                             sim_status.set_text(t("sim.success", msg=msg))
-                            sim_status.classes(replace="text-green")
+                            sim_status.classes(replace="text-green text-caption")
                             # 刷新 OBS 叠加层
                             capture_cd.refresh_capture_cd = True
                         else:
                             sim_status.set_text(t("sim.failure", msg=msg))
-                            sim_status.classes(replace="text-red")
+                            sim_status.classes(replace="text-red text-caption")
 
-                    ui.button(t("sim.send"), on_click=lambda: create_background_task(do_simulate_gift()))
+                    ui.button(t("sim.send"), on_click=lambda: create_background_task(do_simulate_gift())).classes("bt-btn bt-btn--accent bt-btn--wide")
 
                 # 动态刷新礼物选择列表
                 def refresh_sim_gift_options():
@@ -2344,20 +2687,7 @@ def index():
                 # 定时刷新礼物选项
                 sim_refresh_timer = ui.timer(10, lambda: refresh_sim_gift_options())
 
-        # obs源
-        with ui.label(f"http://{host}:{port}/capture_cd").on("click", js_handler=f'() => navigator.clipboard.writeText("http://{host}:{port}/capture_cd")').on("click", lambda: ui.notify(t("notify.copied"), type="info")):
-            ui.tooltip(t("main.tooltip.obs_url"))
-        with ui.link(t("main.link.docs"), "https://docs.travail.nya-wsl.com", True):
-            ui.tooltip(t("main.tooltip.docs"))
-
         init_task()
-
-    # 右下角悬浮按钮组
-    with ui.page_sticky(position='bottom-right', x_offset=20, y_offset=10):
-        with ui.row().classes("gap-1.5"):
-            ui.button(on_click=lambda: ticket_dialog().open(), icon='bug_report').props('fab').tooltip(t("main.tooltip.ticket"))
-            ui.button(on_click=lambda: ticket_list_dialog().open(), icon='inbox').props('fab').tooltip(t("main.tooltip.ticket_list"))
-            ui.button(on_click=lambda: ui.navigate.to("/about", new_tab=True), icon='contact_support').props('fab')
 
 @app.on_startup
 async def create_job():
@@ -2541,12 +2871,12 @@ if __name__ == "__main__":
         ui.run(
             host=host,
             port=port,
-            title=f"bili_travail | {version}",
+            title=f"bili_travail {version}",
             favicon="static/logo.ico",
             reload=False,
             show=False,
             native=True,
-            window_size=(window_width, 780),
+            window_size=(window_width, WINDOW_HEIGHT),
             reconnect_timeout=30,
             language=i18n.ui_language(),
             use_colors=False,

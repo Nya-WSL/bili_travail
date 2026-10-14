@@ -15,6 +15,7 @@ logger = log.logger
 
 async def about_page():
     styles.page_styles()  # 加载自定义样式
+    styles.doc_styles()  # 卡片保持浅色外观，不跟随主界面配色
     base_config = travail_config.Config()
     config = base_config.load()
     ui.query("body").style(
@@ -22,7 +23,7 @@ async def about_page():
     )  # 设置背景图片  # pyright: ignore[reportIndexIssue, reportArgumentType]
 
     # Card框
-    with ui.card(align_items="center").classes("absolute-center"):
+    with ui.card(align_items="center").classes("absolute-center bt-doc-card"):
         ui.label(t("about.title")).classes("text-3xl")  # type: ignore[index]
 
         # 私货
