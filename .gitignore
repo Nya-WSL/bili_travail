@@ -176,6 +176,10 @@ cython_debug/
 
 data/*.json
 
+# 豁免头像缓存 json（build.py 需拷贝进安装包与 zip 作为预置缓存），
+# 上面的 data/*.json 通配排除会让 CI fresh checkout 拿不到该文件
+!data/bili_img.json
+
 /data/history
 /data/sys_info
 /data/blind_box
