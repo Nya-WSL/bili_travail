@@ -2217,7 +2217,8 @@ def index():
 
             with ui.tab_panel("5").classes("items-center").style("height: 210px;"):
                 with ui.row():
-                    ui.button(t("main.btn.blind_box"), on_click=lambda: blind_box_value_dialog())
+                    # ui.button(t("main.btn.blind_box"), on_click=lambda: blind_box_value_dialog())
+                    ui.button(t("main.btn.blind_box"), on_click=lambda: ui.navigate.to("/capture_blind", True))
                     ui.button(t("main.btn.gift_stats"), on_click=lambda: ui.navigate.to("/count", True))
 
             with ui.tab_panel("6").classes("items-center gap-1").style("height: 210px;"):
